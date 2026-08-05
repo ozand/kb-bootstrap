@@ -1,0 +1,56 @@
+Metadata-Version: 2.4
+Name: kb-bootstrap
+Version: 0.1.0
+Summary: A CLI tool to bootstrap a local Knowledge Base (OKF + QMD) with agent skills.
+Author: ozand
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+# Knowledge Base (OKF + QMD) Bootstrap Framework
+
+A portable CLI tool to instantly initialize a local Knowledge Base (Raw -> Wiki OKF + QMD Semantic Search) and install the necessary AI Agent Skills in any repository, on any host.
+
+## Installation
+
+Since this is packaged as a standard Python tool, you can install it globally or via `pipx` from any location (or directly from GitHub once pushed):
+
+```bash
+# Install locally in editable mode (if you are in the source folder)
+pip install -e .
+
+# Or install globally using pipx (Recommended for multi-host use)
+pipx install /path/to/kb-bootstrap
+```
+
+*When published to a remote Git repository, you can install it on any host via:*
+```bash
+pipx install git+https://github.com/ozand/kb-bootstrap.git
+```
+
+## Usage
+
+Once installed, the `kb-bootstrap` command is available globally in your terminal. Navigate to the root of the project where you want to create the knowledge base and run:
+
+### Option 1: Single Project (Default)
+For a standalone application repository.
+```bash
+cd /path/to/your-project
+kb-bootstrap --type single
+```
+This generates:
+- Local `kb/raw/` directory.
+- `qmd.json` for semantic search.
+- All 4 Agent Skills (`qmd-operator`, `kb-wiki-builder`, `kb-capture`, `kb-lookup`) placed in `.agents/skills/`.
+
+### Option 2: Umbrella Workspace
+For a monorepo containing multiple servers or applications.
+```bash
+cd /path/to/umbrella-repo
+kb-bootstrap --type umbrella
+```
+This generates:
+- Global `qmd/collections/` configuration.
+- Centralized `kb/apps/`, `kb/systems/`, and `kb/architecture/`.
+- All 4 Agent Skills placed in the root `.agents/skills/`.

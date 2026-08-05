@@ -1,0 +1,2 @@
+include kb_bootstrap/templates/skills/**/*.md
+include kb_bootstrap/templates/qmd/**/*.template

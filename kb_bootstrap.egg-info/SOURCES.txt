@@ -1,0 +1,14 @@
+MANIFEST.in
+README.md
+pyproject.toml
+kb_bootstrap/cli.py
+kb_bootstrap.egg-info/PKG-INFO
+kb_bootstrap.egg-info/SOURCES.txt
+kb_bootstrap.egg-info/dependency_links.txt
+kb_bootstrap.egg-info/entry_points.txt
+kb_bootstrap.egg-info/top_level.txt
+kb_bootstrap/templates/qmd/qmd.json.template
+kb_bootstrap/templates/skills/kb-capture/SKILL.md
+kb_bootstrap/templates/skills/kb-lookup/SKILL.md
+kb_bootstrap/templates/skills/kb-wiki-builder/SKILL.md
+kb_bootstrap/templates/skills/qmd-operator/SKILL.md

@@ -1,0 +1,2 @@
+[console_scripts]
+kb-bootstrap = kb_bootstrap.cli:main

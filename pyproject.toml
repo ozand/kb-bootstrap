@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kb-bootstrap"
+version = "0.1.0"
+description = "A CLI tool to bootstrap a local Knowledge Base (OKF + QMD) with agent skills."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "ozand" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+kb-bootstrap = "kb_bootstrap.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["kb_bootstrap"]
+
+[tool.setuptools.package-data]
+kb_bootstrap = ["templates/skills/**/*.md", "templates/qmd/**/*.template"]
