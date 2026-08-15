@@ -1,6 +1,13 @@
 # Knowledge Base (OKF + QMD) Bootstrap Framework
 
-A portable CLI tool to instantly initialize a local Knowledge Base (Raw -> Wiki OKF + QMD Semantic Search) and install the necessary AI Agent Skills in any repository, on any host.
+A portable CLI tool to instantly initialize a local Knowledge Base architecture in any repository. This framework combines the **Open Knowledge Format (OKF)** for structured documentation and **QMD** for semantic search.
+
+## Core Concepts
+
+- **[Open Knowledge Format (OKF)](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)**: A standard for structuring knowledge. We split data into a `raw/` layer (unprocessed scrapes, logs, release notes) and a `wiki/` layer (Markdown files with strict YAML frontmatter like `id`, `category`, and `tags`).
+- **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**: A CLI tool for blazing-fast local semantic search (RAG) over your markdown files. It indexes your `raw/` and `wiki/` layers so agents can instantly find context.
+
+> ⚠️ **Prerequisite:** To use the semantic search features, the user or the agent must install the `qmd` CLI globally. See [tobi/qmd](https://github.com/tobi/qmd) for installation instructions (e.g., `go install github.com/tobi/qmd@latest`).
 
 ## Agent Instructions: How to bootstrap a project
 
