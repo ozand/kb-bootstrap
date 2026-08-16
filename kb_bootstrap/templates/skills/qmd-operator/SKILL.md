@@ -18,7 +18,12 @@ Manage the local QMD (Semantic Search) workspace. This skill allows agents to co
 ### 1. Update the Index
 After adding new files to the knowledge base:
 ```bash
-qmd index update
+qmd update
+```
+
+List configured collections:
+```bash
+qmd collection list
 ```
 
 ### 2. Search and Query
@@ -45,4 +50,4 @@ paths:
 exclude:
   - "**/.DS_Store"
 ```
-Then run `qmd index update` to register it.
+Then run `qmd update` to register it.

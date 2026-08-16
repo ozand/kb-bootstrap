@@ -91,6 +91,18 @@ This generates:
 - `qmd.json` for semantic search.
 - All 4 Agent Skills (`qmd-operator`, `kb-wiki-builder`, `kb-capture`, `kb-lookup`) placed in `.agents/skills/`.
 
+### Validate Markdown links
+
+The generated package also includes the NetworkX-based Markdown graph validation behavior. Run it against a knowledge-base directory (the default is `docs`):
+
+```bash
+kb-bootstrap validate --dir kb
+```
+
+The command reports dead links, connected subgraphs, and orphan nodes. Dead links return exit status 1; orphan nodes are reported as warnings and do not fail validation. The validator excludes `raw/` directories, matching the original linter behavior.
+
+QMD commands use the official CLI entry points: `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
+
 ### Option 2: Umbrella Workspace
 For a monorepo containing multiple servers or applications.
 ```bash

@@ -4,6 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from .graph_linter import validate
+
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
         (base_path / d).mkdir(parents=True, exist_ok=True)
@@ -12,7 +14,15 @@ def main():
     parser = argparse.ArgumentParser(description="Bootstrap Knowledge Base architecture (OKF + QMD)")
     parser.add_argument("--target", default=".", help="Target directory for initialization (default: current directory)")
     parser.add_argument("--type", choices=["single", "umbrella"], default="single", help="Project architecture type")
+    subparsers = parser.add_subparsers(dest="command")
+    validate_parser = subparsers.add_parser("validate", help="Validate Markdown links in a knowledge base")
+    validate_parser.add_argument("--dir", default="docs", help="Base directory to scan")
     args = parser.parse_args()
+
+    if args.command == "validate":
+        report, is_valid = validate(args.dir)
+        print(report)
+        return 0 if is_valid else 1
 
     target = Path(args.target).resolve()
     # The package directory is where this cli.py is located
@@ -79,4 +89,4 @@ def main():
     print(f"Success! Agent skills kb-wiki-builder, qmd-operator, kb-capture, and kb-lookup installed to {target / '.agents/skills/'}")
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

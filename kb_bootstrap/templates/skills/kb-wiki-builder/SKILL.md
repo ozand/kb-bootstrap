@@ -57,4 +57,4 @@ Brief description of the concept or component.
 1. Read the target raw file via context-mode tools.
 2. Draft the OKF document based on the template.
 3. Write the file to its proper location.
-4. (Optional) Run `qmd index update` using `qmd-operator` so the new wiki file is searchable.
+4. (Optional) Run `qmd update` using `qmd-operator` so the new wiki file is searchable.
