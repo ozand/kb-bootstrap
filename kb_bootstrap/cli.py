@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .graph_linter import validate
 from .qmd_validator import validate_qmd_collections
+from .repository_doctor import inspect_repository
 
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
@@ -55,6 +56,14 @@ def main():
         default=".",
         help="Project root containing qmd/collections (default: current directory)",
     )
+    doctor_parser = subparsers.add_parser(
+        "doctor", help="Check repository identity before GitHub work"
+    )
+    doctor_parser.add_argument(
+        "--repo",
+        required=True,
+        help="Expected GitHub repository in owner/name form",
+    )
     args = parser.parse_args()
 
     if args.command == "validate":
@@ -64,6 +73,11 @@ def main():
         print()
         print(qmd_report)
         return 0 if graph_valid and qmd_valid else 1
+
+    if args.command == "doctor":
+        report, is_valid = inspect_repository(args.repo)
+        print(report)
+        return 0 if is_valid else 1
 
     target = Path(args.target).resolve()
     # The package directory is where this cli.py is located
