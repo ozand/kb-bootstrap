@@ -52,9 +52,23 @@ Brief description of the concept or component.
 - [Raw Source Name](./raw/<source_file>.md)
 ```
 
+## Collection boundaries
+
+Generated projects separate retrieval into:
+
+- `<project>-raw` for source captures under `kb/raw/`;
+- `<project>-wiki` for canonical OKF Markdown under `kb/` excluding `raw/`.
+
+Use the raw collection to gather evidence and the wiki collection to verify the resulting canonical article.
+
 ## Workflow
 
-1. Read the target raw file via context-mode tools.
+1. Read the target source from `<project>-raw` via QMD or context-mode tools.
 2. Draft the OKF document based on the template.
-3. Write the file to its proper location.
-4. (Optional) Run `qmd update` using `qmd-operator` so the new wiki file is searchable.
+3. Write the file to its proper canonical location.
+4. Run the mandatory completion gate:
+   - `kb-bootstrap validate --dir kb --project-root .`;
+   - the project test command;
+   - `qmd update`, followed by smoke searches in `<project>-wiki` and `<project>-raw`.
+
+Do not report completion if validation/tests fail or if the QMD update/search steps were not actually verified.

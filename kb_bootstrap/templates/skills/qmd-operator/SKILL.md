@@ -27,27 +27,29 @@ qmd collection list
 ```
 
 ### 2. Search and Query
-To perform a fast keyword or semantic search across a specific collection:
-```bash
-qmd search "<keywords>" -c <collection_name>
-```
+Generated projects use two collections:
 
-For a complex semantic query specifying intent:
+- `<project>-wiki` for canonical OKF knowledge; use this by default.
+- `<project>-raw` for source captures; query it explicitly during research.
+
 ```bash
-qmd query "intent: <what you are looking for>\nlex: <keywords>" -c <collection_name>
+qmd search "<keywords>" -c <project>-wiki
+qmd query "intent: <what you are looking for>\nlex: <keywords>" -c <project>-wiki
+qmd search "<source keywords>" -c <project>-raw
 ```
 
 ### 3. Read a Document
 If QMD returns a reference to a file (e.g., `qmd://my-app/raw/releases.md`), use the context-mode tools to read the actual file from the disk.
 
 ## Configuring a New Collection
-To define what files belong to a specific context, create a YAML file in `qmd/collections/<name>.yaml`:
-```yaml
-name: <collection_name>
-description: "Knowledge base for <collection_name>"
-paths:
-  - "../../kb/"
-exclude:
-  - "**/.DS_Store"
-```
-Then run `qmd update` to register it.
+To define what files belong to a specific context, create a YAML file in `qmd/collections/<name>.yaml`. Keep canonical and raw paths separate; do not point both collections at the same mixed corpus.
+
+## Completion gate
+
+Before reporting knowledge-base work complete:
+
+1. Run `kb-bootstrap validate --dir kb --project-root .`.
+2. Run the project test command.
+3. Run `qmd update`, then smoke-test `qmd search` against both `<project>-wiki` and `<project>-raw`.
+
+Do not claim QMD indexing success when QMD is unavailable or a smoke query was not run.
