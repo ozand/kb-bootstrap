@@ -90,6 +90,25 @@ and the reported head commit must match the pushed upstream contribution commit.
 A commit that exists only in the consumer repository is not upstream completion
 evidence.
 
+Run the read-only completion check before closing or reporting an Issue:
+
+```bash
+# Commit already merged into the default branch
+kb-bootstrap check-completion \
+  --repo ozand/kb-bootstrap \
+  --commit <commit-id>
+
+# Commit still reachable only from an associated pull request
+kb-bootstrap check-completion \
+  --repo ozand/kb-bootstrap \
+  --commit <commit-id> \
+  --pr <number>
+```
+
+The command exits non-zero for a wrong repository, unavailable commit, unrelated
+commit, or mismatched pull request. It does not close Issues, create pull requests,
+change remotes, rewrite history, or modify branches.
+
 ## Sanitized completion evidence
 
 A safe receipt may include:

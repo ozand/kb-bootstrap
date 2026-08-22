@@ -7,6 +7,7 @@ from pathlib import Path
 from .graph_linter import validate
 from .qmd_validator import validate_qmd_collections
 from .repository_doctor import inspect_repository
+from .completion_validator import validate_completion
 
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
@@ -64,6 +65,19 @@ def main():
         required=True,
         help="Expected GitHub repository in owner/name form",
     )
+    completion_parser = subparsers.add_parser(
+        "check-completion",
+        help="Verify that a commit belongs to the target default branch or pull request",
+    )
+    completion_parser.add_argument(
+        "--repo", required=True, help="Issue repository in owner/name form"
+    )
+    completion_parser.add_argument(
+        "--commit", required=True, help="Completion commit ID"
+    )
+    completion_parser.add_argument(
+        "--pr", type=int, help="Associated pull request number"
+    )
     args = parser.parse_args()
 
     if args.command == "validate":
@@ -76,6 +90,11 @@ def main():
 
     if args.command == "doctor":
         report, is_valid = inspect_repository(args.repo)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "check-completion":
+        report, is_valid = validate_completion(args.repo, args.commit, args.pr)
         print(report)
         return 0 if is_valid else 1
 
