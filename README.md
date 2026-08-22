@@ -105,6 +105,14 @@ If remote identity is missing, ambiguous, or does not match the intended Issue r
 
 Repository receipts and examples must contain only sanitized metadata such as repository names, remote roles, branch names, commit IDs, and public URLs. Never include credentials, tokens, private payloads, local runtime state, or unsanitized logs.
 
+Run the read-only repository preflight before GitHub mutations or completion claims:
+
+```bash
+kb-bootstrap doctor --repo example/consumer-project
+```
+
+The doctor reports the current directory, Git root, sanitized `origin`/`upstream` identities, `gh` default repository, requested target, and local/remote default branches. It exits non-zero when identity is missing, ambiguous, or mismatched. It never changes remotes, branches, GitHub defaults, Issues, or pull requests.
+
 ## Installation (Manual)
 
 Since this is packaged as a standard Python tool, you can install it globally or via `pipx` from any location (or directly from GitHub once pushed):
