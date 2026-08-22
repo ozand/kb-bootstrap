@@ -17,13 +17,40 @@ request. Verify the intended repository with its maintainer.
 
 ## Consumer-owned work
 
-Work from the consumer checkout and target its repository explicitly:
+Work from the consumer checkout and target its repository explicitly. Configure
+the checkout so an ordinary `git push` defaults to the consumer `origin`:
 
 ```bash
 kb-bootstrap doctor --repo example/consumer-project
+git config --local remote.pushDefault origin
 git switch -c docs/example-consumer-change
-gh pr create --repo example/consumer-project --base main
+git config --local branch.docs/example-consumer-change.pushRemote origin
 ```
+
+Verify the effective configuration before pushing:
+
+```bash
+git config --local --get remote.pushDefault
+git config --local --get branch.docs/example-consumer-change.pushRemote
+git remote get-url --push origin
+git push --dry-run
+```
+
+Both Git config values must report `origin`. Inspect only the sanitized repository
+identity in a receipt; do not publish a token-bearing push URL. Then push and open
+the consumer pull request explicitly:
+
+```bash
+git push -u origin docs/example-consumer-change
+gh pr create \
+  --repo example/consumer-project \
+  --base main \
+  --head docs/example-consumer-change
+```
+
+A branch-level `pushRemote` takes precedence over `remote.pushDefault`. Use the
+branch setting to keep downstream branches on `origin`; do not set it to upstream
+for ordinary consumer work.
 
 Before reporting completion, verify that the pull request head commit and base
 repository match the consumer Issue.
@@ -63,16 +90,25 @@ backup.
 
 ## Create and verify the upstream pull request
 
-Push the branch to an explicitly verified repository you are authorized to use,
-then create the pull request with an explicit target:
+Push the branch to an explicitly verified repository you are authorized to use.
+Do not change the consumer checkout's `remote.pushDefault` to make an upstream
+push convenient. From the separate upstream checkout/worktree, verify the push
+remote and name it explicitly:
 
 ```bash
+kb-bootstrap doctor --repo ozand/kb-bootstrap
+git remote get-url --push origin
+git push --dry-run origin feat/example-upstream-change
 git push -u origin feat/example-upstream-change
 gh pr create \
   --repo ozand/kb-bootstrap \
   --base main \
   --head feat/example-upstream-change
 ```
+
+If the upstream contribution checkout pushes to a fork, explicitly name that fork
+remote and use an owner-qualified PR head. Never rely on an inherited consumer
+push default.
 
 If the branch is hosted in a fork, use an explicit owner-qualified head such as
 `contributor:feat/example-upstream-change`.
