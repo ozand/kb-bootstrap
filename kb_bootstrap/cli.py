@@ -40,6 +40,11 @@ def main():
     parser = argparse.ArgumentParser(description="Bootstrap Knowledge Base architecture (OKF + QMD)")
     parser.add_argument("--target", default=".", help="Target directory for initialization (default: current directory)")
     parser.add_argument("--type", choices=["single", "umbrella"], default="single", help="Project architecture type")
+    parser.add_argument(
+        "--with-project-lessons",
+        action="store_true",
+        help="Generate an opt-in project-local lessons store and routing contract",
+    )
     subparsers = parser.add_subparsers(dest="command")
     validate_parser = subparsers.add_parser(
         "validate", help="Validate Markdown links and QMD collection configuration"
@@ -80,6 +85,13 @@ def main():
     shutil.copy2(skills_src / "kb-wiki-builder" / "SKILL.md", target / ".agents/skills/kb-wiki-builder/SKILL.md")
     shutil.copy2(skills_src / "kb-capture" / "SKILL.md", target / ".agents/skills/kb-capture/SKILL.md")
     shutil.copy2(skills_src / "kb-lookup" / "SKILL.md", target / ".agents/skills/kb-lookup/SKILL.md")
+
+    if args.with_project_lessons:
+        lessons_src = pkg_dir / "templates" / "lessons"
+        create_dirs(target, ["kb/lessons"])
+        shutil.copy2(lessons_src / "SCHEMA.md", target / "kb/lessons/SCHEMA.md")
+        shutil.copy2(lessons_src / "index.yaml", target / "kb/lessons/index.yaml")
+        shutil.copy2(lessons_src / "lesson-stores.json", target / "lesson-stores.json")
 
     project_name = project_slug(target)
 
@@ -137,6 +149,9 @@ def main():
 
     append_gitignore_rules(target)
     (target / "kb/raw/.gitkeep").touch(exist_ok=True)
+
+    if args.with_project_lessons:
+        print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
 
     print(f"Success! Agent skills kb-wiki-builder, qmd-operator, kb-capture, and kb-lookup installed to {target / '.agents/skills/'}")
 

@@ -134,6 +134,24 @@ This generates:
 - `qmd.json` for semantic search.
 - All 4 Agent Skills (`qmd-operator`, `kb-wiki-builder`, `kb-capture`, `kb-lookup`) placed in `.agents/skills/`.
 
+### Optional project-local lessons
+
+Project-local lesson storage is opt-in and belongs to the target repository:
+
+```bash
+kb-bootstrap --type single --with-project-lessons
+```
+
+The option adds:
+
+- `kb/lessons/SCHEMA.md` — the project-local Markdown/frontmatter contract.
+- `kb/lessons/index.yaml` — the deterministic local lesson catalogue using `PROJECT-XXXX` IDs.
+- `lesson-stores.json` — explicit capture and lookup routing; the generated default selects exactly one local capture store.
+
+Without `--with-project-lessons`, these files are not generated and the existing scaffold output is preserved. Generated `kb-capture` instructions refuse missing or ambiguous destinations. Generated `kb-lookup` instructions search a configured local store first, then an explicitly configured read-only shared store. The tool does not discover shared stores, write to two stores, synchronize lessons, or publish promotion candidates automatically.
+
+This capability depends on the generator and routing contracts tracked in [#4](https://github.com/ozand/kb-bootstrap/issues/4), [#24](https://github.com/ozand/kb-bootstrap/issues/24), and [#25](https://github.com/ozand/kb-bootstrap/issues/25), plus shared-registry metadata and identity work in `ozand/workspace-registry` [#50](https://github.com/ozand/workspace-registry/issues/50) and [#51](https://github.com/ozand/workspace-registry/issues/51). Demand evidence remains tracked separately in [#27](https://github.com/ozand/kb-bootstrap/issues/27).
+
 ### Validate Markdown links
 
 The generated package also includes the NetworkX-based Markdown graph validation behavior. Run it against a knowledge-base directory (the default is `docs`):

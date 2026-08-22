@@ -1,2 +1,5 @@
 include kb_bootstrap/templates/skills/**/*.md
 include kb_bootstrap/templates/qmd/**/*.template
+include kb_bootstrap/templates/lessons/*.md
+include kb_bootstrap/templates/lessons/*.yaml
+include kb_bootstrap/templates/lessons/*.json
