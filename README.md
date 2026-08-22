@@ -69,14 +69,33 @@ A project initialized by `kb-bootstrap` may have both its own repository and thi
 - In a multi-remote repository, classify the task by the files and behavior it owns; do not infer ownership from whichever remote the GitHub CLI selects.
 - An explicit user request to contribute upstream overrides the normal consumer route only after the upstream repository identity is verified.
 
-Before creating, editing, closing, or commenting on an Issue, verify the Git root, the relevant remote URL, the target repository, and its default branch. Use an explicit repository argument for mutating GitHub commands, for example:
+Before creating, editing, closing, or commenting on an Issue, verify the Git root, the relevant remote URL, the target repository, and its default branch.
+
+Configure and verify the GitHub CLI default repository once for each checkout:
 
 ```bash
-# Consumer-owned task
+# This changes only the local gh repository selection; it does not change Git remotes.
+gh repo set-default example/consumer-project
+gh repo set-default --view
+
+# Safe read-only verification.
+gh repo view --json nameWithOwner,defaultBranchRef
+```
+
+The reported repository and default branch must match the intended target. If authentication or repository identity cannot be verified, stop before any mutation. Do not use commands that print authentication tokens as verification evidence.
+
+A verified default makes read-only discovery convenient, but every mutating GitHub command must still include an explicit repository target:
+
+```bash
+# Consumer-owned mutation
 gh issue create --repo example/consumer-project
 
-# Reusable framework task
+# Reusable framework mutation
 gh issue create --repo example/kb-bootstrap
+
+# The same requirement applies to edits, comments, closures, and PR creation.
+gh issue comment 123 --repo example/consumer-project --body "Sanitized status"
+gh pr create --repo example/kb-bootstrap
 ```
 
 If remote identity is missing, ambiguous, or does not match the intended Issue repository, stop without mutating GitHub or Git state and ask for clarification. Completion evidence must come from the repository that owns the Issue: a commit that exists only in a consumer checkout does not complete an upstream Issue.
