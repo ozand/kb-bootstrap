@@ -124,6 +124,14 @@ kb-bootstrap manifest --output repository-context.json --check
 
 See the [repository context manifest schema](docs/REPOSITORY_CONTEXT_SCHEMA.md) for the exact deterministic fields and omission rules.
 
+To add repository-routing guidance without overwriting a downstream project's local instructions, explicitly manage one delimited block:
+
+```bash
+kb-bootstrap agents-governance --repo example/consumer-project --file AGENTS.md
+```
+
+See the [managed AGENTS.md block contract](docs/AGENTS_GOVERNANCE_BLOCK.md). Normal scaffolding does not rewrite an existing `AGENTS.md`.
+
 ## Installation (Manual)
 
 Since this is packaged as a standard Python tool, you can install it globally or via `pipx` from any location (or directly from GitHub once pushed):
