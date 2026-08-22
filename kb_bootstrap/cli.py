@@ -8,6 +8,7 @@ from .graph_linter import validate
 from .qmd_validator import validate_qmd_collections
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
+from .repository_manifest import validate_manifest_file, write_manifest
 
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
@@ -78,6 +79,20 @@ def main():
     completion_parser.add_argument(
         "--pr", type=int, help="Associated pull request number"
     )
+    manifest_parser = subparsers.add_parser(
+        "manifest", help="Generate or validate sanitized repository context"
+    )
+    manifest_parser.add_argument(
+        "--repo", help="Repository in owner/name form when generating"
+    )
+    manifest_parser.add_argument(
+        "--output",
+        default="repository-context.json",
+        help="Manifest output path (default: repository-context.json)",
+    )
+    manifest_parser.add_argument(
+        "--check", action="store_true", help="Validate the existing output file"
+    )
     args = parser.parse_args()
 
     if args.command == "validate":
@@ -95,6 +110,17 @@ def main():
 
     if args.command == "check-completion":
         report, is_valid = validate_completion(args.repo, args.commit, args.pr)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "manifest":
+        output = Path(args.output)
+        if args.check:
+            report, is_valid = validate_manifest_file(output)
+        elif not args.repo:
+            report, is_valid = "--repo is required when generating a manifest", False
+        else:
+            report, is_valid = write_manifest(args.repo, output)
         print(report)
         return 0 if is_valid else 1
 

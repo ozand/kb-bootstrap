@@ -115,6 +115,15 @@ The doctor reports the current directory, Git root, sanitized `origin`/`upstream
 
 For changes discovered in a generated consumer repository, follow the separate [consumer and upstream contribution workflow](docs/CONTRIBUTING_UPSTREAM.md). Consumer-specific work stays in the consumer checkout; reusable framework work uses a separate verified upstream checkout or worktree and an explicitly targeted pull request.
 
+Downstream tools can generate and validate a sanitized, machine-readable repository context:
+
+```bash
+kb-bootstrap manifest --repo example/consumer-project --output repository-context.json
+kb-bootstrap manifest --output repository-context.json --check
+```
+
+See the [repository context manifest schema](docs/REPOSITORY_CONTEXT_SCHEMA.md) for the exact deterministic fields and omission rules.
+
 ## Installation (Manual)
 
 Since this is packaged as a standard Python tool, you can install it globally or via `pipx` from any location (or directly from GitHub once pushed):
