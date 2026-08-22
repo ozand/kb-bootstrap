@@ -7,6 +7,17 @@ description: Extract verifiable facts from raw documentation (kb/*/raw) and gene
 
 Automates the transition of information from raw, unprocessed text to structured canonical knowledge using the Open Knowledge Format (OKF).
 
+## Repository governance gate
+
+Before writing canonical knowledge:
+
+1. decide whether the article is consumer-owned knowledge or a reusable upstream framework change;
+2. name the repository target explicitly and run `kb-bootstrap doctor --repo <owner/repository>`;
+3. fail closed unless the doctor returns `RESULT: OK`;
+4. use a separate verified checkout/worktree for upstream changes, never the consumer branch.
+
+Before claiming a committed article or framework update complete, run `kb-bootstrap check-completion --repo <owner/repository> --commit <commit> [--pr <number>]`. Keep evidence sanitized and omit credentials, private payloads, local runtime state, and unsanitized logs.
+
 ## When to use
 
 - You have just fetched new raw documentation or release notes into the `raw/` directory.

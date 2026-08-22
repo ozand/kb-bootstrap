@@ -7,6 +7,17 @@ description: Manage local QMD semantic search, index collections, and execute se
 
 Manage the local QMD (Semantic Search) workspace. This skill allows agents to configure QMD collections, update the vector index, and query the documentation.
 
+## Repository governance gate
+
+Search and query operations are read-only. Before changing QMD configuration, knowledge files, Issues, branches, or pull requests:
+
+1. distinguish consumer-owned work from reusable upstream `kb-bootstrap` work;
+2. name the target as `owner/repository` and run `kb-bootstrap doctor --repo <owner/repository>`;
+3. stop unless the doctor returns `RESULT: OK`;
+4. perform upstream framework work only in a separate verified checkout/worktree.
+
+Before reporting a committed change complete, run `kb-bootstrap check-completion --repo <owner/repository> --commit <commit> [--pr <number>]`. Use sanitized repository, branch, commit, public URL, and verification results only.
+
 ## When to use
 
 - You need to search for facts in product documentation.

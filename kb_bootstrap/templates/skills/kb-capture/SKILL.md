@@ -7,7 +7,18 @@ description: Record a recurring or non-obvious error lesson in exactly one expli
 
 Use this skill after resolving a recurring or non-obvious error.
 
-## Preflight
+## Repository governance gate
+
+Before writing a lesson:
+
+1. Classify the destination as consumer-owned project knowledge or an explicitly configured upstream/shared contribution.
+2. Resolve one explicit repository target in `owner/repository` form. Do not infer it from a remote name or machine path.
+3. Run `kb-bootstrap doctor --repo <owner/repository>` and stop if it does not return `RESULT: OK`.
+4. For upstream/shared work, use a separate verified checkout or worktree; never write from the consumer branch by convenience.
+
+After committing or opening a pull request, run `kb-bootstrap check-completion --repo <owner/repository> --commit <commit> [--pr <number>]` before claiming Issue completion. Stop on missing or mismatched evidence. Receipts may contain only sanitized repository, branch, commit, public URL, and test results.
+
+## Lesson-store preflight
 
 1. Find `lesson-stores.json` at the repository root.
 2. Read `capture_store` and resolve exactly one configured store with that name.

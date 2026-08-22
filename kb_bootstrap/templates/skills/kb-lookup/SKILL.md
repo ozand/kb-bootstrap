@@ -7,6 +7,17 @@ description: Look up an error fix using deterministic project-local-first preced
 
 Use this skill immediately after an error and before guessing or retrying.
 
+## Repository governance gate
+
+Lookup is read-only, but any follow-up edit, capture, Issue mutation, commit, or pull request must first:
+
+1. distinguish the consumer repository from an upstream/shared repository;
+2. name the target explicitly as `owner/repository`;
+3. run `kb-bootstrap doctor --repo <owner/repository>` and fail closed unless it returns `RESULT: OK`;
+4. use a separate verified checkout/worktree for upstream changes.
+
+Before claiming a follow-up complete, require `kb-bootstrap check-completion --repo <owner/repository> --commit <commit> [--pr <number>]`. Do not expose private paths, credentials, payloads, or runtime state in the result.
+
 ## Store configuration
 
 Read `lesson-stores.json` at the repository root. Do not discover lesson stores
