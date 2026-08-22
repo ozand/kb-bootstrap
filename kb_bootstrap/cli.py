@@ -136,6 +136,7 @@ def main():
         )
 
     append_gitignore_rules(target)
+    (target / "kb/raw/.gitkeep").touch(exist_ok=True)
 
     print(f"Success! Agent skills kb-wiki-builder, qmd-operator, kb-capture, and kb-lookup installed to {target / '.agents/skills/'}")
 

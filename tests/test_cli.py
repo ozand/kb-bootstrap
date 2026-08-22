@@ -26,6 +26,8 @@ class CliTests(unittest.TestCase):
             self.assertTrue((root / "qmd/collections/wiki.yaml").is_file())
             self.assertTrue((root / "qmd/collections/raw.yaml").is_file())
             self.assertFalse((root / "qmd/collections/default.yaml").exists())
+            self.assertTrue((root / "kb/raw/.gitkeep").is_file())
+            self.assertEqual((root / "kb/raw/.gitkeep").read_text(encoding="utf-8"), "")
 
             wiki = (root / "qmd/collections/wiki.yaml").read_text(encoding="utf-8")
             raw = (root / "qmd/collections/raw.yaml").read_text(encoding="utf-8")
@@ -50,6 +52,7 @@ class CliTests(unittest.TestCase):
             self.run_cli("--target", directory, "--type", "umbrella")
 
             self.assertTrue((root / "kb/raw").is_dir())
+            self.assertTrue((root / "kb/raw/.gitkeep").is_file())
             self.assertTrue((root / "qmd/collections/wiki.yaml").is_file())
             self.assertTrue((root / "qmd/collections/raw.yaml").is_file())
             self.assertTrue((root / "qmd.json").is_file())
