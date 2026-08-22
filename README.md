@@ -55,9 +55,12 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
    - Single application/tool: `kb-bootstrap --type single`
    - Large monorepo/workspace (like `servers_team`): `kb-bootstrap --type umbrella`
 
-3. **Verify Deployment:** 
+3. **Verify Deployment:**
    - Check that `.agents/skills/` contains the 4 generated skills (`kb-capture`, `kb-lookup`, `kb-wiki-builder`, `qmd-operator`).
-   - Check that `qmd.json` was created.
+   - Check that `qmd.json`, `qmd/collections/wiki.yaml`, and `qmd/collections/raw.yaml` were created.
+   - Run `kb-bootstrap validate --dir kb --project-root .`.
+   - Run the project test command.
+   - Run `qmd update`, then smoke-test both generated collections with `qmd search`.
 
 ## Repository remote and issue-routing policy
 
@@ -130,9 +133,14 @@ cd /path/to/your-project
 kb-bootstrap --type single
 ```
 This generates:
-- Local `kb/raw/` directory.
-- `qmd.json` for semantic search.
+- Local `kb/raw/` directory retained by `kb/raw/.gitkeep` in fresh Git checkouts.
+- Root `qmd.json` with `collections_dir` set to `./qmd/collections`.
+- `qmd/collections/<project>-wiki` configuration in `wiki.yaml`, indexing canonical Markdown under `kb/` while excluding `kb/raw/`.
+- `qmd/collections/<project>-raw` configuration in `raw.yaml`, indexing source captures under `kb/raw/`.
+- Anchored `.gitignore` rules for generated top-level artifacts and large raw files without hiding `kb/models/` or sanitized raw Markdown.
 - All 4 Agent Skills (`qmd-operator`, `kb-wiki-builder`, `kb-capture`, `kb-lookup`) placed in `.agents/skills/`.
+
+Collection names are derived from the target directory name. Use `<project>-wiki` for canonical answers by default and query `<project>-raw` explicitly when inspecting source evidence.
 
 ### Optional project-local lessons
 
@@ -152,17 +160,35 @@ Without `--with-project-lessons`, these files are not generated and the existing
 
 This capability depends on the generator and routing contracts tracked in [#4](https://github.com/ozand/kb-bootstrap/issues/4), [#24](https://github.com/ozand/kb-bootstrap/issues/24), and [#25](https://github.com/ozand/kb-bootstrap/issues/25), plus shared-registry metadata and identity work in `ozand/workspace-registry` [#50](https://github.com/ozand/workspace-registry/issues/50) and [#51](https://github.com/ozand/workspace-registry/issues/51). Demand evidence remains tracked separately in [#27](https://github.com/ozand/kb-bootstrap/issues/27).
 
-### Validate Markdown links
+### Validate the generated knowledge base
 
-The generated package also includes the NetworkX-based Markdown graph validation behavior. Run it against a knowledge-base directory (the default is `docs`):
+Run structural validation from the project root:
 
 ```bash
-kb-bootstrap validate --dir kb
+kb-bootstrap validate --dir kb --project-root .
 ```
 
-The command reports dead links, connected subgraphs, and orphan nodes. Dead links return exit status 1; orphan nodes are reported as warnings and do not fail validation. The validator excludes `raw/` directories, matching the original linter behavior.
+The command performs both checks:
 
-QMD commands use the official CLI entry points: `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
+1. Markdown graph validation under `--dir`: dead links fail, while orphan nodes are reported as warnings. The graph linter excludes `raw/` directories.
+2. QMD collection validation under `--project-root`: `qmd/collections/*.yaml` must contain valid, unique names and at least one existing configured path. Invalid collection syntax or missing target paths fail validation.
+
+Structural validation does not update the QMD index. Complete the actual verification pipeline:
+
+```bash
+# 1. Structural validation
+kb-bootstrap validate --dir kb --project-root .
+
+# 2. Project tests
+python -m pytest -q  # replace with the repository's documented test command
+
+# 3. QMD indexing and retrieval smoke tests
+qmd update
+qmd search "<canonical query>" -c <project>-wiki
+qmd search "<source query>" -c <project>-raw
+```
+
+Only report QMD rollout as successful when `qmd update` and both smoke searches were actually executed. QMD commands use the official CLI entry points: `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
 
 ### Option 2: Umbrella Workspace
 For a monorepo containing multiple servers or applications.
@@ -171,6 +197,7 @@ cd /path/to/umbrella-repo
 kb-bootstrap --type umbrella
 ```
 This generates:
-- Global `qmd/collections/` configuration.
-- Centralized `kb/apps/`, `kb/systems/`, and `kb/architecture/`.
+- Root `qmd.json` and the same project-derived `<project>-wiki` / `<project>-raw` collection split used by the single layout.
+- Centralized `kb/apps/`, `kb/systems/`, `kb/architecture/`, and retained `kb/raw/` directories.
+- Anchored `.gitignore` rules that preserve canonical and sanitized Markdown knowledge.
 - All 4 Agent Skills placed in the root `.agents/skills/`.
