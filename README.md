@@ -113,7 +113,7 @@ kb-bootstrap doctor --repo example/consumer-project
 
 The doctor reports the current directory, Git root, sanitized `origin`/`upstream` identities, `gh` default repository, requested target, and local/remote default branches. It exits non-zero when identity is missing, ambiguous, or mismatched. It never changes remotes, branches, GitHub defaults, Issues, or pull requests.
 
-For changes discovered in a generated consumer repository, follow the separate [consumer and upstream contribution workflow](docs/CONTRIBUTING_UPSTREAM.md). Consumer-specific work stays in the consumer checkout; reusable framework work uses a separate verified upstream checkout or worktree and an explicitly targeted pull request.
+For changes discovered in a generated consumer repository, follow the separate [consumer and upstream contribution workflow](docs/CONTRIBUTING_UPSTREAM.md). Consumer-specific work stays in the consumer checkout; reusable framework work uses a separate verified upstream checkout or worktree and an explicitly targeted pull request. Configure and verify downstream Git push precedence using the [push safety guide](docs/PUSH_SAFETY.md); `kb-bootstrap` never changes push defaults or remote URLs automatically.
 
 Downstream tools can generate and validate a sanitized, machine-readable repository context:
 
