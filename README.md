@@ -59,6 +59,30 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
    - Check that `.agents/skills/` contains the 4 generated skills (`kb-capture`, `kb-lookup`, `kb-wiki-builder`, `qmd-operator`).
    - Check that `qmd.json` was created.
 
+## Repository remote and issue-routing policy
+
+A project initialized by `kb-bootstrap` may have both its own repository and this framework configured as Git remotes. Treat the remote names as ownership boundaries:
+
+- `origin` is the current consumer project's repository. Project-specific knowledge, configuration, documentation, and defects belong there.
+- `upstream` is optional and identifies the framework or source repository from which the consumer was derived. Reusable CLI, generator, packaged-template, and framework-documentation defects belong there.
+- In an origin-only repository, route all project work to `origin` unless the user explicitly names another repository.
+- In a multi-remote repository, classify the task by the files and behavior it owns; do not infer ownership from whichever remote the GitHub CLI selects.
+- An explicit user request to contribute upstream overrides the normal consumer route only after the upstream repository identity is verified.
+
+Before creating, editing, closing, or commenting on an Issue, verify the Git root, the relevant remote URL, the target repository, and its default branch. Use an explicit repository argument for mutating GitHub commands, for example:
+
+```bash
+# Consumer-owned task
+gh issue create --repo example/consumer-project
+
+# Reusable framework task
+gh issue create --repo example/kb-bootstrap
+```
+
+If remote identity is missing, ambiguous, or does not match the intended Issue repository, stop without mutating GitHub or Git state and ask for clarification. Completion evidence must come from the repository that owns the Issue: a commit that exists only in a consumer checkout does not complete an upstream Issue.
+
+Repository receipts and examples must contain only sanitized metadata such as repository names, remote roles, branch names, commit IDs, and public URLs. Never include credentials, tokens, private payloads, local runtime state, or unsanitized logs.
+
 ## Installation (Manual)
 
 Since this is packaged as a standard Python tool, you can install it globally or via `pipx` from any location (or directly from GitHub once pushed):
