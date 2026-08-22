@@ -1,5 +1,7 @@
 # Knowledge Base (OKF + QMD) Bootstrap Framework
 
+Current release: **0.2.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes and migration considerations.
+
 A portable CLI tool to instantly initialize a local Knowledge Base architecture in any repository. This framework combines the **Open Knowledge Format (OKF)** for structured documentation and **QMD** for semantic search.
 
 ## Core Concepts
