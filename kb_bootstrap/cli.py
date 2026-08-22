@@ -9,6 +9,7 @@ from .qmd_validator import validate_qmd_collections
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .repository_manifest import validate_manifest_file, write_manifest
+from .agents_governance import update_agents_file
 
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
@@ -93,6 +94,15 @@ def main():
     manifest_parser.add_argument(
         "--check", action="store_true", help="Validate the existing output file"
     )
+    agents_parser = subparsers.add_parser(
+        "agents-governance", help="Create or update the managed AGENTS.md block"
+    )
+    agents_parser.add_argument(
+        "--repo", required=True, help="Expected repository in owner/name form"
+    )
+    agents_parser.add_argument(
+        "--file", default="AGENTS.md", help="AGENTS.md path (default: AGENTS.md)"
+    )
     args = parser.parse_args()
 
     if args.command == "validate":
@@ -121,6 +131,11 @@ def main():
             report, is_valid = "--repo is required when generating a manifest", False
         else:
             report, is_valid = write_manifest(args.repo, output)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "agents-governance":
+        report, is_valid = update_agents_file(Path(args.file), args.repo)
         print(report)
         return 0 if is_valid else 1
 
