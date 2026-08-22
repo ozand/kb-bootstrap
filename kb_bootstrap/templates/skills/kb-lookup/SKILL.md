@@ -1,18 +1,42 @@
 ---
 name: kb-lookup
-description: Look up a fix in the local error knowledge base when a command fails, a tool errors, or behavior is unexpected. Matches the real error text against error_signatures in index.yaml and applies the matched lesson's resolution. Use whenever an error or failure occurs before retrying.
+description: Look up an error fix using deterministic project-local-first precedence and an optional explicitly configured read-only shared store. Use whenever a command fails or behavior is unexpected before retrying.
 ---
 
 # kb-lookup — search for an error fix
 
-Use this skill immediately when an error or failure occurs, BEFORE trying to guess the solution or retrying the command.
+Use this skill immediately after an error and before guessing or retrying.
 
-## How to use
+## Store configuration
 
-1. Look for the local error index file (usually `.workspace-kb/index.yaml` or `kb/index.yaml`).
-2. Search the file for keywords or exact substrings from the error you just received.
-3. If an `error_signatures` block matches your error, note the `file` path pointing to the lesson.
-4. Read the corresponding `KB-XXXX-*.md` file.
-5. Apply the instructions found under the `## Resolution` heading of the lesson.
+Read `lesson-stores.json` at the repository root. Do not discover lesson stores
+from absolute paths, sibling directories, Git remotes, or machine-specific state.
 
-If no match is found, proceed with standard troubleshooting. Once resolved, consider using `kb-capture` to document the fix.
+Supported entries are:
+
+```json
+{
+  "version": 1,
+  "capture_store": "local",
+  "local": {"path": "kb/lessons"},
+  "shared": {"path": "an-explicitly-configured-path", "read_only": true}
+}
+```
+
+The `shared` entry is optional and must be explicitly configured. It is lookup-only.
+
+## Lookup order
+
+1. If `local` is configured and available, search its `index.yaml` first.
+2. If there is no local match and `shared` is explicitly configured as read-only,
+   search its `index.yaml` second.
+3. If the shared store is missing or unavailable, report that sanitized source as
+   unavailable and finish the local result; do not perform hidden discovery or write.
+4. If configuration is malformed or ambiguous, stop and report a blocking,
+   sanitized configuration error.
+5. For a match, read the referenced lesson and apply its `## Resolution` and
+   `## Prevention` sections.
+
+Report provenance as `local` or `shared` plus the lesson ID. Do not expose private
+absolute paths or lesson payloads in receipts. Lookup never writes, synchronizes,
+promotes, or publishes lessons.

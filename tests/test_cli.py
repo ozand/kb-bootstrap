@@ -57,6 +57,63 @@ class CliTests(unittest.TestCase):
             self.assertTrue((root / "qmd/collections/raw.yaml").is_file())
             self.assertTrue((root / "qmd.json").is_file())
 
+    def test_default_generation_does_not_create_project_lessons_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            self.run_cli("--target", directory, "--type", "single")
+
+            self.assertFalse((root / "kb/lessons").exists())
+            self.assertFalse((root / "lesson-stores.json").exists())
+
+    def test_opt_in_generation_creates_project_lessons_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            self.run_cli(
+                "--target",
+                directory,
+                "--type",
+                "single",
+                "--with-project-lessons",
+            )
+
+            stores = json.loads((root / "lesson-stores.json").read_text(encoding="utf-8"))
+            self.assertEqual(stores["capture_store"], "local")
+            self.assertEqual(stores["local"]["path"], "kb/lessons")
+            self.assertNotIn("shared", stores)
+            self.assertTrue((root / "qmd/collections/wiki.yaml").is_file())
+            self.assertTrue((root / "qmd/collections/raw.yaml").is_file())
+            self.assertTrue((root / "kb/raw/.gitkeep").is_file())
+
+            index = (root / "kb/lessons/index.yaml").read_text(encoding="utf-8")
+            schema = (root / "kb/lessons/SCHEMA.md").read_text(encoding="utf-8")
+            self.assertIn("id_prefix: PROJECT-", index)
+            self.assertIn("lessons: []", index)
+            self.assertIn("PROJECT-0001", schema)
+
+    def test_generated_lesson_skills_fail_closed_and_use_local_first_lookup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            self.run_cli("--target", directory, "--with-project-lessons")
+
+            capture = (root / ".agents/skills/kb-capture/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            lookup = (root / ".agents/skills/kb-lookup/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("resolve exactly one configured store", capture)
+            self.assertIn("Stop without writing", capture)
+            self.assertIn("Never infer a workspace path", capture)
+            self.assertIn("search its `index.yaml` first", lookup)
+            self.assertIn("search its `index.yaml` second", lookup)
+            self.assertIn("read_only", lookup)
+            self.assertIn("Lookup never writes", lookup)
+            self.assertNotIn("T:\\Code", capture)
+            self.assertNotIn("T:\\Code", lookup)
+
     def test_validate_combines_graph_and_qmd_results(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

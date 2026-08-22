@@ -1,49 +1,42 @@
 ---
 name: kb-capture
-description: Record a new lesson in the workspace error knowledge base after resolving a recurring or non-obvious error using OKF standard. Use after fixing an error that was not already in the KB and is likely to recur.
+description: Record a recurring or non-obvious error lesson in exactly one explicitly configured lesson store. Use after resolving an error that was not already documented and is likely to recur.
 ---
 
-# kb-capture — record a new error lesson
+# kb-capture — record an error lesson
 
-Use this skill right after you resolve an error that was **not** already in the KB and is likely to recur or was non-obvious to diagnose.
+Use this skill after resolving a recurring or non-obvious error.
 
-## Steps
+## Preflight
 
-1. Find the local `index.yaml` (often in `.workspace-kb/index.yaml` or `kb/index.yaml`).
-2. Determine the next free id (current max is `KB-XXXX`, use next).
-3. Create a new markdown file `lessons/KB-XXXX-<slug>.md` with the OKF YAML Frontmatter.
-4. Fill every required field. In particular:
-   - `error_signatures` — **mandatory**. Use the most distinctive, stable parts of the real error (avoid timestamps, temp paths, PIDs).
-5. Add an entry to the `index.yaml` with: `id`, `title`, `file`, `category`, `severity`, `tags`, `error_signatures`.
+1. Find `lesson-stores.json` at the repository root.
+2. Read `capture_store` and resolve exactly one configured store with that name.
+3. Stop without writing when:
+   - `lesson-stores.json` is absent;
+   - `capture_store` is absent or names an unavailable store;
+   - multiple destinations are selected or the configuration is ambiguous;
+   - the selected store is shared and its explicit contribution workflow is unavailable.
+4. Never infer a workspace path, discover a shared store in the background, or write
+   to local and shared stores in one operation.
 
-## OKF Error Markdown Template
+The generated project-local contract uses:
 
-```markdown
----
-id: KB-XXXX
-title: "<Clear title describing the failure>"
-category: "<e.g., build, environment, runtime>"
-severity: <low|medium|high>
-tags: [tag1, tag2]
-status: active
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-error_signatures:
-  - "<Stable part of error message>"
----
-
-# <Title>
-
-## Symptom
-<What was observed>
-
-## Root Cause
-<Why it happened>
-
-## Resolution
-- Step 1
-- Step 2
-
-## Prevention
-<How to avoid this in the future>
+```json
+{
+  "version": 1,
+  "capture_store": "local",
+  "local": {"path": "kb/lessons"}
+}
 ```
+
+## Capture into the local store
+
+1. Read `kb/lessons/SCHEMA.md` and `kb/lessons/index.yaml`.
+2. Allocate the next unused repository-local ID using the configured `id_prefix`.
+3. Create `kb/lessons/PROJECT-XXXX-<slug>.md` with matching frontmatter.
+4. Add one matching entry to `kb/lessons/index.yaml`.
+5. Validate that the filename ID, frontmatter ID, and index ID are identical and
+   unique before reporting success.
+
+Capture only sanitized error signatures. Do not record credentials, private
+payloads, runtime state, or unstable temporary values.

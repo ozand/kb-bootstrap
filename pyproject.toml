@@ -27,4 +27,10 @@ include-package-data = true
 packages = ["kb_bootstrap"]
 
 [tool.setuptools.package-data]
-kb_bootstrap = ["templates/skills/**/*.md", "templates/qmd/**/*.template"]
+kb_bootstrap = [
+    "templates/skills/**/*.md",
+    "templates/qmd/**/*.template",
+    "templates/lessons/*.md",
+    "templates/lessons/*.yaml",
+    "templates/lessons/*.json",
+]
