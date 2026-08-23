@@ -5,6 +5,7 @@ from pathlib import Path
 SKILLS_ROOT = Path("kb_bootstrap/templates/skills")
 SKILLS = ["kb-capture", "kb-lookup", "kb-wiki-builder", "qmd-operator"]
 ROUTING_POLICY = Path("docs/LESSON_ROUTING_POLICY.md")
+PROMOTION_WORKFLOW = Path("docs/LESSON_PROMOTION_WORKFLOW.md")
 
 
 class SkillGovernanceTests(unittest.TestCase):
@@ -74,6 +75,42 @@ class SkillGovernanceTests(unittest.TestCase):
         self.assertIn("Automatic dual writes, mirroring, synchronization, and promotion are prohibited", policy)
         self.assertIn("Search a complete explicitly configured local store first", policy)
         self.assertIn("sanitized category and result", policy)
+
+    def test_promotion_workflow_requires_manual_sanitized_single_destination(self):
+        workflow = PROMOTION_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("## Promotion: project to workspace", workflow)
+        self.assertIn("## Demotion: workspace to project", workflow)
+        self.assertIn("explicit approval", workflow)
+        self.assertIn("personally identifiable information", workflow)
+        self.assertIn("private hostnames", workflow)
+        self.assertIn("runtime/session state", workflow)
+        self.assertIn("one selected workspace destination", workflow)
+        self.assertIn("one selected project destination", workflow)
+        self.assertIn("never one cross-store transaction", workflow)
+        self.assertIn("### Sanitized promotion fixture", workflow)
+        self.assertIn("### Sanitized demotion fixture", workflow)
+        self.assertIn("[consumer versus kb-bootstrap upstream contribution workflow](CONTRIBUTING_UPSTREAM.md)", workflow)
+        self.assertIn("Issues #4, #6, and #22", workflow)
+        self.assertIn("Future Issue #29 may prepare a contribution candidate", workflow)
+
+    def test_promotion_workflow_receipt_is_sanitized_and_verifiable(self):
+        workflow = PROMOTION_WORKFLOW.read_text(encoding="utf-8")
+
+        for field in [
+            "source_scope",
+            "source_lesson_id",
+            "destination_scope",
+            "destination_owner",
+            "destination_lesson_id",
+            "reviewer",
+            "actor",
+            "result",
+            "rationale",
+        ]:
+            self.assertIn(field, workflow)
+        self.assertIn("no unintended source mutation or second destination write occurred", workflow)
+        self.assertIn("The receipt is evidence of a reviewed result", workflow)
 
     def test_qmd_dual_collection_guidance_is_preserved(self):
         qmd = (SKILLS_ROOT / "qmd-operator/SKILL.md").read_text(encoding="utf-8")
