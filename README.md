@@ -53,11 +53,13 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
    ```bash
    cd /path/to/target/project
    ```
-2. **Determine project type and execute:**
-   - Single application/tool: `kb-bootstrap --type single`
-   - Large monorepo/workspace (like `servers_team`): `kb-bootstrap --type umbrella`
+2. **Choose the content layout and execute:**
+   - One application/tool knowledge layout: `kb-bootstrap --type single`
+   - Multi-application/workspace knowledge layout: `kb-bootstrap --type umbrella`
 
-3. **Verify Deployment:**
+   `single` and `umbrella` describe the generated knowledge content topology. They do not describe where the repository is hosted or deployed.
+
+3. **Verify the generated scaffold:**
    - Check that `.agents/skills/` contains the 4 generated skills (`kb-capture`, `kb-lookup`, `kb-wiki-builder`, `qmd-operator`).
    - Check that `qmd.json`, `qmd/collections/wiki.yaml`, and `qmd/collections/raw.yaml` were created.
    - Run `kb-bootstrap validate --dir kb --project-root .`.
@@ -153,10 +155,26 @@ pipx install git+https://github.com/ozand/kb-bootstrap.git
 
 ## Usage
 
-Once installed, the `kb-bootstrap` command is available globally in your terminal. Navigate to the root of the project where you want to create the knowledge base and run:
+Once installed, the `kb-bootstrap` command is available globally in your terminal. Navigate to the root of the repository that will own the generated files and run it.
 
-### Option 1: Single Project (Default)
-For a standalone application repository.
+### Repository placement and content topology
+
+Repository placement and generated content topology are separate choices:
+
+- **Standalone placement:** the knowledge base has its own repository. Example: create an empty `product-knowledge` repository, enter its root, and run `kb-bootstrap --type single` or `--type umbrella` according to the content it will hold.
+- **Embedded placement:** the knowledge base lives inside an existing product repository. Example: enter the existing application repository root and run `kb-bootstrap --type single` so that repository owns its `kb/`, QMD configuration, and generated skills.
+
+Placement determines which repository owns the generated files, Issues, commits, and pull requests. The command does not create a repository, select a deployment model, or infer ownership from a parent workspace. If the intended repository root or owner is ambiguous, resolve it before running the generator.
+
+The current `--type single|umbrella` option selects only the **content topology**:
+
+- `single` creates the layout for one application or tool.
+- `umbrella` creates centralized areas for multiple applications and systems.
+
+Both topologies work in either standalone or embedded placement. No separate standalone/embedded generator modes are needed. A future `--layout` name could be a compatibility alias for `--type`; it would not introduce new behavior and is not currently implemented.
+
+### Option 1: Single Content Layout (Default)
+For knowledge centered on one application or tool.
 ```bash
 cd /path/to/your-project
 kb-bootstrap --type single
@@ -219,8 +237,8 @@ qmd search "<source query>" -c <project>-raw
 
 Only report QMD rollout as successful when `qmd update` and both smoke searches were actually executed. QMD commands use the official CLI entry points: `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
 
-### Option 2: Umbrella Workspace
-For a monorepo containing multiple servers or applications.
+### Option 2: Umbrella Content Layout
+For knowledge spanning multiple servers or applications in one owning repository.
 ```bash
 cd /path/to/umbrella-repo
 kb-bootstrap --type umbrella
