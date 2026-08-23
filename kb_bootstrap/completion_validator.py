@@ -108,15 +108,10 @@ def validate_completion(
         pr_view, pr_ok = _run(
             [
                 "gh",
-                "pr",
-                "view",
-                str(pull_request),
-                "--repo",
-                repository,
-                "--json",
-                "baseRepository,headRefOid,url",
+                "api",
+                f"repos/{repository}/pulls/{pull_request}",
                 "--jq",
-                '"\\(.baseRepository.nameWithOwner)\\t\\(.headRefOid)\\t\\(.url)"',
+                '"\\(.base.repo.full_name)\\t\\(.head.sha)\\t\\(.html_url)"',
             ],
             working_directory,
         )

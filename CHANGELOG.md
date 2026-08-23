@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-08-23
+
+### Repository governance safeguards
+
+- Fix pull-request completion validation by reading the PR base repository, head
+  commit, and public URL through fields supported by the GitHub API.
+- Preserve fail-closed behavior for unavailable PRs, wrong repositories, and
+  commits not reachable from the associated PR head.
+
 ## 0.2.0 — 2026-08-22
 
 ### Knowledge-base scaffolding
