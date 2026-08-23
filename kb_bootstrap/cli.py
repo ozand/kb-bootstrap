@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .graph_linter import validate
 from .qmd_validator import validate_qmd_collections
+from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .repository_manifest import validate_manifest_file, write_manifest
@@ -58,6 +59,24 @@ def main():
         "--project-root",
         default=".",
         help="Project root containing qmd/collections (default: current directory)",
+    )
+    search_parser = subparsers.add_parser(
+        "search", help="Search canonical knowledge or explicitly selected raw research"
+    )
+    search_parser.add_argument("query", help="QMD full-text search query")
+    search_parser.add_argument(
+        "--mode",
+        choices=["canonical", "raw"],
+        default="canonical",
+        help="Search canonical knowledge by default; raw requires explicit selection",
+    )
+    search_parser.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root containing qmd/collections (default: current directory)",
+    )
+    search_parser.add_argument(
+        "--limit", type=int, default=5, help="Maximum results (default: 5)"
     )
     doctor_parser = subparsers.add_parser(
         "doctor", help="Check repository identity before GitHub work"
@@ -112,6 +131,13 @@ def main():
         print()
         print(qmd_report)
         return 0 if graph_valid and qmd_valid else 1
+
+    if args.command == "search":
+        report, is_valid = search_qmd(
+            args.query, args.mode, Path(args.project_root), args.limit
+        )
+        print(report)
+        return 0 if is_valid else 1
 
     if args.command == "doctor":
         report, is_valid = inspect_repository(args.repo)

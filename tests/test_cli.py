@@ -148,6 +148,28 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("T:\\Code", capture)
             self.assertNotIn("T:\\Code", lookup)
 
+    def test_search_command_defaults_to_canonical_mode(self):
+        with patch(
+            "kb_bootstrap.cli.search_qmd", return_value=("RESULT: OK", True)
+        ) as search:
+            result = self.run_cli(
+                "search", "setup", "--project-root", ".", "--limit", "3"
+            )
+
+        self.assertEqual(result, 0)
+        search.assert_called_once_with("setup", "canonical", Path("."), 3)
+
+    def test_search_command_accepts_explicit_raw_mode(self):
+        with patch(
+            "kb_bootstrap.cli.search_qmd", return_value=("RESULT: OK", True)
+        ) as search:
+            result = self.run_cli(
+                "search", "trace", "--mode", "raw", "--project-root", "."
+            )
+
+        self.assertEqual(result, 0)
+        search.assert_called_once_with("trace", "raw", Path("."), 5)
+
     def test_validate_combines_graph_and_qmd_results(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
