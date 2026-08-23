@@ -65,6 +65,8 @@ class CliTests(unittest.TestCase):
 
             self.assertFalse((root / "kb/lessons").exists())
             self.assertFalse((root / "lesson-stores.json").exists())
+            self.assertFalse((root / ".agents/skills/kb-capture").exists())
+            self.assertTrue((root / ".agents/skills/kb-lookup/SKILL.md").is_file())
 
     def test_opt_in_generation_creates_project_lessons_contract(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -85,12 +87,40 @@ class CliTests(unittest.TestCase):
             self.assertTrue((root / "qmd/collections/wiki.yaml").is_file())
             self.assertTrue((root / "qmd/collections/raw.yaml").is_file())
             self.assertTrue((root / "kb/raw/.gitkeep").is_file())
+            self.assertTrue((root / ".agents/skills/kb-capture/SKILL.md").is_file())
 
             index = (root / "kb/lessons/index.yaml").read_text(encoding="utf-8")
             schema = (root / "kb/lessons/SCHEMA.md").read_text(encoding="utf-8")
             self.assertIn("id_prefix: PROJECT-", index)
             self.assertIn("lessons: []", index)
             self.assertIn("PROJECT-0001", schema)
+
+    def test_opt_in_rerun_preserves_existing_lesson_data_and_routing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            self.run_cli("--target", directory, "--with-project-lessons")
+            index = root / "kb/lessons/index.yaml"
+            stores = root / "lesson-stores.json"
+            index.write_text("version: 1\nid_prefix: PROJECT-\nlessons:\n  - id: PROJECT-0001\n", encoding="utf-8")
+            stores.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "capture_store": "local",
+                        "local": {"path": "kb/lessons"},
+                        "shared": {"path": "configured-shared", "read_only": True},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.run_cli("--target", directory, "--with-project-lessons")
+
+            self.assertIn("PROJECT-0001", index.read_text(encoding="utf-8"))
+            updated_stores = json.loads(stores.read_text(encoding="utf-8"))
+            self.assertEqual(updated_stores["shared"]["path"], "configured-shared")
+            self.assertTrue(updated_stores["shared"]["read_only"])
 
     def test_generated_lesson_skills_fail_closed_and_use_local_first_lookup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -107,8 +137,12 @@ class CliTests(unittest.TestCase):
             self.assertIn("resolve exactly one configured store", capture)
             self.assertIn("Stop without writing", capture)
             self.assertIn("Never infer a workspace path", capture)
+            self.assertIn("all three contract items exist", capture)
+            self.assertIn("local lesson contract unavailable", capture)
             self.assertIn("search its `index.yaml` first", lookup)
             self.assertIn("search its `index.yaml` second", lookup)
+            self.assertIn("no lesson stores configured", lookup)
+            self.assertIn("does not imply that a local lesson store exists", lookup)
             self.assertIn("read_only", lookup)
             self.assertIn("Lookup never writes", lookup)
             self.assertNotIn("T:\\Code", capture)

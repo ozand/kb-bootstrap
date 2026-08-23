@@ -145,27 +145,34 @@ def main():
 
     print(f"Initializing {args.type} Knowledge Base in {target}...")
 
-    # Create skill directories
+    # Create the always-available read-only and wiki skill directories.
     create_dirs(target, [
-        ".agents/skills/qmd-operator", 
-        ".agents/skills/kb-wiki-builder", 
-        ".agents/skills/kb-capture", 
-        ".agents/skills/kb-lookup"
+        ".agents/skills/qmd-operator",
+        ".agents/skills/kb-wiki-builder",
+        ".agents/skills/kb-lookup",
     ])
-    
-    # Copy skills
+
+    # Copy the always-available skills. Capture is installed only with its local contract.
     skills_src = pkg_dir / "templates" / "skills"
     shutil.copy2(skills_src / "qmd-operator" / "SKILL.md", target / ".agents/skills/qmd-operator/SKILL.md")
     shutil.copy2(skills_src / "kb-wiki-builder" / "SKILL.md", target / ".agents/skills/kb-wiki-builder/SKILL.md")
-    shutil.copy2(skills_src / "kb-capture" / "SKILL.md", target / ".agents/skills/kb-capture/SKILL.md")
     shutil.copy2(skills_src / "kb-lookup" / "SKILL.md", target / ".agents/skills/kb-lookup/SKILL.md")
 
     if args.with_project_lessons:
+        create_dirs(target, [".agents/skills/kb-capture"])
+        shutil.copy2(
+            skills_src / "kb-capture" / "SKILL.md",
+            target / ".agents/skills/kb-capture/SKILL.md",
+        )
         lessons_src = pkg_dir / "templates" / "lessons"
         create_dirs(target, ["kb/lessons"])
-        shutil.copy2(lessons_src / "SCHEMA.md", target / "kb/lessons/SCHEMA.md")
-        shutil.copy2(lessons_src / "index.yaml", target / "kb/lessons/index.yaml")
-        shutil.copy2(lessons_src / "lesson-stores.json", target / "lesson-stores.json")
+        for source, destination in [
+            (lessons_src / "SCHEMA.md", target / "kb/lessons/SCHEMA.md"),
+            (lessons_src / "index.yaml", target / "kb/lessons/index.yaml"),
+            (lessons_src / "lesson-stores.json", target / "lesson-stores.json"),
+        ]:
+            if not destination.exists():
+                shutil.copy2(source, destination)
 
     project_name = project_slug(target)
 
@@ -224,10 +231,12 @@ def main():
     append_gitignore_rules(target)
     (target / "kb/raw/.gitkeep").touch(exist_ok=True)
 
+    installed_skills = "kb-wiki-builder, qmd-operator, and kb-lookup"
     if args.with_project_lessons:
         print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
+        installed_skills += ", plus kb-capture"
 
-    print(f"Success! Agent skills kb-wiki-builder, qmd-operator, kb-capture, and kb-lookup installed to {target / '.agents/skills/'}")
+    print(f"Success! Agent skills {installed_skills} installed to {target / '.agents/skills/'}")
 
 if __name__ == "__main__":
     sys.exit(main() or 0)
