@@ -42,7 +42,15 @@ The generated project-local contract uses:
 
 ## Capture into the local store
 
-1. Read `kb/lessons/SCHEMA.md` and `kb/lessons/index.yaml`.
+Local capture is supported only when all three contract items exist:
+
+- configured `local.path` directory;
+- `<local.path>/SCHEMA.md`;
+- `<local.path>/index.yaml`.
+
+If any item is absent, stop with `RESULT: BLOCKED (local lesson contract unavailable)` without printing the resolved path or writing any file.
+
+1. Read the configured local store's `SCHEMA.md` and `index.yaml`.
 2. Allocate the next unused repository-local ID using the configured `id_prefix`.
 3. Create `kb/lessons/PROJECT-XXXX-<slug>.md` with matching frontmatter.
 4. Add one matching entry to `kb/lessons/index.yaml`.

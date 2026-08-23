@@ -60,7 +60,7 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
    `single` and `umbrella` describe the generated knowledge content topology. They do not describe where the repository is hosted or deployed.
 
 3. **Verify the generated scaffold:**
-   - Check that `.agents/skills/` contains the 4 generated skills (`kb-capture`, `kb-lookup`, `kb-wiki-builder`, `qmd-operator`).
+   - Check that `.agents/skills/` contains `kb-lookup`, `kb-wiki-builder`, and `qmd-operator`; `kb-capture` is generated only with `--with-project-lessons`.
    - Check that `qmd.json`, `qmd/collections/wiki.yaml`, and `qmd/collections/raw.yaml` were created.
    - Run `kb-bootstrap validate --dir kb --project-root .`.
    - Run the project test command.
@@ -185,7 +185,7 @@ This generates:
 - `qmd/collections/<project>-wiki` configuration in `wiki.yaml`, indexing canonical Markdown under `kb/` while excluding `kb/raw/`.
 - `qmd/collections/<project>-raw` configuration in `raw.yaml`, indexing source captures under `kb/raw/`.
 - Anchored `.gitignore` rules for generated top-level artifacts and large raw files without hiding `kb/models/` or sanitized raw Markdown.
-- All 4 Agent Skills (`qmd-operator`, `kb-wiki-builder`, `kb-capture`, `kb-lookup`) placed in `.agents/skills/`.
+- Read-only/search skills (`qmd-operator`, `kb-wiki-builder`, `kb-lookup`) placed in `.agents/skills/`; `kb-capture` is omitted until `--with-project-lessons` creates its local contract.
 
 Collection names are derived from the target directory name. Use `<project>-wiki` for canonical answers by default and query `<project>-raw` explicitly when inspecting source evidence.
 
@@ -199,11 +199,12 @@ kb-bootstrap --type single --with-project-lessons
 
 The option adds:
 
+- `.agents/skills/kb-capture/SKILL.md` — capture instructions enabled only with the complete local contract.
 - `kb/lessons/SCHEMA.md` — the project-local Markdown/frontmatter contract.
 - `kb/lessons/index.yaml` — the deterministic local lesson catalogue using `PROJECT-XXXX` IDs.
 - `lesson-stores.json` — explicit capture and lookup routing; the generated default selects exactly one local capture store.
 
-Without `--with-project-lessons`, these files are not generated and the existing scaffold output is preserved. Generated `kb-capture` instructions refuse missing or ambiguous destinations. Generated `kb-lookup` instructions search a configured local store first, then an explicitly configured read-only shared store. The tool does not discover shared stores, write to two stores, synchronize lessons, or publish promotion candidates automatically.
+Without `--with-project-lessons`, these files and the `kb-capture` skill are not generated. Generated `kb-lookup` instructions block when no lesson stores are configured, search a complete configured local store first, then an explicitly configured read-only shared store. The tool does not discover shared stores, write to two stores, synchronize lessons, or publish promotion candidates automatically.
 
 This capability depends on the generator and routing contracts tracked in [#4](https://github.com/ozand/kb-bootstrap/issues/4), [#24](https://github.com/ozand/kb-bootstrap/issues/24), and [#25](https://github.com/ozand/kb-bootstrap/issues/25), plus shared-registry metadata and identity work in `ozand/workspace-registry` [#50](https://github.com/ozand/workspace-registry/issues/50) and [#51](https://github.com/ozand/workspace-registry/issues/51). Demand evidence remains tracked separately in [#27](https://github.com/ozand/kb-bootstrap/issues/27).
 
@@ -247,4 +248,4 @@ This generates:
 - Root `qmd.json` and the same project-derived `<project>-wiki` / `<project>-raw` collection split used by the single layout.
 - Centralized `kb/apps/`, `kb/systems/`, `kb/architecture/`, and retained `kb/raw/` directories.
 - Anchored `.gitignore` rules that preserve canonical and sanitized Markdown knowledge.
-- All 4 Agent Skills placed in the root `.agents/skills/`.
+- Read-only/search skills placed in the root `.agents/skills/`; `kb-capture` is added only with `--with-project-lessons`.

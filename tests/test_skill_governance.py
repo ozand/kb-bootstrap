@@ -32,6 +32,19 @@ class SkillGovernanceTests(unittest.TestCase):
         self.assertIn("consumer-owned work", qmd)
         self.assertIn("stop unless", qmd)
 
+    def test_lesson_skills_have_sanitized_fail_closed_contract(self):
+        capture = (SKILLS_ROOT / "kb-capture/SKILL.md").read_text(encoding="utf-8")
+        lookup = (SKILLS_ROOT / "kb-lookup/SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("all three contract items exist", capture)
+        self.assertIn("RESULT: BLOCKED (local lesson contract unavailable)", capture)
+        self.assertIn("RESULT: BLOCKED (no lesson stores configured)", lookup)
+        self.assertIn("does not imply that a local lesson store exists", lookup)
+        self.assertNotIn("T:\\Code", capture)
+        self.assertNotIn("T:\\Code", lookup)
+        self.assertNotIn(".workspace-kb", capture)
+        self.assertNotIn(".workspace-kb", lookup)
+
     def test_qmd_dual_collection_guidance_is_preserved(self):
         qmd = (SKILLS_ROOT / "qmd-operator/SKILL.md").read_text(encoding="utf-8")
         wiki = (SKILLS_ROOT / "kb-wiki-builder/SKILL.md").read_text(encoding="utf-8")
