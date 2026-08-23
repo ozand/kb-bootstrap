@@ -5,7 +5,7 @@ description: Record a recurring or non-obvious error lesson in exactly one expli
 
 # kb-capture — record an error lesson
 
-Use this skill after resolving a recurring or non-obvious error.
+Use this skill after resolving a recurring or non-obvious error. Follow the [lesson ownership and routing policy](https://github.com/ozand/kb-bootstrap/blob/main/docs/LESSON_ROUTING_POLICY.md); that document is the normative ownership and routing policy. This skill provides capture-specific operational checks and does not add another destination.
 
 ## Repository governance gate
 
