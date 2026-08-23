@@ -5,7 +5,7 @@ description: Look up an error fix using deterministic project-local-first preced
 
 # kb-lookup — search for an error fix
 
-Use this skill immediately after an error and before guessing or retrying.
+Use this skill immediately after an error and before guessing or retrying. Follow the [lesson ownership and routing policy](https://github.com/ozand/kb-bootstrap/blob/main/docs/LESSON_ROUTING_POLICY.md); that document is the normative ownership and routing policy. This skill provides lookup-specific operational checks and never creates another store.
 
 ## Repository governance gate
 

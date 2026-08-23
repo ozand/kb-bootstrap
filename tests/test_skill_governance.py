@@ -4,6 +4,7 @@ from pathlib import Path
 
 SKILLS_ROOT = Path("kb_bootstrap/templates/skills")
 SKILLS = ["kb-capture", "kb-lookup", "kb-wiki-builder", "qmd-operator"]
+ROUTING_POLICY = Path("docs/LESSON_ROUTING_POLICY.md")
 
 
 class SkillGovernanceTests(unittest.TestCase):
@@ -44,6 +45,35 @@ class SkillGovernanceTests(unittest.TestCase):
         self.assertNotIn("T:\\Code", lookup)
         self.assertNotIn(".workspace-kb", capture)
         self.assertNotIn(".workspace-kb", lookup)
+
+    def test_lesson_skills_reference_canonical_routing_policy(self):
+        capture = (SKILLS_ROOT / "kb-capture/SKILL.md").read_text(encoding="utf-8")
+        lookup = (SKILLS_ROOT / "kb-lookup/SKILL.md").read_text(encoding="utf-8")
+        policy_url = "https://github.com/ozand/kb-bootstrap/blob/main/docs/LESSON_ROUTING_POLICY.md"
+
+        self.assertIn(policy_url, capture)
+        self.assertIn(policy_url, lookup)
+        self.assertIn("normative ownership and routing policy", capture)
+        self.assertIn("normative ownership and routing policy", lookup)
+
+    def test_routing_policy_covers_deterministic_ownership_contract(self):
+        policy = ROUTING_POLICY.read_text(encoding="utf-8")
+
+        for heading in [
+            "### Canonical project knowledge",
+            "### Project-scoped lessons",
+            "### Workspace-global lessons",
+            "### Local-only",
+            "### Shared-only lookup",
+            "### Local-first with shared fallback",
+            "### Ambiguous or conflicting",
+        ]:
+            self.assertIn(heading, policy)
+        self.assertIn("exactly one explicit destination", policy)
+        self.assertIn("Automatic dual writes", policy)
+        self.assertIn("Automatic dual writes, mirroring, synchronization, and promotion are prohibited", policy)
+        self.assertIn("Search a complete explicitly configured local store first", policy)
+        self.assertIn("sanitized category and result", policy)
 
     def test_qmd_dual_collection_guidance_is_preserved(self):
         qmd = (SKILLS_ROOT / "qmd-operator/SKILL.md").read_text(encoding="utf-8")
