@@ -189,6 +189,18 @@ This generates:
 
 Collection names are derived from the target directory name. Use `<project>-wiki` for canonical answers by default and query `<project>-raw` explicitly when inspecting source evidence.
 
+Use the read-only search wrapper when mode labeling and validated collection selection are required:
+
+```bash
+# Canonical is the default.
+kb-bootstrap search "how is setup configured?" --project-root .
+
+# Raw research requires explicit opt-in.
+kb-bootstrap search "original error trace" --mode raw --project-root .
+```
+
+The wrapper runs `qmd search` against exactly one matching collection. Raw results are marked `[RAW]` and include sanitized QMD collection/source provenance. Missing or ambiguous mode collections block before QMD is called. The wrapper does not update indexes, write source files, canonicalize, or promote results.
+
 ### Optional project-local lessons
 
 Project-local lesson storage is opt-in and belongs to the target repository:
