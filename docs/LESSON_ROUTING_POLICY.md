@@ -97,4 +97,4 @@ Examples include a missing `capture_store`, an unknown selected store, multiple 
 - `kb-capture` implements the single-destination capture rules and is generated only with the opt-in project-local lesson contract.
 - `kb-lookup` implements read-only local-first/shared-second lookup and blocks when no deterministic store configuration exists.
 
-The skills retain operational checks specific to their capability. This document is the normative ownership and routing policy. Manual promotion and demotion between scopes are defined separately and always require explicit review; they are never inferred from lookup or capture.
+The skills retain operational checks specific to their capability. This document is the normative ownership and routing policy. Manual promotion and demotion between scopes follow the separate [reviewed promotion and demotion workflow](LESSON_PROMOTION_WORKFLOW.md), always require explicit review, and are never inferred from lookup or capture.
