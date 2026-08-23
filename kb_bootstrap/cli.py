@@ -10,6 +10,7 @@ from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .contribution_candidate import prepare_candidate
+from .lesson_cache import check_cache, sync_cache
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
 
@@ -100,6 +101,14 @@ def main():
     completion_parser.add_argument(
         "--pr", type=int, help="Associated pull request number"
     )
+    cache_parser = subparsers.add_parser(
+        "lesson-cache", help="Refresh or check an explicit read-only shared lesson cache"
+    )
+    cache_parser.add_argument("--source", required=True, help="Sanitized shared source bundle JSON")
+    cache_parser.add_argument("--cache", required=True, help="Local cache JSON")
+    cache_parser.add_argument("--lesson", action="append", default=[], help="Allowed lesson ID; repeat for multiple IDs")
+    cache_parser.add_argument("--prune", action="store_true", help="Remove cached entries outside the allowlist")
+    cache_parser.add_argument("--check", action="store_true", help="Report freshness without writing")
     candidate_parser = subparsers.add_parser(
         "prepare-shared-candidate",
         help="Prepare a sanitized shared lesson candidate locally without publishing",
@@ -153,6 +162,14 @@ def main():
 
     if args.command == "check-completion":
         report, is_valid = validate_completion(args.repo, args.commit, args.pr)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "lesson-cache":
+        if args.check:
+            report, is_valid = check_cache(Path(args.source), Path(args.cache), args.lesson)
+        else:
+            report, is_valid = sync_cache(Path(args.source), Path(args.cache), args.lesson, args.prune)
         print(report)
         return 0 if is_valid else 1
 
