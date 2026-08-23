@@ -218,7 +218,18 @@ The option adds:
 
 Without `--with-project-lessons`, these files and the `kb-capture` skill are not generated. Generated `kb-lookup` instructions block when no lesson stores are configured, search a complete configured local store first, then an explicitly configured read-only shared store. The tool does not discover shared stores, write to two stores, synchronize lessons, or publish promotion candidates automatically. See the [lesson ownership and routing policy](docs/LESSON_ROUTING_POLICY.md) for the canonical ownership categories, deterministic examples, and sanitized failure rules. Cross-scope changes use the separate manual [reviewed lesson promotion and demotion workflow](docs/LESSON_PROMOTION_WORKFLOW.md). A consumer may prepare a local, write-free artifact through the [reviewed shared contribution candidate workflow](docs/SHARED_CONTRIBUTION_CANDIDATE.md); publication remains a separate explicitly authorized action. Disconnected consumers may also opt into a bounded [offline shared lesson cache](docs/OFFLINE_LESSON_CACHE.md) with explicit lesson IDs, provenance/version/freshness metadata, and read-only refresh/check/prune behavior.
 
-This capability depends on the generator and routing contracts tracked in [#4](https://github.com/ozand/kb-bootstrap/issues/4), [#24](https://github.com/ozand/kb-bootstrap/issues/24), and [#25](https://github.com/ozand/kb-bootstrap/issues/25), plus shared-registry metadata and identity work in `ozand/workspace-registry` [#50](https://github.com/ozand/workspace-registry/issues/50) and [#51](https://github.com/ozand/workspace-registry/issues/51). Demand evidence remains tracked separately in [#27](https://github.com/ozand/kb-bootstrap/issues/27).
+The universal lesson metadata, registry identity, configured-store lookup, contribution-candidate, and offline-cache contracts are owned by `kb-bootstrap`. Any repository may opt into them using explicit local paths and configuration; no particular consumer repository is required. See the [shared lesson metadata contract](docs/SHARED_LESSON_METADATA.md). The project-local scaffold and routing history are tracked in [#24](https://github.com/ozand/kb-bootstrap/issues/24), [#25](https://github.com/ozand/kb-bootstrap/issues/25), and [#28](https://github.com/ozand/kb-bootstrap/issues/28).
+
+Universal validation and lookup commands:
+
+```bash
+kb-bootstrap validate-shared-metadata --input lesson-metadata.json
+kb-bootstrap validate-lesson-registry --root path/to/lesson-registry
+kb-bootstrap validate-lesson-registry --root path/to/lesson-registry --next-id
+kb-bootstrap lesson-lookup --config lookup-bundle.json --query "timeout" --timeout 2
+```
+
+These commands require explicit files/directories, perform no hidden store discovery, and do not write lessons, indexes, registries, or external repositories. [`lookup-bundle.json`](docs/LESSON_LOOKUP_BUNDLE.md) is a separate read-only search input containing at most one explicit local JSON store and one explicit shared JSON store; it is not the generated capture-routing `lesson-stores.json`. Local results take precedence, and the shared store is queried only when local lookup has no match.
 
 ### Validate the generated knowledge base
 

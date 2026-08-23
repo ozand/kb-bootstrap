@@ -77,6 +77,14 @@ class ContributionCandidateTests(unittest.TestCase):
             self.assertNotIn("remote_url", prepared["target"])
             self.assertNotIn("private-value", output.read_text(encoding="utf-8"))
 
+    def test_promoted_from_rejects_workspace_lesson_id(self):
+        candidate = valid_candidate()
+        candidate["metadata"]["promoted_from"]["lesson_id"] = "KB-0001"
+        errors = validate_candidate(candidate)
+        self.assertIn(
+            "promoted_from must contain repository and PROJECT-XXXX lesson ID", errors
+        )
+
     def test_wrong_target_blocks_without_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

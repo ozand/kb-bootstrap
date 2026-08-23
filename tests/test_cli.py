@@ -170,6 +170,65 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         search.assert_called_once_with("trace", "raw", Path("."), 5)
 
+    def test_validate_shared_metadata_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "metadata.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "scope": "workspace",
+                        "source_repository": "example/tooling",
+                        "observed_in": ["example/tooling"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_cli("validate-shared-metadata", "--input", str(path))
+        self.assertEqual(result, 0)
+
+    def test_validate_lesson_registry_and_next_id_commands(self):
+        with patch(
+            "kb_bootstrap.cli.validate_registry",
+            return_value=([], {"files": 1, "entries": 1}),
+        ) as validate:
+            result = self.run_cli("validate-lesson-registry", "--root", "registry")
+        self.assertEqual(result, 0)
+        validate.assert_called_once_with(Path("registry"))
+
+        with patch("kb_bootstrap.cli.next_id", return_value=("KB-0002", [])) as allocate:
+            result = self.run_cli(
+                "validate-lesson-registry", "--root", "registry", "--next-id"
+            )
+        self.assertEqual(result, 0)
+        allocate.assert_called_once_with(Path("registry"))
+
+    def test_explicit_lesson_lookup_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "stores.json"
+            config = {
+                "version": 1,
+                "stores": [
+                    {"name": "project", "type": "local", "path": "local.json"}
+                ],
+            }
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            with patch(
+                "kb_bootstrap.cli.federated_lookup", return_value=("RESULT: OK", True)
+            ) as lookup:
+                result = self.run_cli(
+                    "lesson-lookup",
+                    "--config",
+                    str(config_path),
+                    "--query",
+                    "timeout",
+                    "--timeout",
+                    "1.5",
+                )
+            self.assertEqual(result, 0)
+            lookup.assert_called_once_with(
+                config, "timeout", config_path.resolve().parent, 1.5
+            )
+
     def test_lesson_cache_requires_explicit_lessons(self):
         with patch(
             "kb_bootstrap.cli.sync_cache", return_value=("RESULT: OK", True)

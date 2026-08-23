@@ -1,6 +1,7 @@
 import os
 import shutil
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,9 @@ from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .contribution_candidate import prepare_candidate
 from .lesson_cache import check_cache, sync_cache
+from .shared_metadata import validate_metadata
+from .lesson_registry import next_id, validate_registry
+from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
 
@@ -101,6 +105,25 @@ def main():
     completion_parser.add_argument(
         "--pr", type=int, help="Associated pull request number"
     )
+    metadata_parser = subparsers.add_parser(
+        "validate-shared-metadata", help="Validate universal lesson scope and provenance metadata"
+    )
+    metadata_parser.add_argument("--input", required=True, help="Metadata JSON file")
+    registry_parser = subparsers.add_parser(
+        "validate-lesson-registry", help="Validate lesson IDs, files, frontmatter, and index consistency"
+    )
+    registry_parser.add_argument("--root", required=True, help="Registry root with lessons/ and index.yaml")
+    registry_parser.add_argument("--next-id", action="store_true", help="Suggest the next ID only after validation")
+    lookup_parser = subparsers.add_parser(
+        "lesson-lookup", help="Read-only lookup across explicitly configured local/shared stores"
+    )
+    lookup_parser.add_argument(
+        "--config",
+        required=True,
+        help="Explicit lookup-bundle JSON (separate from generated lesson-stores.json)",
+    )
+    lookup_parser.add_argument("--query", required=True, help="Lookup query")
+    lookup_parser.add_argument("--timeout", type=float, default=2.0, help="Per-store timeout in seconds")
     cache_parser = subparsers.add_parser(
         "lesson-cache", help="Refresh or check an explicit read-only shared lesson cache"
     )
@@ -162,6 +185,65 @@ def main():
 
     if args.command == "check-completion":
         report, is_valid = validate_completion(args.repo, args.commit, args.pr)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "validate-shared-metadata":
+        try:
+            metadata = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            print("RESULT: BLOCKED (metadata is unavailable or invalid JSON)")
+            return 1
+        if not isinstance(metadata, dict):
+            print("RESULT: BLOCKED (metadata must be an object)")
+            return 1
+        errors, warnings = validate_metadata(metadata)
+        for warning in warnings:
+            print(f"WARNING: {warning}")
+        if errors:
+            print(f"RESULT: BLOCKED ({len(errors)} error(s))")
+            for error in errors:
+                print(f"  - {error}")
+            return 1
+        print("RESULT: OK")
+        print(f"scope: {metadata['scope']}")
+        print("provenance: sanitized")
+        return 0
+
+    if args.command == "validate-lesson-registry":
+        root = Path(args.root)
+        if args.next_id:
+            lesson_id, errors = next_id(root)
+            if errors:
+                print(f"RESULT: BLOCKED ({len(errors)} error(s))")
+                for error in errors:
+                    print(f"  - {error}")
+                return 1
+            print("RESULT: OK")
+            print(f"next lesson ID: {lesson_id}")
+            return 0
+        errors, summary = validate_registry(root)
+        if errors:
+            print(f"RESULT: BLOCKED ({len(errors)} error(s))")
+            for error in errors:
+                print(f"  - {error}")
+            return 1
+        print("RESULT: OK")
+        print(f"lesson files: {summary['files']}")
+        print(f"index entries: {summary['entries']}")
+        return 0
+
+    if args.command == "lesson-lookup":
+        config_path = Path(args.config).resolve()
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            print("RESULT: BLOCKED (configuration is unavailable or invalid JSON)")
+            return 1
+        if not isinstance(config, dict):
+            print("RESULT: BLOCKED (configuration must be an object)")
+            return 1
+        report, is_valid = federated_lookup(config, args.query, config_path.parent, args.timeout)
         print(report)
         return 0 if is_valid else 1
 
