@@ -138,9 +138,8 @@ class GovernanceScenarioTests(unittest.TestCase):
                 "--jq", ".status",
             ): ("diverged", True),
             (
-                "gh", "pr", "view", "42", "--repo", UPSTREAM,
-                "--json", "baseRepository,headRefOid,url", "--jq",
-                '"\\(.baseRepository.nameWithOwner)\\t\\(.headRefOid)\\t\\(.url)"',
+                "gh", "api", f"repos/{UPSTREAM}/pulls/42", "--jq",
+                '"\\(.base.repo.full_name)\\t\\(.head.sha)\\t\\(.html_url)"',
             ): (f"{UPSTREAM}\t{PR_HEAD}\t{pr_url}", True),
             (
                 "gh", "api", f"repos/{UPSTREAM}/compare/{COMMIT}...{PR_HEAD}",

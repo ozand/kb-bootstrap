@@ -82,15 +82,10 @@ class CompletionValidatorTests(unittest.TestCase):
         responses[
             (
                 "gh",
-                "pr",
-                "view",
-                "12",
-                "--repo",
-                REPOSITORY,
-                "--json",
-                "baseRepository,headRefOid,url",
+                "api",
+                f"repos/{REPOSITORY}/pulls/12",
                 "--jq",
-                '"\\(.baseRepository.nameWithOwner)\\t\\(.headRefOid)\\t\\(.url)"',
+                '"\\(.base.repo.full_name)\\t\\(.head.sha)\\t\\(.html_url)"',
             )
         ] = (f"{REPOSITORY}\t{PR_HEAD}\thttps://github.com/example/project/pull/12", True)
         responses[
@@ -108,6 +103,60 @@ class CompletionValidatorTests(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertIn("pull request reachable: yes", report)
         self.assertIn("RESULT: OK", report)
+
+    def test_wrong_pr_repository_blocks(self):
+        responses = self.base_responses()
+        responses[
+            (
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/compare/{COMMIT}...main",
+                "--jq",
+                ".status",
+            )
+        ] = ("diverged", True)
+        responses[
+            (
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/pulls/12",
+                "--jq",
+                '"\\(.base.repo.full_name)\\t\\(.head.sha)\\t\\(.html_url)"',
+            )
+        ] = (f"example/other\t{PR_HEAD}\thttps://github.com/example/other/pull/12", True)
+
+        report, is_valid, _ = self.run_validation(responses, pull_request=12)
+
+        self.assertFalse(is_valid)
+        self.assertIn("pull request base repository does not match target", report)
+        self.assertIn("RESULT: BLOCKED", report)
+
+    def test_unavailable_pr_blocks(self):
+        responses = self.base_responses()
+        responses[
+            (
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/compare/{COMMIT}...main",
+                "--jq",
+                ".status",
+            )
+        ] = ("diverged", True)
+        responses[
+            (
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/pulls/12",
+                "--jq",
+                '"\\(.base.repo.full_name)\\t\\(.head.sha)\\t\\(.html_url)"',
+            )
+        ] = ("", False)
+
+        report, is_valid, _ = self.run_validation(responses, pull_request=12)
+
+        self.assertFalse(is_valid)
+        self.assertIn("associated pull request is unavailable", report)
+        self.assertIn("RESULT: BLOCKED", report)
 
     def test_unreachable_commit_blocks(self):
         responses = self.base_responses()
