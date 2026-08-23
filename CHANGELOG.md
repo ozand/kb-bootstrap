@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Architecture correction
+
+- Make `kb-bootstrap` the owner of universal shared lesson metadata, registry
+  identity/index validation, fail-closed ID guidance, and explicit local/shared
+  lookup orchestration.
+- Keep every consumer repository optional and independently configured; no
+  workspace-specific repository or filesystem path is required.
+
 ## 0.2.1 — 2026-08-23
 
 ### Repository governance safeguards

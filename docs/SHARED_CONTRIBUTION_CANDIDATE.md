@@ -75,4 +75,4 @@ Blocked reports identify only the failed field/category and never echo candidate
 
 A prepared artifact is not approval to publish. A human reviewer must inspect it and then use the destination repository's normal, explicitly targeted contribution workflow. Any later branch, commit, push, pull request, or shared-store write is a separate authorized operation with its own repository preflight and completion evidence.
 
-The shared metadata and identity contracts are owned by `ozand/workspace-registry`; this command consumes those public contracts without embedding a registry path or allocating a workspace-global lesson ID.
+The universal shared metadata and identity contracts are owned by `kb-bootstrap`. This command consumes those bundled contracts without requiring a particular consumer repository or embedding a registry path. It prepares a candidate but does not allocate or reserve a workspace-global lesson ID.

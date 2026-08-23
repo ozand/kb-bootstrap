@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BRANCH_PATTERN = re.compile(r"^[A-Za-z0-9._/-]+$")
-ID_PATTERN = re.compile(r"^(?:KB|PROJECT)-\d{4}$")
+PROJECT_LESSON_PATTERN = re.compile(r"^PROJECT-\d{4}$")
 SENSITIVE_PATTERNS = [
     re.compile(r"(?i)(token|password|secret|api[_-]?key|authorization)\s*[:=]"),
     re.compile(r"(?i)bearer\s+\S+"),
@@ -70,8 +70,13 @@ def validate_candidate(candidate: Dict[str, Any]) -> List[str]:
         elif len(set(observed)) != len(observed):
             errors.append("observed_in entries must be unique")
         promoted = metadata.get("promoted_from")
-        if not isinstance(promoted, dict) or not _repository(promoted.get("repository")) or not isinstance(promoted.get("lesson_id"), str) or not ID_PATTERN.fullmatch(promoted.get("lesson_id", "")):
-            errors.append("promoted_from must contain repository and lesson ID")
+        if (
+            not isinstance(promoted, dict)
+            or not _repository(promoted.get("repository"))
+            or not isinstance(promoted.get("lesson_id"), str)
+            or not PROJECT_LESSON_PATTERN.fullmatch(promoted.get("lesson_id", ""))
+        ):
+            errors.append("promoted_from must contain repository and PROJECT-XXXX lesson ID")
 
     if not isinstance(content, dict):
         errors.append("content must be an object")
