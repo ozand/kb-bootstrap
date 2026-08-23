@@ -170,6 +170,40 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         search.assert_called_once_with("trace", "raw", Path("."), 5)
 
+    def test_lesson_cache_requires_explicit_lessons(self):
+        with patch(
+            "kb_bootstrap.cli.sync_cache", return_value=("RESULT: OK", True)
+        ) as sync:
+            result = self.run_cli(
+                "lesson-cache",
+                "--source", "source.json",
+                "--cache", "cache.json",
+                "--lesson", "KB-0001",
+                "--prune",
+            )
+
+        self.assertEqual(result, 0)
+        sync.assert_called_once_with(
+            Path("source.json"), Path("cache.json"), ["KB-0001"], True
+        )
+
+    def test_lesson_cache_check_is_read_only(self):
+        with patch(
+            "kb_bootstrap.cli.check_cache", return_value=("RESULT: OK", True)
+        ) as check:
+            result = self.run_cli(
+                "lesson-cache",
+                "--source", "source.json",
+                "--cache", "cache.json",
+                "--lesson", "KB-0001",
+                "--check",
+            )
+
+        self.assertEqual(result, 0)
+        check.assert_called_once_with(
+            Path("source.json"), Path("cache.json"), ["KB-0001"]
+        )
+
     def test_prepare_shared_candidate_command_is_local_only(self):
         with patch(
             "kb_bootstrap.cli.prepare_candidate", return_value=("RESULT: OK", True)
