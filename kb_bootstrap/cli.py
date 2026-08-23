@@ -9,6 +9,7 @@ from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
+from .contribution_candidate import prepare_candidate
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
 
@@ -99,6 +100,12 @@ def main():
     completion_parser.add_argument(
         "--pr", type=int, help="Associated pull request number"
     )
+    candidate_parser = subparsers.add_parser(
+        "prepare-shared-candidate",
+        help="Prepare a sanitized shared lesson candidate locally without publishing",
+    )
+    candidate_parser.add_argument("--input", required=True, help="Candidate input JSON")
+    candidate_parser.add_argument("--output", required=True, help="Prepared candidate output JSON")
     manifest_parser = subparsers.add_parser(
         "manifest", help="Generate or validate sanitized repository context"
     )
@@ -146,6 +153,11 @@ def main():
 
     if args.command == "check-completion":
         report, is_valid = validate_completion(args.repo, args.commit, args.pr)
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "prepare-shared-candidate":
+        report, is_valid = prepare_candidate(Path(args.input), Path(args.output))
         print(report)
         return 0 if is_valid else 1
 

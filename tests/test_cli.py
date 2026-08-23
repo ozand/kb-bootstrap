@@ -170,6 +170,21 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         search.assert_called_once_with("trace", "raw", Path("."), 5)
 
+    def test_prepare_shared_candidate_command_is_local_only(self):
+        with patch(
+            "kb_bootstrap.cli.prepare_candidate", return_value=("RESULT: OK", True)
+        ) as prepare:
+            result = self.run_cli(
+                "prepare-shared-candidate",
+                "--input",
+                "input.json",
+                "--output",
+                "candidate.json",
+            )
+
+        self.assertEqual(result, 0)
+        prepare.assert_called_once_with(Path("input.json"), Path("candidate.json"))
+
     def test_validate_combines_graph_and_qmd_results(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
