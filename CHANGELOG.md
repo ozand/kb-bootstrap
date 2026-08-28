@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Research decisions
+
+- Retain repository-scoped `PROJECT-XXXX` and `KB-XXXX` identifiers with mandatory
+  scope, owner, and provenance; defer global immutable IDs until documented
+  incident/interchange thresholds are met.
+
 ### Architecture correction
 
 - Make `kb-bootstrap` the owner of universal shared lesson metadata, registry
