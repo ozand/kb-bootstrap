@@ -62,6 +62,9 @@ class LessonCacheTests(unittest.TestCase):
             self.assertEqual(entry["registry_version"], "r1")
             self.assertEqual(entry["lesson_version"], "v1")
             self.assertEqual(entry["freshness"], "fresh")
+            self.assertNotIn("scope", entry)
+            self.assertNotIn("owner_repository", entry)
+            self.assertNotIn("registry_owner", entry)
             self.assertNotIn("private", entry["content"])
             self.assertIn("shared store write: no", report)
 

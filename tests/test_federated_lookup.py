@@ -38,6 +38,23 @@ class FederatedLookupTests(unittest.TestCase):
             self.assertIn("[LOCAL] PROJECT-0001", report)
             self.assertIn("provenance: store=project; type=local", report)
 
+    def test_provenance_is_configured_store_label_not_owner_tuple(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_store(root, "local.json", store(lesson("PROJECT-0001", "Local fix", ["timeout"])))
+            report, valid = federated_lookup(
+                config({"name": "project", "type": "local", "path": "local.json"}),
+                "timeout", root,
+            )
+            self.assertTrue(valid)
+            self.assertIn(
+                "provenance: store=project; type=local; lesson=PROJECT-0001",
+                report,
+            )
+            self.assertNotIn("scope=", report)
+            self.assertNotIn("owner=", report)
+            self.assertNotIn("source_repository=", report)
+
     def test_shared_only(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
