@@ -31,6 +31,16 @@ Before using this framework, ensure your host environment has the required toolc
      - Install QMD: `go install github.com/tobi/qmd@latest`
      - *(Ensure your Go binary path `~/go/bin` is in your system `$PATH`)*
 
+The read-only `kb-bootstrap search` wrapper resolves the QMD executable through the
+host `PATH` before invoking it without a shell. This supports Windows executable
+shims and paths containing spaces while preserving argument boundaries. Supported
+runtimes are Python 3.8+ and an installed `qmd` executable; verify availability
+with `qmd --version`, then run a representative search from the project root:
+
+```text
+kb-bootstrap search "how is setup configured?" --project-root .
+```
+
 ---
 
 ## Agent Instructions: How to bootstrap a project

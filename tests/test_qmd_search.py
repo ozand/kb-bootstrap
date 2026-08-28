@@ -102,14 +102,30 @@ class QmdSearchTests(unittest.TestCase):
     def test_missing_qmd_executable_blocks_without_exception(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_project(directory)
-            with patch(
-                "kb_bootstrap.qmd_search.subprocess.run", side_effect=FileNotFoundError
-            ):
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value=None):
                 report, valid = search_qmd("anything", project_root=root)
 
             self.assertFalse(valid)
             self.assertIn("QMD search is unavailable", report)
             self.assertIn("RESULT: BLOCKED", report)
+
+    def test_resolves_windows_executable_path_without_shell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            result = [{"title": "Guide", "file": "qmd://demo-wiki/guide.md", "score": 0.9}]
+            windows_qmd = r"C:\\Program Files\\QMD\\qmd.cmd"
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value=windows_qmd), patch(
+                "kb_bootstrap.qmd_search.subprocess.run",
+                return_value=type("Result", (), {"stdout": json.dumps(result), "returncode": 0})(),
+            ) as run:
+                report, valid = search_qmd("setup", project_root=root)
+
+            self.assertTrue(valid)
+            self.assertIn("[CANONICAL] Guide", report)
+            command = run.call_args.args[0]
+            self.assertEqual(command[0], windows_qmd)
+            self.assertEqual(command[-2:], ["--", "setup"])
+            self.assertFalse(run.call_args.kwargs.get("shell", False))
 
     def test_search_wrapper_uses_only_read_only_qmd_search_command(self):
         with tempfile.TemporaryDirectory() as directory:

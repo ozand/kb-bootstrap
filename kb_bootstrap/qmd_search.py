@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import List, Tuple, Union
@@ -11,9 +12,17 @@ from .qmd_validator import _collection_values
 
 
 def _run(command: List[str], cwd: Path) -> Tuple[str, bool]:
+    if not command:
+        return "", False
+
+    executable = shutil.which(command[0])
+    if executable is None:
+        return "", False
+
+    resolved_command = [executable] + command[1:]
     try:
         result = subprocess.run(
-            command,
+            resolved_command,
             cwd=str(cwd),
             text=True,
             capture_output=True,
