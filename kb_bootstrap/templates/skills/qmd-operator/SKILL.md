@@ -26,7 +26,15 @@ Before reporting a committed change complete, run `kb-bootstrap check-completion
 
 ## Commands
 
-### 1. Update the Index
+### 1. Register the Collections (once per machine)
+`qmd/collections/*.yaml` is this project's declaration; QMD does not read it. QMD only indexes collections registered in its own registry, so register both once:
+```bash
+qmd collection add kb --name <project>-wiki --mask "**/*.md"
+qmd collection add kb/raw --name <project>-raw --mask "**/*.md"
+```
+Until this has run, `qmd search -c <project>-wiki` answers `Collection not found` and `kb-bootstrap search` reports `QMD search is unavailable: Collection not found: <project>-wiki`. Register into the index QMD selects for this directory (global `~/.config/qmd/index.yml` or a project-local `.qmd/index.yml`); `kb-bootstrap search` does not pass `--index`, so a collection under a named index is invisible to it.
+
+### 2. Update the Index
 After adding new files to the knowledge base:
 ```bash
 qmd update
@@ -37,7 +45,7 @@ List configured collections:
 qmd collection list
 ```
 
-### 2. Search and Query
+### 3. Search and Query
 Generated projects use two collections:
 
 - `<project>-wiki` for canonical OKF knowledge; use this by default.
@@ -49,7 +57,7 @@ qmd query "intent: <what you are looking for>\nlex: <keywords>" -c <project>-wik
 qmd search "<source keywords>" -c <project>-raw
 ```
 
-### 3. Read a Document
+### 4. Read a Document
 If QMD returns a reference to a file (e.g., `qmd://my-app/raw/releases.md`), use the context-mode tools to read the actual file from the disk.
 
 ## Configuring a New Collection
@@ -61,6 +69,6 @@ Before reporting knowledge-base work complete:
 
 1. Run `kb-bootstrap validate --dir kb --project-root .`.
 2. Run the project test command.
-3. Run `qmd update`, then smoke-test `qmd search` against both `<project>-wiki` and `<project>-raw`.
+3. Confirm both collections appear in `qmd collection list` (register them with `qmd collection add` if not), run `qmd update`, then smoke-test `qmd search` against both `<project>-wiki` and `<project>-raw`.
 
 Do not claim QMD indexing success when QMD is unavailable or a smoke query was not run.

@@ -263,13 +263,17 @@ kb-bootstrap validate --dir kb --project-root .
 # 2. Project tests
 python -m pytest -q  # replace with the repository's documented test command
 
-# 3. QMD indexing and retrieval smoke tests
+# 3. QMD registration (once per machine per collection), indexing, and retrieval smoke tests
+qmd collection add kb --name <project>-wiki --mask "**/*.md"
+qmd collection add kb/raw --name <project>-raw --mask "**/*.md"
 qmd update
 qmd search "<canonical query>" -c <project>-wiki
 qmd search "<source query>" -c <project>-raw
 ```
 
-Only report QMD rollout as successful when `qmd update` and both smoke searches were actually executed. QMD commands use the official CLI entry points: `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
+`qmd/collections/*.yaml` and `qmd.json` are this package's declarations, checked by `kb-bootstrap validate`; QMD itself does not read them. QMD keeps its own collection registry (`~/.config/qmd/index.yml`, or a project-local `.qmd/index.yml`, or a named index selected with `qmd --index <name>`), and `qmd update` re-indexes only collections already registered there. Until `qmd collection add` has been run for `<project>-wiki`, `qmd search -c <project>-wiki` answers `Collection not found` and `kb-bootstrap search` reports it as `QMD search is unavailable: Collection not found: <project>-wiki`. `kb-bootstrap search` queries whichever index QMD selects for the project directory; it does not pass `--index`, so a collection registered under a named index is not visible to it.
+
+Only report QMD rollout as successful when `qmd collection add`, `qmd update`, and both smoke searches were actually executed. QMD commands use the official CLI entry points: `qmd collection add`, `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
 
 ### Option 2: Umbrella Content Layout
 For knowledge spanning multiple servers or applications in one owning repository.
