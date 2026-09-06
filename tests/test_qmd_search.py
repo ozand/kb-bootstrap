@@ -142,6 +142,72 @@ class QmdSearchTests(unittest.TestCase):
             self.assertNotIn("embed", command)
             self.assertNotIn("collection", command)
 
+    # The three faults that "QMD search is unavailable" used to hide behind one
+    # word. Each must stay distinguishable from the report alone.
+
+    def test_missing_executable_diagnostic_names_the_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value=None):
+                report, valid = search_qmd("anything", project_root=root)
+
+            self.assertFalse(valid)
+            self.assertIn("QMD search is unavailable: qmd executable not found on PATH", report)
+
+    def test_unregistered_collection_diagnostic_is_qmd_stderr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            failed = type(
+                "Result", (), {"stdout": "", "stderr": "Collection not found: demo-wiki\n", "returncode": 1}
+            )()
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
+                "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
+            ):
+                report, valid = search_qmd("anything", project_root=root)
+
+            self.assertFalse(valid)
+            self.assertIn("QMD search is unavailable: Collection not found: demo-wiki", report)
+            self.assertIn("RESULT: BLOCKED", report)
+
+    def test_nonzero_exit_without_output_reports_exit_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            failed = type("Result", (), {"stdout": "", "stderr": "", "returncode": 3})()
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
+                "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
+            ):
+                report, valid = search_qmd("anything", project_root=root)
+
+            self.assertFalse(valid)
+            self.assertIn("QMD search is unavailable: qmd exited 3", report)
+
+    def test_diagnostic_is_one_line_and_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            failed = type(
+                "Result", (), {"stdout": "", "stderr": ("x" * 500) + "\nsecond line\n", "returncode": 1}
+            )()
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
+                "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
+            ):
+                report, _ = search_qmd("anything", project_root=root)
+
+            error_line = next(line for line in report.splitlines() if "QMD search is unavailable" in line)
+            self.assertNotIn("second line", report)
+            self.assertLessEqual(len(error_line), len("  - QMD search is unavailable: ") + 200)
+
+    def test_success_path_and_legacy_two_tuple_patches_are_unchanged(self):
+        # Callers and tests that patch _run with a bare ("", False) still get
+        # the stable phrase with no dangling separator.
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            with patch("kb_bootstrap.qmd_search._run", return_value=("", False)):
+                report, valid = search_qmd("anything", project_root=root)
+
+            self.assertFalse(valid)
+            self.assertIn("  - QMD search is unavailable\n", report + "\n")
+            self.assertNotIn("unavailable:", report)
+
 
 if __name__ == "__main__":
     unittest.main()

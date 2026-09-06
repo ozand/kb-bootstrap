@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Search diagnostics
+
+- `kb-bootstrap search` appends QMD's own one-line diagnostic to
+  `QMD search is unavailable` instead of reporting the bare phrase. The bare
+  phrase covered three different faults with one word: `qmd` not on PATH, the
+  collection never registered with `qmd collection add`, and the collection
+  registered in a different QMD index than the one QMD selects for the project
+  directory. The stable prefix is kept; only the suffix is new.
+- Document the missing registration step. `qmd/collections/*.yaml` and
+  `qmd.json` are kb-bootstrap declarations that QMD does not read; `qmd update`
+  re-indexes only collections already registered. The README pipeline and the
+  `qmd-operator` skill now run `qmd collection add` before `qmd update`.
+
 ### Architecture correction
 
 - Make `kb-bootstrap` the owner of universal shared lesson metadata, registry
