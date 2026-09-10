@@ -14,6 +14,7 @@ from .contribution_candidate import prepare_candidate
 from .lesson_cache import check_cache, sync_cache
 from .shared_metadata import validate_metadata
 from .lesson_registry import next_id, validate_registry
+from .project_lesson_registry import validate_project_registry
 from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
@@ -110,10 +111,24 @@ def main():
     )
     metadata_parser.add_argument("--input", required=True, help="Metadata JSON file")
     registry_parser = subparsers.add_parser(
-        "validate-lesson-registry", help="Validate lesson IDs, files, frontmatter, and index consistency"
+        "validate-lesson-registry", help="Validate the shared KB-XXXX lesson registry"
     )
-    registry_parser.add_argument("--root", required=True, help="Registry root with lessons/ and index.yaml")
-    registry_parser.add_argument("--next-id", action="store_true", help="Suggest the next ID only after validation")
+    registry_parser.add_argument(
+        "--root", required=True,
+        help="Shared registry root containing lessons/ and index.yaml",
+    )
+    registry_parser.add_argument("--next-id", action="store_true", help="Suggest the next shared KB-XXXX ID only after validation")
+    project_registry_parser = subparsers.add_parser(
+        "validate-project-lessons", help="Validate the project-local PROJECT-XXXX lesson schema"
+    )
+    project_registry_parser.add_argument(
+        "--root", required=True,
+        help="Project-local lessons directory, for example kb/lessons",
+    )
+    project_registry_parser.add_argument(
+        "--project-root", default=".",
+        help="Repository root used to resolve index path values (default: current directory)",
+    )
     lookup_parser = subparsers.add_parser(
         "lesson-lookup", help="Read-only lookup across explicitly configured local/shared stores"
     )
@@ -223,6 +238,18 @@ def main():
             print(f"next lesson ID: {lesson_id}")
             return 0
         errors, summary = validate_registry(root)
+        if errors:
+            print(f"RESULT: BLOCKED ({len(errors)} error(s))")
+            for error in errors:
+                print(f"  - {error}")
+            return 1
+        print("RESULT: OK")
+        print(f"lesson files: {summary['files']}")
+        print(f"index entries: {summary['entries']}")
+        return 0
+
+    if args.command == "validate-project-lessons":
+        errors, summary = validate_project_registry(args.root, args.project_root)
         if errors:
             print(f"RESULT: BLOCKED ({len(errors)} error(s))")
             for error in errors:
