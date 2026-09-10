@@ -1,6 +1,6 @@
 # ADR-001: Validate project-local lesson registries with a separate schema-aware command
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-10
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -83,12 +83,14 @@ Generated project-local registries remain unverifiable by the package's registry
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| A valid project-local registry passes | `tests/test_project_lesson_registry.py::test_valid_project_registry` | not yet written |
-| `PROJECT-XXXX` and configured `id_prefix` are enforced | `tests/test_project_lesson_registry.py::test_id_prefix_and_id_validation` | not yet written |
-| Index paths resolve from the repository root and agree with files/frontmatter | `tests/test_project_lesson_registry.py::test_path_filename_frontmatter_consistency` | not yet written |
-| `SCHEMA.md` is not treated as a lesson | `tests/test_project_lesson_registry.py::test_schema_file_is_excluded` | not yet written |
-| Shared validation remains unchanged | `tests/test_lesson_registry.py` | passing before this change |
-| CLI help distinguishes project-local and shared schemas | `tests/test_cli.py::test_registry_help_names_schema` | not yet written |
+| A valid project-local registry passes | `tests/test_project_lesson_registry.py::test_valid_project_registry` | passing |
+| `PROJECT-XXXX` and configured `id_prefix` are enforced | `tests/test_project_lesson_registry.py::test_id_prefix_and_id_validation` | passing |
+| Index paths resolve from the repository root and agree with files/frontmatter | `tests/test_project_lesson_registry.py::test_path_filename_frontmatter_consistency` | passing |
+| Malformed frontmatter fails closed | `tests/test_project_lesson_registry.py::test_malformed_frontmatter_closing_delimiter_is_rejected` | passing |
+| Symlinked contract or lesson paths fail closed before content is trusted | `tests/test_project_lesson_registry.py::test_symlink_contract_file_is_rejected`, `test_symlink_lesson_is_rejected`, `test_symlinked_lessons_directory_is_rejected` | passing |
+| `SCHEMA.md` is not treated as a lesson | `tests/test_project_lesson_registry.py::test_schema_file_is_excluded` | passing |
+| Shared validation remains unchanged | `tests/test_lesson_registry.py` | passing |
+| CLI help distinguishes project-local and shared schemas | `tests/test_cli.py::test_registry_help_names_schema`, `tests/test_project_lesson_registry.py::test_cli_help_names_project_local_schema` | passing |
 
 ## Rollback
 

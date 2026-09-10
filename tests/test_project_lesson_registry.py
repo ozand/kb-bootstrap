@@ -91,6 +91,27 @@ class ProjectLessonRegistryTests(unittest.TestCase):
                 errors,
             )
 
+    def test_malformed_frontmatter_closing_delimiter_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lesson_file = root / "kb" / "lessons" / "PROJECT-0001-example.md"
+            lesson_file.parent.mkdir(parents=True)
+            lesson_file.write_text(
+                "---\nid: PROJECT-0001\n---oops\n\n# Malformed\n",
+                encoding="utf-8",
+            )
+            lessons = write_project_registry(
+                root,
+                [{"id": "PROJECT-0001", "path": "kb/lessons/" + lesson_file.name}],
+            )
+
+            errors, _ = validate_project_registry(lessons, root)
+
+            self.assertIn(
+                "project-local lesson PROJECT-0001 filename/frontmatter ID mismatch",
+                errors,
+            )
+
     def test_schema_file_is_excluded(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -112,9 +133,37 @@ class ProjectLessonRegistryTests(unittest.TestCase):
             errors, _ = validate_project_registry(lessons, root)
 
             self.assertIn(
-                "project-local index entry PROJECT-0001 path must be under kb/lessons",
+                "project-local index path is outside lessons directory: docs/PROJECT-0001-example.md",
                 errors,
             )
+
+    def test_custom_lessons_directory_is_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lessons = root / "knowledge" / "lessons"
+            lessons.mkdir(parents=True)
+            (lessons / "SCHEMA.md").write_text("# Schema\n", encoding="utf-8")
+            lesson_file = lessons / "PROJECT-0001-example.md"
+            lesson_file.write_text("---\nid: PROJECT-0001\n---\n", encoding="utf-8")
+            (lessons / "index.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "scope": "project",
+                        "id_prefix": "PROJECT-",
+                        "lessons": [
+                            {"id": "PROJECT-0001", "path": "knowledge/lessons/PROJECT-0001-example.md"}
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            errors, summary = validate_project_registry(lessons, root)
+
+            self.assertEqual(errors, [])
+            self.assertEqual(summary["files"], 1)
 
     def test_path_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -127,8 +176,88 @@ class ProjectLessonRegistryTests(unittest.TestCase):
             errors, _ = validate_project_registry(lessons, root)
 
             self.assertIn(
-                "project-local index entry PROJECT-0001 path must be under kb/lessons",
+                "project-local index path is outside lessons directory: ../outside.md",
                 errors,
+            )
+
+    def test_symlink_lesson_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lessons = write_project_registry(root)
+            target = root / "PROJECT-0001-target.md"
+            target.write_text("---\nid: PROJECT-0001\n---\n", encoding="utf-8")
+            link = lessons / "PROJECT-0001-example.md"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation is unavailable")
+            (lessons / "index.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "scope": "project",
+                        "id_prefix": "PROJECT-",
+                        "lessons": [
+                            {"id": "PROJECT-0001", "path": "kb/lessons/PROJECT-0001-example.md"}
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            errors, _ = validate_project_registry(lessons, root)
+
+            self.assertTrue(any("traverses a symlink" in error for error in errors))
+
+    def test_symlink_contract_file_is_rejected(self):
+        for name in ("index.yaml", "SCHEMA.md"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                lessons = write_project_registry(root)
+                link = lessons / name
+                link.unlink()
+                target = root / f"external-{name}"
+                if name == "index.yaml":
+                    target.write_text(
+                        yaml.safe_dump(
+                            {
+                                "version": 1,
+                                "scope": "project",
+                                "id_prefix": "PROJECT-",
+                                "lessons": [],
+                            },
+                            sort_keys=False,
+                        ),
+                        encoding="utf-8",
+                    )
+                else:
+                    target.write_text("# External schema\n", encoding="utf-8")
+                try:
+                    link.symlink_to(target)
+                except (OSError, NotImplementedError):
+                    self.skipTest("symlink creation is unavailable")
+
+                errors, _ = validate_project_registry(lessons, root)
+
+                self.assertIn(f"project-local {name} traverses a symlink", errors)
+
+    def test_symlinked_lessons_directory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            real = root / "real-lessons"
+            real.mkdir()
+            link = root / "linked-lessons"
+            try:
+                link.symlink_to(real, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symlink creation is unavailable")
+
+            errors, _ = validate_project_registry(link, root)
+
+            self.assertEqual(
+                errors,
+                ["project-local lessons directory traverses a symlink"],
             )
 
     def test_cli_help_names_project_local_schema(self):

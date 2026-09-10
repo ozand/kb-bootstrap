@@ -20,14 +20,26 @@ def _load_yaml(path: Path) -> Dict[str, object]:
 
 
 def _frontmatter(path: Path) -> Dict[str, object]:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] != "---":
         return {}
-    end = text.find("\n---", 4)
-    if end == -1:
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
         return {}
-    parsed = yaml.safe_load(text[4:end])
+    parsed = yaml.safe_load("\n".join(lines[1:end]))
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _traverses_symlink(path: Path) -> bool:
+    """Return whether any existing component of ``path`` is a symlink."""
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def _relative_path(path: Path, project_root: Path) -> str:
@@ -43,10 +55,17 @@ def validate_project_registry(
     IDs controlled by its ``id_prefix``. ``SCHEMA.md`` is documentation, not a
     lesson file.
     """
-    lessons_dir = Path(root).resolve()
-    repository_root = Path(project_root).resolve()
+    raw_lessons_dir = Path(root).absolute()
+    raw_repository_root = Path(project_root).absolute()
     errors: List[str] = []
 
+    if _traverses_symlink(raw_repository_root):
+        return ["project root traverses a symlink"], {}
+    if _traverses_symlink(raw_lessons_dir):
+        return ["project-local lessons directory traverses a symlink"], {}
+
+    lessons_dir = raw_lessons_dir.resolve()
+    repository_root = raw_repository_root.resolve()
     if not lessons_dir.is_dir():
         return ["project-local lessons directory is unavailable"], {}
     try:
@@ -56,9 +75,13 @@ def validate_project_registry(
 
     index_path = lessons_dir / "index.yaml"
     schema_path = lessons_dir / "SCHEMA.md"
-    if not index_path.is_file():
+    if _traverses_symlink(index_path):
+        errors.append("project-local index.yaml traverses a symlink")
+    elif not index_path.is_file():
         errors.append("project-local index.yaml is unavailable")
-    if not schema_path.is_file():
+    if _traverses_symlink(schema_path):
+        errors.append("project-local SCHEMA.md traverses a symlink")
+    elif not schema_path.is_file():
         errors.append("project-local SCHEMA.md is unavailable")
     if errors:
         return errors, {}
@@ -108,14 +131,18 @@ def validate_project_registry(
         if candidate.is_absolute() or "\\" in lesson_path:
             errors.append(f"project-local index entry {lesson_id or position} has an invalid path")
             continue
-        if not lesson_path.startswith("kb/lessons/"):
-            errors.append(f"project-local index entry {lesson_id or position} path must be under kb/lessons")
+        unresolved = repository_root / candidate
+        if _traverses_symlink(unresolved):
+            errors.append(
+                f"project-local index entry {lesson_id or position} traverses a symlink"
+            )
             continue
-        resolved = (repository_root / candidate).resolve()
+        resolved = unresolved.resolve()
         try:
             resolved.relative_to(repository_root)
+            resolved.relative_to(lessons_dir)
         except ValueError:
-            errors.append(f"project-local index path escapes project root: {lesson_path}")
+            errors.append(f"project-local index path is outside lessons directory: {lesson_path}")
             continue
         normalized = _relative_path(resolved, repository_root)
         index_paths.append(normalized)
@@ -135,6 +162,11 @@ def validate_project_registry(
     lesson_files: List[Path] = []
     for lesson_file in sorted(lessons_dir.glob("*.md")):
         if lesson_file.name == "SCHEMA.md":
+            continue
+        if _traverses_symlink(lesson_file):
+            errors.append(
+                f"project-local lesson traverses a symlink: {lesson_file.name}"
+            )
             continue
         lesson_files.append(lesson_file)
         filename_match = FILENAME_PATTERN.fullmatch(lesson_file.name)
