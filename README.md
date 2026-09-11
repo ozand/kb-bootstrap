@@ -241,6 +241,8 @@ kb-bootstrap lesson-lookup --config lookup-bundle.json --query "timeout" --timeo
 
 These commands require explicit files/directories, perform no hidden store discovery, and do not write lessons, indexes, registries, or external repositories. [`lookup-bundle.json`](docs/LESSON_LOOKUP_BUNDLE.md) is a separate read-only search input containing at most one explicit local JSON store and one explicit shared JSON store; it is not the generated capture-routing `lesson-stores.json`. Local results take precedence, and the shared store is queried only when local lookup has no match.
 
+Lesson identity remains repository-owned: `PROJECT-XXXX` and `KB-XXXX` are globally distinguished by scope, owner repository, and provenance. The bounded [lesson identity research](docs/LESSON_IDENTITY_RESEARCH.md) recommends against UUID/ULID or distributed allocation until measurable evidence thresholds are met.
+
 ### Validate the generated knowledge base
 
 Run structural validation from the project root:
