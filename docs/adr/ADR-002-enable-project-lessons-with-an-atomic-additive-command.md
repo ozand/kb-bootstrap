@@ -1,6 +1,6 @@
 # ADR-002: Enable project lessons with an atomic additive command
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-11
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -37,7 +37,7 @@ The command uses one bounded helper that performs a complete read-only preflight
 - A four-artifact contract installation when all four artifacts are absent.
 - A deterministic successful no-op when all four artifacts exist and the project-local registry plus routing contract are valid.
 - A fail-closed result when the target is not initialized, the contract is partial, any destination/path component traverses a symlink, an existing contract is malformed/conflicting, or an atomic write cannot complete.
-- A bounded atomic installation: stage all four files inside their destination directories, then atomically replace only absent destinations; if replacement fails, remove files already installed by this invocation and clean all temporary files.
+- A bounded installation with per-file exclusive no-overwrite publication and compensating rollback: stage all four files inside their destination directories, publish only to absent destinations, and on failure remove only files still proven to have been installed by this invocation plus all owned temporary files.
 - A sanitized receipt listing only stable relative artifact names and whether the result was `enabled` or `already enabled`.
 
 ### What this IS NOT
@@ -68,7 +68,7 @@ Rejected. Existing indexes can contain lessons, routing can include reviewed loc
 
 ### Alternative 4 — Write files directly in sequence
 
-Rejected. A failure after one or more direct writes leaves a partial contract. Staging plus atomic replacement and compensating removal bounds the failure.
+Rejected. A failure after one or more direct writes leaves a partial contract. Staging plus per-file exclusive publication and compensating removal bounds the failure. There is no portable all-or-nothing filesystem transaction across the four destination paths, so the command does not claim global atomic visibility.
 
 ### Alternative 5 — Add another initializer flag or generator mode
 
@@ -86,7 +86,7 @@ Rejected. Placement and lifecycle are not content topology modes. A distinct com
 ### What gets harder
 
 - The CLI owns a second lifecycle operation in addition to initialization.
-- Four-artifact installation needs staging, rollback, and injected-failure tests.
+- Four-artifact installation needs staging, exclusive publication, ownership-aware rollback, and injected-failure tests.
 - Complete existing contracts require both routing validation and project registry validation before the command may report a no-op.
 - Consumers with partial contracts must resolve them explicitly rather than receiving automatic repair.
 
@@ -100,13 +100,13 @@ Rejected. Placement and lifecycle are not content topology modes. A distinct com
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Eligible initialized repository receives exactly four artifacts | `tests/test_project_lesson_enablement.py::test_enables_only_project_lesson_contract` | not yet written |
-| Resulting registry passes ADR-001 validation | `tests/test_project_lesson_enablement.py::test_enabled_registry_validates` | not yet written |
-| Complete valid contract is a deterministic byte-preserving no-op | `tests/test_project_lesson_enablement.py::test_complete_contract_is_idempotent_no_op` | not yet written |
-| Unrelated QMD and skills remain byte-for-byte unchanged | `tests/test_project_lesson_enablement.py::test_unrelated_configuration_is_preserved` | not yet written |
-| Partial, malformed, conflicting, escaping, or symlinked state blocks before mutation | focused rejection cases in `tests/test_project_lesson_enablement.py` | not yet written |
-| Injected replacement failure leaves no partial contract or temporary files | `tests/test_project_lesson_enablement.py::test_atomic_failure_rolls_back` | not yet written |
-| CLI exposes the explicit post-init command and sanitized receipt | `tests/test_project_lesson_enablement.py::test_cli_enablement_receipt` | not yet written |
+| Eligible initialized repository receives exactly four artifacts | `tests/test_project_lesson_enablement.py::test_enables_only_project_lesson_contract` | passing |
+| Resulting registry passes ADR-001 validation | `tests/test_project_lesson_enablement.py::test_enables_only_project_lesson_contract` | passing |
+| Complete valid contract is a deterministic byte-preserving no-op | `tests/test_project_lesson_enablement.py::test_complete_contract_is_idempotent_no_op` | passing |
+| Unrelated QMD and skills remain byte-for-byte unchanged | `tests/test_project_lesson_enablement.py::test_enables_only_project_lesson_contract` | passing |
+| Partial, malformed, conflicting, escaping, or symlinked state blocks before mutation | focused rejection cases in `tests/test_project_lesson_enablement.py` | passing |
+| Injected replacement failure leaves no owned partial contract or temporary files and preserves foreign replacements | `tests/test_project_lesson_enablement.py::test_atomic_failure_rolls_back`, `test_race_replacement_is_not_deleted_during_rollback` | passing |
+| CLI exposes the explicit post-init command and sanitized receipt | `tests/test_project_lesson_enablement.py::test_cli_enablement_receipt`, `test_receipt_is_sanitized` | passing |
 
 ## Rollback
 

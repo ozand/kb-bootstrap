@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Project-local lessons
+
+- Add `kb-bootstrap enable-project-lessons --target <repository-root>` for bounded post-init enablement without rerunning the initializer or rewriting unrelated QMD and skill configuration.
+- Install exactly the existing four-file project-local lesson contract when fully absent, return a deterministic no-op when complete and valid, and fail closed on partial, malformed, conflicting, path-escaping, or symlinked state.
+- Stage writes and publish each file exclusively without overwrite, with ownership-aware compensating rollback after failure.
+
 ### Search diagnostics
 
 - `kb-bootstrap search` appends QMD's own one-line diagnostic to
