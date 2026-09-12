@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -278,11 +279,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         prepare.assert_called_once_with(Path("input.json"), Path("candidate.json"))
 
-    def test_validate_combines_graph_and_qmd_results(self):
+    def test_validate_combines_profile_graph_and_qmd_results(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.run_cli("--target", directory, "--type", "single")
             (root / "kb/index.md").write_text("# Index\n", encoding="utf-8")
+            (root / "kb/overview.md").write_text(
+                "---\ntype: Concept\nstatus: stable\n---\n\n# Overview\n",
+                encoding="utf-8",
+            )
 
             result = self.run_cli(
                 "validate",
@@ -294,11 +299,52 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
 
+    def test_validate_defaults_to_generated_kb_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.run_cli("--target", directory, "--type", "single")
+            (root / "kb/overview.md").write_text(
+                "---\ntype: Concept\n---\n\n# Overview\n",
+                encoding="utf-8",
+            )
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch("sys.argv", ["kb-bootstrap", "validate", "--project-root", directory]):
+                    result = main()
+            finally:
+                os.chdir(previous)
+
+            self.assertEqual(result, 0)
+
+    def test_validate_fails_when_canonical_profile_is_invalid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.run_cli("--target", directory, "--type", "single")
+            (root / "kb/invalid.md").write_text(
+                "---\ntitle: Missing type\nstatus: active\n---\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_cli(
+                "validate",
+                "--dir",
+                str(root / "kb"),
+                "--project-root",
+                directory,
+            )
+
+            self.assertEqual(result, 1)
+
     def test_validate_fails_when_collection_path_is_missing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.run_cli("--target", directory, "--type", "single")
             (root / "kb/index.md").write_text("# Index\n", encoding="utf-8")
+            (root / "kb/overview.md").write_text(
+                "---\ntype: Concept\nstatus: stable\n---\n\n# Overview\n",
+                encoding="utf-8",
+            )
             (root / "qmd/collections/raw.yaml").write_text(
                 "name: project-raw\npaths:\n  - ../../missing/\n",
                 encoding="utf-8",

@@ -23,6 +23,22 @@ class GraphLinterTests(unittest.TestCase):
             self.assertFalse(is_valid)
             self.assertIn("missing.md", report)
 
+    def test_raw_and_lesson_directories_are_excluded_case_insensitively(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "index.md").write_text("[Guide](guide.md)\n", encoding="utf-8")
+            (root / "guide.md").write_text("# Guide\n", encoding="utf-8")
+            for relative in ("raw/source.md", "Raw/source.md", "lessons/item.md", "Lessons/item.md"):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("[Missing](missing.md)\n", encoding="utf-8")
+
+            report, is_valid = validate(root)
+
+            self.assertTrue(is_valid)
+            self.assertIn("Nodes (MD Files): 2", report)
+            self.assertIn("DEAD LINKS: 0", report)
+
     def test_orphans_are_reported(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -1,6 +1,6 @@
 # ADR-003: Use a minimal OKF v0.2 canonical profile with separate graph integrity
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-12
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -31,7 +31,7 @@ An ordinary canonical concept passes the core profile when:
 - the frontmatter parses to a mapping;
 - `type` is a non-empty string.
 
-Unknown `type` values and unknown additional frontmatter keys are accepted. Validation is read-only and never normalizes, drops, or rewrites metadata.
+Unknown `type` values and unknown additional frontmatter keys are accepted. Scalar values are loaded as authored strings for profile type checks, avoiding YAML 1.1 boolean/date/number coercion. Validation is read-only and leaves source bytes unchanged; it does not claim to round-trip or transform metadata. Static symlinked roots, directories, and files fail closed. The validator rechecks paths immediately before reading, but like ordinary path-based filesystem tools it does not claim a race-free snapshot under concurrent replacement; consumers must validate a stable checkout.
 
 ### Generated guidance
 
@@ -59,7 +59,7 @@ Other OKF v0.2 families (`sources`, `generated`, `verified`, `stale_after`, and 
 
 ### Reserved files
 
-- `index.md` and `log.md` are excluded from ordinary concept-frontmatter validation.
+- `index.md` and `log.md` are reserved case-insensitively and excluded from ordinary concept-frontmatter validation at every directory level.
 - This increment does not add structural validation for their optional/conventional body formats.
 - A root `index.md` version declaration remains allowed and is not rewritten.
 
@@ -69,13 +69,13 @@ Existing dead-link and orphan analysis remains the **kb-bootstrap graph-integrit
 
 - dead links continue to fail `kb-bootstrap validate`;
 - orphans continue to be warnings;
-- `raw/` remains excluded.
+- case-insensitive `raw/` and `lessons/` directories remain excluded so graph analysis uses the same canonical content boundary.
 
 Documentation must state that dead-link rejection is intentionally stricter than OKF v0.2 conformance. The validator report presents canonical-profile and graph-integrity results as separate sections so a user cannot mistake one for the other.
 
 ### CLI integration
 
-The existing `kb-bootstrap validate --dir <canonical-root> --project-root <root>` command runs:
+The existing `kb-bootstrap validate --dir <canonical-root> --project-root <root>` command runs, with `--dir` defaulting to the generated canonical root `kb`:
 
 1. canonical OKF v0.2 profile validation;
 2. existing graph-integrity validation;
@@ -133,14 +133,14 @@ Rejected and explicitly out of scope. Validation reports mismatches only. Migrat
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Generated guidance includes required `type` and `status: stable` | focused skill/profile test | not yet written |
-| Missing/empty `type` and malformed frontmatter fail deterministically | canonical profile fixtures | not yet written |
-| Unknown types and additional fields are accepted without mutation | canonical profile fixtures with byte comparison | not yet written |
-| Generated optional fields use the documented types/status values | canonical profile valid/invalid fixtures | not yet written |
-| Reserved files and raw directories are excluded | canonical profile traversal tests | not yet written |
-| Repeated validation produces byte-identical reports and does not rewrite inputs | deterministic repeat test | not yet written |
-| Graph dead links remain a separately labelled local failure | combined CLI/report tests | not yet written |
-| Existing QMD and graph behavior remain covered | full repository suite | passing before implementation |
+| Generated guidance includes required `type` and `status: stable` | focused skill/profile test | passing |
+| Missing/empty `type` and malformed frontmatter fail deterministically | `tests/test_canonical_profile.py` invalid fixtures | passing |
+| Unknown types and additional fields are accepted without mutation | `test_valid_minimal_and_unknown_metadata_pass_without_mutation` | passing |
+| Generated optional fields use the documented types/status values | `test_generated_optional_fields_are_validated` | passing |
+| Reserved files and raw/lesson directories are excluded case-insensitively | canonical profile and graph traversal tests | passing |
+| Repeated validation produces byte-identical reports and does not rewrite inputs | canonical profile repeat/byte tests | passing |
+| Graph dead links remain a separately labelled local failure | combined CLI/report tests | passing |
+| Existing QMD and graph behavior remain covered | full repository suite | passing |
 
 ## Rollback
 
