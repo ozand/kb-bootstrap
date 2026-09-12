@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.3.0 — 2026-09-12
+
 ### Project-local lessons
 
-- Add `kb-bootstrap enable-project-lessons --target <repository-root>` for bounded post-init enablement without rerunning the initializer or rewriting unrelated QMD and skill configuration.
-- Install exactly the existing four-file project-local lesson contract when fully absent, return a deterministic no-op when complete and valid, and fail closed on partial, malformed, conflicting, path-escaping, or symlinked state.
-- Stage writes and publish each file exclusively without overwrite, with ownership-aware compensating rollback after failure.
+- Add the public `kb-bootstrap enable-project-lessons --target <repository-root>` command for bounded post-init enablement without rerunning the initializer or rewriting unrelated QMD and skill configuration.
+- Install the four project-local contract files when fully absent, return a deterministic no-op when complete and valid, and fail closed on partial, malformed, conflicting, path-escaping, or symlinked state.
+- Stage writes and install each file exclusively without overwriting existing destinations; use compensating rollback that removes only files still identified as created by this invocation.
 
 ### Search diagnostics
 
@@ -23,17 +27,29 @@
 
 ### Research decisions
 
-- Retain repository-scoped `PROJECT-XXXX` and `KB-XXXX` identifiers with mandatory
-  scope, owner, and provenance; defer global immutable IDs until documented
-  incident/interchange thresholds are met.
+- Retain repository-scoped `PROJECT-XXXX` and `KB-XXXX` identifiers; require
+  scope, owner, and provenance at identity-safe interchange boundaries, and defer
+  global immutable IDs until documented incident/interchange thresholds are met.
 
-### Architecture correction
+### Universal lesson workflows
 
 - Make `kb-bootstrap` the owner of universal shared lesson metadata, registry
   identity/index validation, fail-closed ID guidance, and explicit local/shared
   lookup orchestration.
+- Add explicit canonical/raw QMD search, local shared-contribution candidate preparation,
+  and bounded offline shared-lesson caching.
+- Add a separate validator and CLI command for generated project-local `PROJECT-XXXX`
+  registries without changing the shared `KB-XXXX` registry contract.
 - Keep every consumer repository optional and independently configured; no
   workspace-specific repository or filesystem path is required.
+
+### Documentation and migration
+
+- Clarify that repository placement is independent from `single` or `umbrella`
+  content topology.
+- Document staged existing-consumer migration plus deterministic lesson routing,
+  promotion/demotion, lookup-bundle, candidate, cache, shared metadata, and identity policies.
+- Add ADR-001 for the project-local validator and ADR-002 for bounded post-init enablement.
 
 ## 0.2.1 — 2026-08-23
 
