@@ -15,6 +15,7 @@ from .lesson_cache import check_cache, sync_cache
 from .shared_metadata import validate_metadata
 from .lesson_registry import next_id, validate_registry
 from .project_lesson_registry import validate_project_registry
+from .project_lesson_enablement import enable_project_lessons
 from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
@@ -128,6 +129,16 @@ def main():
     project_registry_parser.add_argument(
         "--project-root", default=".",
         help="Repository root used to resolve index path values (default: current directory)",
+    )
+    enable_lessons_parser = subparsers.add_parser(
+        "enable-project-lessons",
+        help="Safely enable project-local lessons in an initialized repository",
+    )
+    enable_lessons_parser.add_argument(
+        "--target",
+        default=".",
+        dest="enable_target",
+        help="Initialized repository root (default: current directory)",
     )
     lookup_parser = subparsers.add_parser(
         "lesson-lookup", help="Read-only lookup across explicitly configured local/shared stores"
@@ -259,6 +270,12 @@ def main():
         print(f"lesson files: {summary['files']}")
         print(f"index entries: {summary['entries']}")
         return 0
+
+    if args.command == "enable-project-lessons":
+        pkg_dir = Path(__file__).parent.resolve()
+        report, is_valid = enable_project_lessons(args.enable_target, pkg_dir)
+        print(report)
+        return 0 if is_valid else 1
 
     if args.command == "lesson-lookup":
         config_path = Path(args.config).resolve()
