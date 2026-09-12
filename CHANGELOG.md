@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-No unreleased changes.
+### Research decisions
+
+- Keep cross-repository lesson promotion as one-owner, explicitly reviewed operations; prefer idempotent evidence, read-only reconciliation, and separately authorized compensation over distributed transactions.
+- Define measurable incident, recovery-time, adoption, and audit thresholds before implementing a reconciliation receipt or reconsidering automatic coordination.
 
 ## 0.3.0 — 2026-09-12
 
