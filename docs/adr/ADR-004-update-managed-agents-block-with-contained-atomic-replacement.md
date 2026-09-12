@@ -1,6 +1,6 @@
 # ADR-004: Update the managed AGENTS.md block with contained atomic replacement
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-13
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -52,7 +52,7 @@ The helper receives `project_root` and target path separately. It reports only s
 For an existing target, capture before planning:
 
 - exact bytes;
-- a content digest;
+- exact content bytes;
 - stable file identity where available (`st_dev`, `st_ino`);
 - mode bits to preserve.
 
@@ -67,10 +67,10 @@ For a missing target, record the missing state. If a file appears before publica
 - Create one uniquely named temporary file in the existing target directory using exclusive creation.
 - Write all bytes, flush, and `fsync` the temporary file.
 - Recheck target path safety and source state immediately before publication:
-  - existing target must still be the same regular non-symlink file identity and exact bytes/digest;
+  - existing target must still be the same regular non-symlink file identity and exact bytes;
   - missing target must still be absent and non-symlink.
 - For an existing target, publish with same-directory atomic `os.replace` and preserve original mode bits on the staged file before replacement.
-- For a missing target, publish with an exclusive no-overwrite primitive. If the platform cannot provide it, fail closed rather than overwrite a race-created file.
+- For a missing target, publish with the platform's hard-link exclusive no-overwrite primitive. If the filesystem or policy does not support hard links, fail closed with a sanitized atomic-update category rather than overwrite a race-created file.
 - Remove owned temporary files on every failure. Never delete or overwrite a destination whose identity no longer matches the observed source state.
 
 Atomicity means readers see either the complete old file or the complete new file at the replacement point. It does not mean the command locks out all future writers or provides a cross-process transaction after publication.
@@ -140,15 +140,15 @@ Rejected as overengineering. Issue #60 needs one bounded managed-file operation.
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Contained regular target creation and update succeed | focused governance success tests | not yet written |
-| Absolute, escaping, NUL, unavailable-root, and missing-parent paths block without mutation | path boundary tests | not yet written |
-| Project-root, parent, and target symlinks block before read/write | symlink tests | not yet written |
-| Unmanaged bytes and existing mode remain unchanged | byte/mode preservation tests | not yet written |
-| Detected concurrent modification preserves the foreign edit | injected pre-replace race tests | not yet written |
-| Existing replacement is atomic and injected write/replace failures preserve old bytes | staging/replacement failure tests | not yet written |
-| Missing-target publication never overwrites a race-created file | exclusive-create race test | not yet written |
-| Temporary artifacts are cleaned and reports contain no private paths/content | cleanup/sanitization tests | not yet written |
-| Repeated unchanged update is a no-op | existing idempotence test | passing before implementation |
+| Contained regular target creation and update succeed | governance creation/update tests | passing |
+| Absolute, escaping, NUL, unavailable-root, and missing-parent paths block without mutation | `test_absolute_escape_nul_missing_parent_and_unavailable_root_block` | passing |
+| Project-root, parent, and target symlinks block before read/write | static and staged-parent symlink tests | passing |
+| Unmanaged bytes and supported existing mode remain unchanged | `test_append_and_update_preserve_surrounding_bytes_and_mode` | passing |
+| Detected concurrent modification preserves the foreign edit | `test_concurrent_modification_blocks_and_preserves_foreign_edit` | passing |
+| Existing replacement is atomic and injected write/replace failures preserve old bytes | atomic/staging failure tests | passing |
+| Missing-target publication never overwrites a race-created file and unsupported hard links fail cleanly | missing-target race/capability tests | passing |
+| Temporary artifacts are cleaned and reports contain no private paths/content | cleanup and sanitized boundary tests | passing |
+| Repeated unchanged update is a no-op | `test_repeated_update_is_idempotent` | passing |
 
 ## Rollback
 

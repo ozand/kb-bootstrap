@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Managed AGENTS.md hardening
+
+- Contain `agents-governance` targets within an explicit project root and reject absolute, escaping, invalid, non-regular, or static symlinked paths before mutation.
+- Stage complete managed-block updates, recheck source identity/content, preserve unmanaged bytes and supported mode bits, and publish existing files with same-directory atomic replacement.
+- Publish missing files exclusively without overwriting race-created content; fail closed on detected concurrency or write errors and clean owned temporary files.
+
 ### Canonical OKF profile
 
 - Align generated canonical wiki guidance with a documented minimal OKF v0.2 profile: require non-empty `type`, recommend descriptive fields plus `status: stable`, and accept unknown types/metadata without rewriting source files.
