@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .graph_linter import validate
+from .canonical_profile import validate_canonical_profile
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
@@ -62,7 +63,9 @@ def main():
     validate_parser = subparsers.add_parser(
         "validate", help="Validate Markdown links and QMD collection configuration"
     )
-    validate_parser.add_argument("--dir", default="docs", help="Base directory to scan")
+    validate_parser.add_argument(
+        "--dir", default="kb", help="Canonical knowledge directory to scan (default: kb)"
+    )
     validate_parser.add_argument(
         "--project-root",
         default=".",
@@ -190,12 +193,17 @@ def main():
     args = parser.parse_args()
 
     if args.command == "validate":
+        profile_report, profile_valid = validate_canonical_profile(args.dir)
         graph_report, graph_valid = validate(args.dir)
         qmd_report, qmd_valid = validate_qmd_collections(args.project_root)
+        print(profile_report)
+        print()
+        print("=== kb-bootstrap Graph Integrity Extension ===")
+        print("Dead links fail this local check even though OKF v0.2 tolerates them.")
         print(graph_report)
         print()
         print(qmd_report)
-        return 0 if graph_valid and qmd_valid else 1
+        return 0 if profile_valid and graph_valid and qmd_valid else 1
 
     if args.command == "search":
         report, is_valid = search_qmd(

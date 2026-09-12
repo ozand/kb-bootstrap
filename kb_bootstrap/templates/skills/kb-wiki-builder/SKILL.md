@@ -27,27 +27,20 @@ Before claiming a committed article or framework update complete, run `kb-bootst
 ## Rules for Extraction
 
 1. **No Hallucination:** Only extract claims that are explicitly stated in the `raw/` files. Do not invent features or guess compatibility.
-2. **OKF Format:** All generated wiki files MUST include a strict YAML frontmatter.
+2. **OKF Format:** All generated wiki concept files MUST follow the kb-bootstrap canonical OKF v0.2 profile. `type` is the only always-required OKF key; unknown types and additional human-authored keys are allowed.
 3. **Location:** Save the generated files in the canonical knowledge root (e.g., `kb/overview.md` or `kb/apps/<app>/overview.md`), NEVER in `raw/`.
 
 ## OKF Markdown Template
 
-Use this exact structure for the generated files:
+Use this profile-aligned structure for generated ordinary concept files:
 
 ```markdown
 ---
-id: <PREFIX>-<NUMBER> (e.g., APP-001)
+type: "<Descriptive concept type, e.g. Concept, Architecture, Setup>"
 title: "<Clear, descriptive title>"
-category: "<e.g., concept, architecture, setup>"
+description: "<One-sentence summary>"
 tags: [tag1, tag2]
-status: active
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-environment:
-  os: any
-  shell: any
-  tools: []
-error_signatures: []
+status: stable
 ---
 
 # <Title>
@@ -62,6 +55,8 @@ Brief description of the concept or component.
 ## References (Источники)
 - [Raw Source Name](./raw/<source_file>.md)
 ```
+
+`type` must be a non-empty string. `title`, `description`, `tags`, and `status` are recommended generated defaults. When present, `tags` is a list of strings and `status` is `draft`, `stable`, or `deprecated`. Preserve unknown or human-authored frontmatter keys; do not normalize or delete them. `index.md` and `log.md` are reserved files rather than ordinary concepts. Project-local error lessons under `kb/lessons/` use their separate lesson schema and are not canonical OKF concepts.
 
 ## Collection boundaries
 

@@ -6,7 +6,7 @@ A portable CLI tool to instantly initialize a local Knowledge Base architecture 
 
 ## Core Concepts
 
-- **[Open Knowledge Format (OKF)](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)**: A standard for structuring knowledge. We split data into a `raw/` layer (unprocessed scrapes, logs, release notes) and a `wiki/` layer (Markdown files with strict YAML frontmatter like `id`, `category`, and `tags`).
+- **[Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)**: A vendor-neutral Markdown and YAML-frontmatter format. The [kb-bootstrap canonical profile](docs/OKF_V0_2_CANONICAL_PROFILE.md) requires non-empty `type`, recommends `title`, `description`, `tags`, and `status: stable`, accepts unknown extensions, and keeps stricter dead-link checks separate from OKF conformance.
 - **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**: A CLI tool for blazing-fast local semantic search (RAG) over your markdown files. It indexes your `raw/` and `wiki/` layers so agents can instantly find context.
 
 ## Prerequisites & System Requirements
@@ -251,10 +251,13 @@ Run structural validation from the project root:
 kb-bootstrap validate --dir kb --project-root .
 ```
 
-The command performs both checks:
+The command performs three read-only checks:
 
-1. Markdown graph validation under `--dir`: dead links fail, while orphan nodes are reported as warnings. The graph linter excludes `raw/` directories.
-2. QMD collection validation under `--project-root`: `qmd/collections/*.yaml` must contain valid, unique names and at least one existing configured path. Invalid collection syntax or missing target paths fail validation.
+1. [Canonical OKF v0.2 profile validation](docs/OKF_V0_2_CANONICAL_PROFILE.md) under `--dir` (default `kb`): every ordinary canonical concept needs exact YAML frontmatter and a non-empty `type`; generated optional fields are type-checked; unknown types/metadata are accepted without source mutation; case-insensitive `raw`/`lessons` directories and case-insensitive reserved `index.md`/`log.md` files at every level are excluded; static symlinked paths fail closed, and validation assumes a stable checkout rather than a concurrent filesystem snapshot.
+2. The separately labelled kb-bootstrap graph-integrity extension under `--dir`: dead links fail, while orphan nodes are reported as warnings. This is intentionally stricter than OKF v0.2, which tolerates broken cross-links.
+3. QMD collection validation under `--project-root`: `qmd/collections/*.yaml` must contain valid, unique names and at least one existing configured path. Invalid collection syntax or missing target paths fail validation.
+
+Validation never migrates, repairs, normalizes, or rewrites canonical files.
 
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 

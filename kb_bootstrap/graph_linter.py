@@ -11,7 +11,7 @@ import networkx as nx
 
 
 LINK_PATTERN = re.compile(r"\[.*?\]\((.*?\.md)(?:#.*?)?\)")
-DEFAULT_IGNORED_DIRS = ("raw",)
+DEFAULT_IGNORED_DIRS = ("raw", "lessons")
 
 
 def analyze_graph(
@@ -20,12 +20,14 @@ def analyze_graph(
 ) -> Tuple[nx.DiGraph, Path]:
     """Build a Markdown link graph, preserving the original linter behavior."""
     base_path = Path(base_dir)
-    ignored = set(ignore_dirs)
+    ignored = {directory.casefold() for directory in ignore_dirs}
     graph = nx.DiGraph()
 
     markdown_files = []
     for root, dirs, files in os.walk(base_path):
-        dirs[:] = [directory for directory in dirs if directory not in ignored]
+        dirs[:] = [
+            directory for directory in dirs if directory.casefold() not in ignored
+        ]
         for filename in files:
             if filename.endswith(".md"):
                 absolute = Path(root) / filename

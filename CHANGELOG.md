@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Canonical OKF profile
+
+- Align generated canonical wiki guidance with a documented minimal OKF v0.2 profile: require non-empty `type`, recommend descriptive fields plus `status: stable`, and accept unknown types/metadata without rewriting source files.
+- Add deterministic canonical-profile validation to the existing `validate` command while preserving dead-link rejection as a separately labelled, stricter kb-bootstrap graph-integrity extension.
+- Exclude `raw/`, project lessons, and reserved `index.md`/`log.md` files from ordinary concept-frontmatter validation; defer optional provenance/freshness semantics to Issue #62.
+
 ### Research decisions
 
 - Keep cross-repository lesson promotion as one-owner, explicitly reviewed operations; prefer idempotent evidence, read-only reconciliation, and separately authorized compensation over distributed transactions.
