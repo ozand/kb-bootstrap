@@ -1,6 +1,6 @@
 # ADR-005: Export the canonical graph as versioned deterministic JSON
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-13
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -62,7 +62,7 @@ An edge has fixed key order:
 }
 ```
 
-`fragment` is either a string without the leading `#` or JSON `null`.
+`fragment` is either the exact authored fragment text without the leading `#` or JSON `null`. Version 1 does not percent-decode fragments; an empty trailing `#` is treated as `null`.
 
 The export contains no absolute source/output path, timestamp, hostname, username, inode, random identifier, raw/lesson content, external URL, QMD state, or Markdown body.
 
@@ -78,13 +78,13 @@ The export contains no absolute source/output path, timestamp, hostname, usernam
 
 ### Link and edge semantics
 
-Version 1 recognizes standard inline Markdown links whose destination is a local path ending case-insensitively in `.md`, optionally followed by `#fragment`.
+Version 1 recognizes a bounded inline Markdown link grammar outside inline/fenced code and image syntax. Its destination is either an angle-bracket destination or an unquoted, whitespace-free local path ending case-insensitively in `.md`, optionally followed by `#fragment`. Unsupported valid Markdown forms such as bare destinations containing parentheses are ignored rather than claimed as parsed; angle brackets may be used for paths containing spaces or parentheses. A recognized local-looking `.md` opener with missing closing destination/title syntax blocks as malformed instead of silently disappearing.
 
 - Relative paths resolve from the source concept's directory.
 - Paths beginning with `/` resolve from the canonical root.
 - Separators serialize as `/`; `.` segments are normalized.
 - Absolute filesystem paths, NULs, backslashes, `..` escapes beyond the canonical root, percent-encoded separators/traversal, and targets traversing symlinks block the export.
-- Fragment-only, external-scheme, protocol-relative, and non-Markdown links are ignored and are not emitted.
+- Fragment-only, external-scheme, protocol-relative, non-Markdown, code/image references, and unsupported valid inline-link forms are ignored and are not emitted; malformed recognized local-link syntax blocks.
 - A local Markdown target must exist and be one of the exported nodes. Missing, reserved, excluded, or otherwise non-node local targets block as a graph-integrity error rather than emitting a dangling edge.
 - Exact duplicate `(source, target, fragment)` edges are de-duplicated.
 - Different fragments remain distinct edges.
@@ -112,7 +112,7 @@ Repeated in-memory export of a stable unchanged tree must be byte-for-byte ident
 
 The output must be outside the canonical source root so it cannot become a future concept/input. Existing output blocks; v1 has no force/overwrite option.
 
-The complete JSON is staged in the existing output directory, flushed, and fsynced. Publication uses an exclusive hard-link no-overwrite primitive. Unsupported hard links fail closed. Race-created output is preserved. Owned temporary files are cleaned; incomplete cleanup is reported without exposing paths.
+The complete JSON is staged in the existing output directory, flushed, and fsynced. Publication uses an exclusive hard-link no-overwrite primitive. Unsupported hard links fail closed. Race-created output is preserved. Owned temporary files are cleaned where possible. Once exclusive hard-link publication succeeds, the complete output is authoritative even if unlinking the staging link fails; the command returns success with a sanitized `temporary cleanup is incomplete` warning rather than reporting publication failure. The residual owned temporary link may require manual cleanup.
 
 Input traversal and output publication assume a stable checkout and do not claim a race-free cross-process filesystem snapshot after final path checks.
 
@@ -179,15 +179,15 @@ Rejected. The command is optional and derived output may be reviewed or versione
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Versioned schema and fixed node/edge key order | export schema snapshot test | not yet written |
-| Repeated stable input produces byte-identical JSON | repeated in-memory and file export tests | not yet written |
-| Unknown frontmatter is represented and source bytes remain unchanged | metadata/source preservation test | not yet written |
-| Canonical profile boundaries and malformed input fail closed | valid/invalid traversal fixtures | not yet written |
-| Relative/root links, fragments, deduplication, and sorting are deterministic | edge normalization fixtures | not yet written |
-| External/non-Markdown links are ignored and dead/escaping/encoded/symlink targets block | link safety fixtures | not yet written |
-| Output is contained, exclusive, and race-created content is preserved | output path/race tests | not yet written |
-| Write/link/fsync failures leave no owned partial output/temp residue | output failure tests | not yet written |
-| Existing validate behavior remains unchanged | current profile/graph/QMD tests | passing before implementation |
+| Versioned schema and fixed node/edge key order | export schema snapshot test | passing |
+| Repeated stable input produces byte-identical JSON | repeated in-memory and file export tests | passing |
+| Unknown frontmatter is represented and source bytes remain unchanged | metadata/source preservation test | passing |
+| Canonical profile boundaries and malformed input fail closed | valid/invalid traversal fixtures | passing |
+| Relative/root links, fragments, deduplication, and sorting are deterministic | edge normalization fixtures | passing |
+| External/non-Markdown/code/image links are ignored and dead/escaping/encoded/symlink/malformed targets block | link safety fixtures | passing |
+| Output is contained, exclusive, and race-created content is preserved | output path/race tests | passing |
+| Write/link/fsync failures leave no owned partial output; published-output temp cleanup failure is warned | output failure tests | passing |
+| Existing validate behavior remains unchanged | current profile/graph/QMD tests | passing |
 
 ## Rollback
 

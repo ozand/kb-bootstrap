@@ -102,6 +102,33 @@ def _concept_files(
     return files, errors
 
 
+def canonical_metadata_errors(metadata: Dict[str, object]) -> List[str]:
+    """Return minimal profile errors for one already parsed frontmatter mapping."""
+    errors: List[str] = []
+    concept_type = metadata.get("type")
+    if not isinstance(concept_type, str) or not concept_type.strip():
+        errors.append("type must be a non-empty string")
+
+    for field in ("title", "description"):
+        value = metadata.get(field)
+        if field in metadata and not isinstance(value, str):
+            errors.append(f"{field} must be a string")
+
+    tags = metadata.get("tags")
+    if "tags" in metadata and (
+        not isinstance(tags, list)
+        or any(not isinstance(tag, str) for tag in tags)
+    ):
+        errors.append("tags must be a list of strings")
+
+    status = metadata.get("status")
+    if "status" in metadata and (
+        not isinstance(status, str) or status not in VALID_STATUSES
+    ):
+        errors.append("status must be draft, stable, or deprecated")
+    return errors
+
+
 def validate_canonical_profile(
     base_dir: Union[os.PathLike, str] = "docs",
 ) -> Tuple[str, bool]:
@@ -126,29 +153,10 @@ def validate_canonical_profile(
             errors.append(f"{relative}: {error}")
             continue
 
-        concept_type = metadata.get("type")
-        if not isinstance(concept_type, str) or not concept_type.strip():
-            errors.append(f"{relative}: type must be a non-empty string")
-
-        for field in ("title", "description"):
-            value = metadata.get(field)
-            if field in metadata and not isinstance(value, str):
-                errors.append(f"{relative}: {field} must be a string")
-
-        tags = metadata.get("tags")
-        if "tags" in metadata and (
-            not isinstance(tags, list)
-            or any(not isinstance(tag, str) for tag in tags)
-        ):
-            errors.append(f"{relative}: tags must be a list of strings")
-
-        status = metadata.get("status")
-        if "status" in metadata and (
-            not isinstance(status, str) or status not in VALID_STATUSES
-        ):
-            errors.append(
-                f"{relative}: status must be draft, stable, or deprecated"
-            )
+        errors.extend(
+            f"{relative}: {metadata_error}"
+            for metadata_error in canonical_metadata_errors(metadata)
+        )
 
     lines = [
         "=== Canonical OKF v0.2 Profile Validation ===",

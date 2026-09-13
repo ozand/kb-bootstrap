@@ -149,6 +149,20 @@ class CliTests(unittest.TestCase):
             self.assertNotIn("T:\\Code", capture)
             self.assertNotIn("T:\\Code", lookup)
 
+    def test_export_graph_command_dispatches_explicit_paths(self):
+        with patch(
+            "kb_bootstrap.cli.write_canonical_graph", return_value=("RESULT: OK", True)
+        ) as export:
+            result = self.run_cli(
+                "export-graph",
+                "--dir", "knowledge",
+                "--project-root", "repo",
+                "--output", "graph.json",
+            )
+
+        self.assertEqual(result, 0)
+        export.assert_called_once_with("repo", "knowledge", "graph.json")
+
     def test_search_command_defaults_to_canonical_mode(self):
         with patch(
             "kb_bootstrap.cli.search_qmd", return_value=("RESULT: OK", True)

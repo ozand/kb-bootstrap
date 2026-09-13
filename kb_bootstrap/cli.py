@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .graph_linter import validate
 from .canonical_profile import validate_canonical_profile
+from .canonical_graph_export import write_canonical_graph
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
@@ -70,6 +71,18 @@ def main():
         "--project-root",
         default=".",
         help="Project root containing qmd/collections (default: current directory)",
+    )
+    export_parser = subparsers.add_parser(
+        "export-graph", help="Export the canonical Markdown graph as deterministic JSON"
+    )
+    export_parser.add_argument(
+        "--dir", default="kb", help="Canonical knowledge directory (default: kb)"
+    )
+    export_parser.add_argument(
+        "--project-root", default=".", help="Repository root (default: current directory)"
+    )
+    export_parser.add_argument(
+        "--output", required=True, help="Repository-relative JSON output path"
     )
     search_parser = subparsers.add_parser(
         "search", help="Search canonical knowledge or explicitly selected raw research"
@@ -209,6 +222,13 @@ def main():
         print()
         print(qmd_report)
         return 0 if profile_valid and graph_valid and qmd_valid else 1
+
+    if args.command == "export-graph":
+        report, is_valid = write_canonical_graph(
+            args.project_root, args.dir, args.output
+        )
+        print(report)
+        return 0 if is_valid else 1
 
     if args.command == "search":
         report, is_valid = search_qmd(
