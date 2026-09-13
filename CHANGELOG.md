@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Canonical graph export
+
+- Add an optional `export-graph` command that derives a versioned deterministic JSON graph from validated canonical Markdown without modifying source content.
+- Export sorted ordinary concept nodes with normalized frontmatter payloads and sorted normalized internal Markdown-link edges/fragments; omit bodies, external URLs, machine paths, timestamps, raw data, and lessons.
+- Fail closed on malformed/dead/escaping/encoded/symlinked local inputs and publish only to a contained absent output through exclusive no-overwrite staging.
+
 ### Managed AGENTS.md hardening
 
 - Contain `agents-governance` targets within an explicit project root and reject absolute, escaping, invalid, non-regular, or static symlinked paths before mutation.

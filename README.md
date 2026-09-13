@@ -259,6 +259,14 @@ The command performs three read-only checks:
 
 Validation never migrates, repairs, normalizes, or rewrites canonical files.
 
+For optional machine-readable analysis, create a versioned deterministic JSON graph without changing Markdown:
+
+```bash
+kb-bootstrap export-graph --project-root . --dir kb --output canonical-graph.json
+```
+
+The [canonical graph export contract](docs/CANONICAL_GRAPH_EXPORT.md) includes sorted ordinary concept nodes, exact normalized frontmatter payloads, and sorted normalized internal Markdown-link edges. Existing outputs, malformed/dead/escaping/symlinked local inputs, and unsafe paths block without overwrite; no UI, server, QMD update, or background process is involved.
+
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 
 ```bash
