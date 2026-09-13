@@ -47,13 +47,16 @@ Inspect `AGENTS.md` before modification. Then explicitly run:
 ```bash
 kb-bootstrap agents-governance \
   --repo example/consumer-project \
+  --project-root . \
   --file AGENTS.md
 ```
 
 The command may create or update only the delimited kb-bootstrap block. Content
-outside the markers must remain unchanged. Duplicate, missing, or reversed markers
-block migration without writing; resolve them manually instead of deleting local
-instructions.
+outside the markers must remain unchanged. The file path must be relative to the
+explicit project root. Path escapes, static symlinks, concurrent source changes,
+duplicate/missing/reversed markers, invalid UTF-8, and atomic publication failures
+block migration without overwriting the current file; resolve them manually instead
+of deleting local instructions.
 
 Verify the diff:
 

@@ -188,7 +188,12 @@ def main():
         "--repo", required=True, help="Expected repository in owner/name form"
     )
     agents_parser.add_argument(
-        "--file", default="AGENTS.md", help="AGENTS.md path (default: AGENTS.md)"
+        "--file", default="AGENTS.md", help="Repository-relative AGENTS.md path (default: AGENTS.md)"
+    )
+    agents_parser.add_argument(
+        "--project-root",
+        default=".",
+        help="Repository root containing the managed file (default: current directory)",
     )
     args = parser.parse_args()
 
@@ -324,7 +329,7 @@ def main():
         return 0 if is_valid else 1
 
     if args.command == "agents-governance":
-        report, is_valid = update_agents_file(Path(args.file), args.repo)
+        report, is_valid = update_agents_file(args.file, args.repo, args.project_root)
         print(report)
         return 0 if is_valid else 1
 
