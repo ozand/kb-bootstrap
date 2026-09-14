@@ -1,6 +1,6 @@
 # ADR-006: Validate canonical provenance and classify freshness with explicit time
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-14
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -41,7 +41,7 @@ Every timestamp validated by this profile must match:
 YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM|-HH:MM)
 ```
 
-Parsing additionally rejects invalid calendar dates, times, and offset ranges. Lowercase `z`, date-only values, missing seconds, whitespace, naive date-times, and trailing text are invalid. Values are normalized only in memory to aware UTC for comparison; authored source text is never rewritten.
+Timestamp strings are bounded to 128 characters. Parsing additionally rejects invalid calendar dates, times, and offset ranges. Numeric offsets are bounded to `-14:00` through `+14:00`; minutes must be below 60 and a 14-hour offset must use minute `00`. Lowercase `z`, date-only values, missing seconds, whitespace, naive date-times, and trailing text are invalid. Values are normalized only in memory to aware UTC for comparison; authored source text is never rewritten.
 
 ### `generated`
 
@@ -95,10 +95,11 @@ Required actor/resource strings:
 - must not contain credential-bearing URL userinfo;
 - must not be a Windows drive/UNC path or an absolute local filesystem path;
 - actor values must not be URLs;
-- source resources may be `http`/`https` URLs without userinfo or contained-looking opaque/relative references;
+- source resources may be `http`/`https` URLs without userinfo and with a hostname, or bounded relative references whose segments match `[A-Za-z0-9][A-Za-z0-9._@+-]*`;
+- relative references reject whitespace, backslashes, query/fragment delimiters, percent escapes, and empty/dot/traversal segments; URL paths reject decoded controls, backslashes, and dot/traversal segments;
 - `file`, `data`, `javascript`, and unsupported URL schemes are rejected.
 
-Reports identify only the file and field category. They never echo actor/resource/timestamp values or document contents. Validation does not assert that accepted actors exist or resources are reachable/trustworthy.
+Provenance families are parsed with native safe YAML scalar types so unquoted booleans, numbers, or dates do not masquerade as required strings; the core ADR-003 authored-string loader remains unchanged. Reports identify only the file and field category. They never echo actor/resource/timestamp values or document contents. Validation does not assert that accepted actors exist or resources are reachable/trustworthy.
 
 ### `status`
 
@@ -144,7 +145,7 @@ Comparison time: explicit | absent
 Source mutation: no
 ```
 
-Errors are sorted by relative POSIX path and stable field category. An invalid concept may contribute to invalid counts, but actor/resource/timestamp payloads are not printed.
+Errors are sorted by relative POSIX path and stable field category. If frontmatter cannot be parsed, the freshness category is `invalid` and optional-family counts remain unavailable rather than falsely attributing each family as invalid. Duplicate YAML mapping keys are rejected by the provenance parser. Actor/resource/timestamp payloads are not printed.
 
 ### Unknown metadata and source preservation
 
@@ -213,14 +214,14 @@ Rejected as scope expansion. This increment validates only the five named famili
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| All five fields absent are valid with unknown freshness | absent fixture | not yet written |
-| Generated/verified/source valid forms and unknown keys pass without mutation | valid family fixtures | not yet written |
-| Malformed/null/missing-required family values fail deterministically | invalid family fixtures | not yet written |
-| Strict offset-aware timestamps and malformed values are distinguished | timestamp matrix | not yet written |
-| Explicit now yields fresh/boundary-stale/after-stale; absent cutoff stays unknown | freshness matrix | not yet written |
-| Unsafe actors/resources block without value/path leakage and no network is used | sanitization/network tests | not yet written |
-| Repeated reports and source bytes are identical | determinism/preservation test | not yet written |
-| Existing validate/profile/graph/QMD and graph export remain compatible | regression/full suite | passing before implementation |
+| All five fields absent are valid with unknown freshness | `test_all_optional_fields_absent_is_valid_unknown` | passing |
+| Generated/verified/source valid forms and unknown keys pass without mutation | valid-family and safe-relative-resource fixtures | passing |
+| Malformed/null/missing-required/duplicate-key values fail deterministically | invalid-family and duplicate-key fixtures | passing |
+| Strict offset-aware timestamps and malformed values are distinguished | timestamp matrix | passing |
+| Explicit now yields fresh/boundary-stale/after-stale; absent cutoff stays unknown | freshness matrix | passing |
+| Unsafe actors/resources block without value/path leakage and no network is used | sanitization/network tests | passing |
+| Repeated reports and source bytes are identical | determinism/preservation test | passing |
+| Existing validate/profile/graph/QMD and graph export remain compatible | focused/full regression suites | passing (206 tests) |
 
 ## Rollback
 

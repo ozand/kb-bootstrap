@@ -331,6 +331,30 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
 
+    def test_validate_passes_explicit_now_to_provenance_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.run_cli("--target", directory, "--type", "single")
+            (root / "kb/overview.md").write_text(
+                "---\ntype: Concept\nstale_after: 2026-09-15T00:00:00Z\n---\n",
+                encoding="utf-8",
+            )
+            with patch(
+                "kb_bootstrap.cli.validate_canonical_provenance",
+                return_value=("RESULT: OK", True),
+            ) as provenance:
+                result = self.run_cli(
+                    "validate",
+                    "--dir", str(root / "kb"),
+                    "--project-root", directory,
+                    "--now", "2026-09-14T12:00:00Z",
+                )
+
+            self.assertEqual(result, 0)
+            provenance.assert_called_once_with(
+                str(root / "kb"), "2026-09-14T12:00:00Z"
+            )
+
     def test_validate_fails_when_canonical_profile_is_invalid(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

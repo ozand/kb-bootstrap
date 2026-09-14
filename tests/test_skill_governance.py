@@ -122,6 +122,10 @@ class SkillGovernanceTests(unittest.TestCase):
         self.assertIn("<project>-wiki", wiki)
         self.assertIn("<project>-raw", wiki)
         self.assertIn("kb-bootstrap validate --dir kb --project-root .", wiki)
+        self.assertIn("Optional provenance/freshness example", wiki)
+        self.assertIn("include them only from verified sanitized evidence", wiki)
+        self.assertNotIn("\ngenerated:\n", wiki)
+        self.assertNotIn("\nstale_after:", wiki)
 
 
 if __name__ == "__main__":

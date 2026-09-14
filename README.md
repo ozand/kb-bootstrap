@@ -251,11 +251,12 @@ Run structural validation from the project root:
 kb-bootstrap validate --dir kb --project-root .
 ```
 
-The command performs three read-only checks:
+The command performs four read-only checks:
 
 1. [Canonical OKF v0.2 profile validation](docs/OKF_V0_2_CANONICAL_PROFILE.md) under `--dir` (default `kb`): every ordinary canonical concept needs exact YAML frontmatter and a non-empty `type`; generated optional fields are type-checked; unknown types/metadata are accepted without source mutation; case-insensitive `raw`/`lessons` directories and case-insensitive reserved `index.md`/`log.md` files at every level are excluded; static symlinked paths fail closed, and validation assumes a stable checkout rather than a concurrent filesystem snapshot.
-2. The separately labelled kb-bootstrap graph-integrity extension under `--dir`: dead links fail, while orphan nodes are reported as warnings. This is intentionally stricter than OKF v0.2, which tolerates broken cross-links.
-3. QMD collection validation under `--project-root`: `qmd/collections/*.yaml` must contain valid, unique names and at least one existing configured path. Invalid collection syntax or missing target paths fail validation.
+2. The separate [canonical provenance/freshness profile](docs/CANONICAL_PROVENANCE_FRESHNESS_PROFILE.md): validates optional `generated`, `verified`, `sources`, `status`, and `stale_after`. Fresh/stale classification uses only explicit `--now <offset-aware timestamp>`; without it freshness is `unknown` and the system clock is not read.
+3. The separately labelled kb-bootstrap graph-integrity extension under `--dir`: dead links fail, while orphan nodes are reported as warnings. This is intentionally stricter than OKF v0.2, which tolerates broken cross-links.
+4. QMD collection validation under `--project-root`: `qmd/collections/*.yaml` must contain valid, unique names and at least one existing configured path. Invalid collection syntax or missing target paths fail validation.
 
 Validation never migrates, repairs, normalizes, or rewrites canonical files.
 

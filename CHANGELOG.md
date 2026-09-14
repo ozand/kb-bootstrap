@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Canonical provenance and freshness
+
+- Add bounded deterministic validation for optional `generated`, `verified`, `sources`, inherited `status`, and `stale_after` metadata without fetching sources or rewriting canonical Markdown.
+- Add optional explicit `validate --now <offset-aware timestamp>` freshness classification: before cutoff is fresh, equality/after is stale, and absent cutoff or comparison time is unknown; the system clock is never used.
+- Validate sanitized actor/resource shapes, strict offset-aware timestamps, mapping/list family forms, empty/absent semantics, and report only relative paths/field categories.
+
 ### Canonical graph export
 
 - Add an optional `export-graph` command that derives a versioned deterministic JSON graph from validated canonical Markdown without modifying source content.

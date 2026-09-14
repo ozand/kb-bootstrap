@@ -41,6 +41,13 @@ title: "<Clear, descriptive title>"
 description: "<One-sentence summary>"
 tags: [tag1, tag2]
 status: stable
+# Optional provenance/freshness example — include only fields backed by evidence:
+# generated:
+#   by: "<public producer/version or human:id>"
+#   at: YYYY-MM-DDTHH:MM:SSZ
+# sources:
+#   - resource: "<public URL or sanitized relative reference>"
+# stale_after: YYYY-MM-DDTHH:MM:SSZ
 ---
 
 # <Title>
@@ -56,7 +63,7 @@ Brief description of the concept or component.
 - [Raw Source Name](./raw/<source_file>.md)
 ```
 
-`type` must be a non-empty string. `title`, `description`, `tags`, and `status` are recommended generated defaults. When present, `tags` is a list of strings and `status` is `draft`, `stable`, or `deprecated`. Preserve unknown or human-authored frontmatter keys; do not normalize or delete them. `index.md` and `log.md` are reserved files rather than ordinary concepts. Project-local error lessons under `kb/lessons/` use their separate lesson schema and are not canonical OKF concepts.
+`type` must be a non-empty string. `title`, `description`, `tags`, and `status` are recommended generated defaults. When present, `tags` is a list of strings and `status` is `draft`, `stable`, or `deprecated`. `generated`, `sources`, and `stale_after` are optional: include them only from verified sanitized evidence, use timestamps with an explicit UTC offset, never invent a producer/source/cutoff, and never fetch a source during validation. `verified` may be added only for an actual confirmation event and requires `by` plus an offset-aware `at`. Preserve unknown or human-authored frontmatter keys; do not normalize or delete them. `index.md` and `log.md` are reserved files rather than ordinary concepts. Project-local error lessons under `kb/lessons/` use their separate lesson schema and are not canonical OKF concepts.
 
 ## Collection boundaries
 
