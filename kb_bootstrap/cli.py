@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .graph_linter import validate
 from .canonical_profile import validate_canonical_profile
+from .canonical_provenance import validate_canonical_provenance
 from .canonical_graph_export import write_canonical_graph
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
@@ -71,6 +72,10 @@ def main():
         "--project-root",
         default=".",
         help="Project root containing qmd/collections (default: current directory)",
+    )
+    validate_parser.add_argument(
+        "--now",
+        help="Explicit offset-aware comparison time for deterministic freshness",
     )
     export_parser = subparsers.add_parser(
         "export-graph", help="Export the canonical Markdown graph as deterministic JSON"
@@ -212,16 +217,21 @@ def main():
 
     if args.command == "validate":
         profile_report, profile_valid = validate_canonical_profile(args.dir)
+        provenance_report, provenance_valid = validate_canonical_provenance(
+            args.dir, args.now
+        )
         graph_report, graph_valid = validate(args.dir)
         qmd_report, qmd_valid = validate_qmd_collections(args.project_root)
         print(profile_report)
+        print()
+        print(provenance_report)
         print()
         print("=== kb-bootstrap Graph Integrity Extension ===")
         print("Dead links fail this local check even though OKF v0.2 tolerates them.")
         print(graph_report)
         print()
         print(qmd_report)
-        return 0 if profile_valid and graph_valid and qmd_valid else 1
+        return 0 if profile_valid and provenance_valid and graph_valid and qmd_valid else 1
 
     if args.command == "export-graph":
         report, is_valid = write_canonical_graph(

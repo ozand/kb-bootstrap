@@ -60,7 +60,7 @@ Producer-defined fields and unknown types are accepted. Frontmatter scalar value
 
 OKF v0.2 also defines optional provenance, trust, lifecycle, and computation fields such as `sources`, `generated`, `verified`, `stale_after`, and Attested Computation fields. They are accepted as additional metadata but are not semantically validated by this minimal profile.
 
-Issue #62 owns the later bounded provenance/freshness profile. Accepting a field here does not claim that its optional-family semantics have been verified.
+The [bounded canonical provenance/freshness profile](CANONICAL_PROVENANCE_FRESHNESS_PROFILE.md) validates `generated`, `verified`, `sources`, `status`, and `stale_after` as a separate report section. Other optional trust/computation semantics remain outside this minimal profile.
 
 ## Reserved files
 
