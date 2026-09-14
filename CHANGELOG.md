@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-09-14
+
 ### Canonical provenance and freshness
 
 - Add bounded deterministic validation for optional `generated`, `verified`, `sources`, inherited `status`, and `stale_after` metadata without fetching sources or rewriting canonical Markdown.
@@ -24,7 +26,7 @@
 
 - Align generated canonical wiki guidance with a documented minimal OKF v0.2 profile: require non-empty `type`, recommend descriptive fields plus `status: stable`, and accept unknown types/metadata without rewriting source files.
 - Add deterministic canonical-profile validation to the existing `validate` command while preserving dead-link rejection as a separately labelled, stricter kb-bootstrap graph-integrity extension.
-- Exclude `raw/`, project lessons, and reserved `index.md`/`log.md` files from ordinary concept-frontmatter validation; defer optional provenance/freshness semantics to Issue #62.
+- Exclude `raw/`, project lessons, and reserved `index.md`/`log.md` files from ordinary concept-frontmatter validation; validate optional provenance/freshness semantics in the separate profile included in this release.
 
 ### Research decisions
 
