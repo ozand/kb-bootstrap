@@ -71,4 +71,4 @@ Before reporting knowledge-base work complete:
 2. Run the project test command.
 3. Confirm both collections appear in `qmd collection list` (register them with `qmd collection add` if not), run `qmd update`, then smoke-test `qmd search` against both `<project>-wiki` and `<project>-raw`.
 
-Do not claim QMD indexing success when QMD is unavailable or a smoke query was not run.
+Do not claim QMD indexing success when QMD is unavailable or a smoke query was not run. The `QMD Collection Validation` section from `kb-bootstrap validate` checks repository declarations and paths only; it does not prove runtime registration, index freshness, search completeness, or relevance. Report universal conformance, any repository-owned policy validation, and retrieval/index freshness as separate outcomes. See the upstream [validation composition guidance](https://github.com/ozand/kb-bootstrap/blob/main/docs/VALIDATION_COMPOSITION.md).

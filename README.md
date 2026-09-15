@@ -260,6 +260,8 @@ The command performs four read-only checks:
 
 Validation never migrates, repairs, normalizes, or rewrites canonical files.
 
+Interpret this as the universal conformance/declaration gate only. A consumer may also require a separate repository-owned policy validator, and QMD registration/index freshness requires separate runtime evidence. One passing gate does not prove either of the others. See [validation composition for consumer repositories](docs/VALIDATION_COMPOSITION.md) for the ownership matrix, generic commands, reporting example, and non-claims.
+
 For optional machine-readable analysis, create a versioned deterministic JSON graph without changing Markdown:
 
 ```bash
@@ -287,7 +289,7 @@ qmd search "<source query>" -c <project>-raw
 
 `qmd/collections/*.yaml` and `qmd.json` are this package's declarations, checked by `kb-bootstrap validate`; QMD itself does not read them. QMD keeps its own collection registry (`~/.config/qmd/index.yml`, or a project-local `.qmd/index.yml`, or a named index selected with `qmd --index <name>`), and `qmd update` re-indexes only collections already registered there. Until `qmd collection add` has been run for `<project>-wiki`, `qmd search -c <project>-wiki` answers `Collection not found` and `kb-bootstrap search` reports it as `QMD search is unavailable: Collection not found: <project>-wiki`. `kb-bootstrap search` queries whichever index QMD selects for the project directory; it does not pass `--index`, so a collection registered under a named index is not visible to it.
 
-Only report QMD rollout as successful when `qmd collection add`, `qmd update`, and both smoke searches were actually executed. QMD commands use the official CLI entry points: `qmd collection add`, `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
+Only report QMD rollout as successful when `qmd collection add`, `qmd update`, and both smoke searches were actually executed. Report universal conformance, repository-owned policy validation, and retrieval/index freshness as separate outcomes; do not infer one from another. QMD commands use the official CLI entry points: `qmd collection add`, `qmd update`, `qmd query`, `qmd search`, and `qmd collection list`. This package does not replace QMD or implement a Python search index.
 
 ### Option 2: Umbrella Content Layout
 For knowledge spanning multiple servers or applications in one owning repository.
