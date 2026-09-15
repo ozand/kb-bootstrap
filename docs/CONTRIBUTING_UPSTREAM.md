@@ -158,6 +158,8 @@ A safe receipt may include:
 Do not include credentials, token-bearing remote URLs, private payloads, local
 runtime checkpoints, or unsanitized logs.
 
+Classify completion evidence and receipts using the [durable and ephemeral evidence guidance](EVIDENCE_RETENTION.md). A sanitized receipt is durable only when an owner, storage class, retention/expiry, access, integrity/version, and post-run availability are explicit. `.pi/`, Herdr transcripts, stdout/stderr, caches, and temporary files remain runtime evidence rather than a repository audit database.
+
 If repository identity, branch target, authentication, or commit containment is
 missing or mismatched, stop and report the mismatch. Do not create or retarget a
 pull request by guessing.
