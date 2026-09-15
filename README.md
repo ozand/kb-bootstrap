@@ -117,7 +117,7 @@ gh pr create --repo example/kb-bootstrap
 
 If remote identity is missing, ambiguous, or does not match the intended Issue repository, stop without mutating GitHub or Git state and ask for clarification. Completion evidence must come from the repository that owns the Issue: a commit that exists only in a consumer checkout does not complete an upstream Issue.
 
-Repository receipts and examples must contain only sanitized metadata such as repository names, remote roles, branch names, commit IDs, and public URLs. Never include credentials, tokens, private payloads, local runtime state, or unsanitized logs.
+Repository receipts and examples must contain only sanitized metadata such as repository names, remote roles, branch names, commit IDs, and public URLs. Never include credentials, tokens, private payloads, local runtime state, or unsanitized logs. A manifest or receipt is durable only when its owner, storage class, retention/expiry, access, integrity/version, and post-run availability are explicit; `.pi/`, Herdr transcripts, caches, and temporary output are not a repository audit database. See [durable and ephemeral evidence](docs/EVIDENCE_RETENTION.md).
 
 Run the read-only repository preflight before GitHub mutations or completion claims:
 

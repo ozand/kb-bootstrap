@@ -117,4 +117,4 @@ This composition does not mean that:
 - `kb-bootstrap` provides a universal consumer profile engine;
 - any step automatically migrates, repairs, normalizes, indexes, or rewrites consumer content.
 
-Each owner remains responsible for the check it defines and the evidence it claims.
+Each owner remains responsible for the check it defines and the evidence it claims. If a validation report or receipt must remain available after the run, separately apply the [durable and ephemeral evidence guidance](EVIDENCE_RETENTION.md); a passing command or runtime transcript does not establish retention.

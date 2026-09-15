@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Governance documentation
+
+- Define durable versus ephemeral workflow evidence, explicit retention and durable-receipt policies, and bounded non-claims for repository-tracked, externally retained, and runtime/session artifacts.
+
 ## 0.4.0 — 2026-09-14
 
 ### Canonical provenance and freshness

@@ -58,3 +58,5 @@ Required rules:
 The manifest never contains token-bearing URLs, credentials, filesystem paths,
 commit/object listings, local runtime checkpoints, `.pi/` data, or arbitrary Git
 configuration.
+
+Generating or validating this manifest does not make it durable or immutable. If it is retained as evidence, apply the [durable and ephemeral evidence guidance](EVIDENCE_RETENTION.md): name the owner, storage class, retention/expiry, access, integrity/version, and post-run availability. Otherwise treat it as a local generated artifact rather than a repository audit record.
