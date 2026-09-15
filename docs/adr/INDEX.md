@@ -8,4 +8,4 @@
 | ADR-004 | Update the managed AGENTS.md block with contained atomic replacement | Accepted — Implemented |
 | ADR-005 | Export the canonical graph as versioned deterministic JSON | Accepted — Implemented |
 | ADR-006 | Validate canonical provenance and classify freshness with explicit time | Accepted — Implemented |
-| ADR-007 | Report the executing validator version from the package | Proposed |
+| ADR-007 | Report the executing validator version from the package | Accepted |
