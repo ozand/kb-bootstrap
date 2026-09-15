@@ -1,6 +1,6 @@
 # ADR-007: Report the executing validator version from the package
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-15
 **Authors**: Pi coding agent
 **Supersedes**: None

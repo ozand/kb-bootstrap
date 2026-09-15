@@ -53,11 +53,11 @@ def test_adr_headers_match_index_and_required_sections_exist():
             assert heading in content
 
 
-def test_proposed_adr_007_does_not_claim_implementation_or_approval():
+def test_accepted_adr_007_does_not_claim_implementation():
     content = (ADR_DIR / "ADR-007-report-the-executing-validator-version-from-the-package.md").read_text(
         encoding="utf-8"
     )
-    assert "**Status**: Proposed" in content
+    assert "**Status**: Accepted" in content
     assert "not yet written" in content
     assert "not yet run" in content
     assert "Accepted — Implemented" not in content
