@@ -84,4 +84,4 @@ Use the raw collection to gather evidence and the wiki collection to verify the 
    - the project test command;
    - `qmd update`, followed by smoke searches in `<project>-wiki` and `<project>-raw`.
 
-Do not report completion if validation/tests fail or if the QMD update/search steps were not actually verified.
+Do not report completion if validation/tests fail or if the QMD update/search steps were not actually verified. Treat universal kb-bootstrap conformance, repository-owned policy validation, and retrieval/index freshness as separate outcomes; one pass does not prove another. The upstream [validation composition guidance](https://github.com/ozand/kb-bootstrap/blob/main/docs/VALIDATION_COMPOSITION.md) defines the reporting boundary.

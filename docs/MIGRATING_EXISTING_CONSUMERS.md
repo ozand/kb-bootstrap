@@ -1,11 +1,11 @@
-# Migrating existing consumer repositories to kb-bootstrap 0.2.0
+# Migrating existing consumer repositories to kb-bootstrap
 
 Migrate one explicitly selected consumer repository at a time. Do not scan or
 modify the whole workspace automatically.
 
 ## Prerequisites
 
-- Install `kb-bootstrap` 0.2.0 in an isolated environment.
+- Install the intended `kb-bootstrap` version in an isolated environment and record that version in the migration evidence.
 - Know the consumer repository identity in `owner/repository` form.
 - Start from the selected consumer repository root.
 - Review its local `AGENTS.md`, `CLAUDE.md`, and repository-specific instructions.
@@ -88,7 +88,7 @@ checkout/worktree with explicit remote, branch, `--repo`, `--base`, and `--head`
 ## 5. Verify knowledge-base structure
 
 Do not replace project taxonomy or unrelated QMD content during this governance
-migration. If the consumer already uses the 0.2.0 dual collection layout, run:
+migration. If the consumer already uses the dual collection layout, run:
 
 ```bash
 kb-bootstrap validate --dir kb --project-root .
@@ -96,6 +96,8 @@ kb-bootstrap validate --dir kb --project-root .
 
 If it still uses legacy `default.yaml`, plan the QMD migration as a separately
 reviewed change; do not combine it with AGENTS.md or push-configuration recovery.
+
+This command establishes only the universal kb-bootstrap conformance and repository-declaration results it reports. Run any repository-owned policy validator separately. QMD registration, indexing, and retrieval freshness also require separate runtime observations. Follow [validation composition](VALIDATION_COMPOSITION.md) and record each required gate with its own label, owner, evidence, and outcome rather than treating one pass as proof of another.
 
 ## 6. Test and prepare review
 
