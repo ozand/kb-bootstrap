@@ -167,6 +167,17 @@ pipx install git+https://github.com/ozand/kb-bootstrap.git
 
 Once installed, the `kb-bootstrap` command is available globally in your terminal. Navigate to the root of the repository that will own the generated files and run it.
 
+### Identify the executing validator
+
+Use `kb-bootstrap --version` to print the version of the executing `kb_bootstrap` package implementation. This is useful when a captured validation result may have come from an older binary:
+
+```text
+kb-bootstrap --version
+# kb-bootstrap 0.4.0
+```
+
+`kb-bootstrap validate` begins with `Validator: kb-bootstrap <version>`. The line identifies the validator implementation only; it does not identify the knowledge base, OKF profile, QMD index, or consumer policy version. Validation sections and exit status retain their existing meanings.
+
 ### Repository placement and content topology
 
 Repository placement and generated content topology are separate choices:

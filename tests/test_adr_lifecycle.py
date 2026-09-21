@@ -53,11 +53,12 @@ def test_adr_headers_match_index_and_required_sections_exist():
             assert heading in content
 
 
-def test_accepted_adr_007_does_not_claim_implementation():
+def test_implemented_adr_007_has_executable_test_evidence():
     content = (ADR_DIR / "ADR-007-report-the-executing-validator-version-from-the-package.md").read_text(
         encoding="utf-8"
     )
-    assert "**Status**: Accepted" in content
-    assert "not yet written" in content
+    assert "**Status**: Accepted — Implemented" in content
+    assert "test_top_level_version_contract" in content
+    assert "test_validate_reports_version_once_on_success_and_failure" in content
+    assert "| passing |" in content
     assert "not yet run" in content
-    assert "Accepted — Implemented" not in content
