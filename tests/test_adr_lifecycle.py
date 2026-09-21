@@ -62,3 +62,13 @@ def test_implemented_adr_007_has_executable_test_evidence():
     assert "test_validate_reports_version_once_on_success_and_failure" in content
     assert "| passing |" in content
     assert "not yet run" in content
+
+
+def test_accepted_adr_008_does_not_claim_implementation():
+    content = (ADR_DIR / "ADR-008-validate-a-logical-published-okf-bundle.md").read_text(
+        encoding="utf-8"
+    )
+    assert "**Status**: Accepted" in content
+    assert "not yet written" in content
+    assert "not yet run after implementation" in content
+    assert "Accepted — Implemented" not in content

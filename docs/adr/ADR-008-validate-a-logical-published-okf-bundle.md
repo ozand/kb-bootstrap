@@ -1,6 +1,6 @@
 # ADR-008: Validate a logical published OKF bundle
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-21
 **Authors**: Pi coding agent
 **Supersedes**: None
