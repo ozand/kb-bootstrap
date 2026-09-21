@@ -22,6 +22,7 @@ from .project_lesson_enablement import enable_project_lessons
 from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
 from .agents_governance import update_agents_file
+from . import __version__
 
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
@@ -54,6 +55,12 @@ def append_gitignore_rules(target: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Bootstrap Knowledge Base architecture (OKF + QMD)")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"kb-bootstrap {__version__}",
+        help="Show executing kb-bootstrap version and exit",
+    )
     parser.add_argument("--target", default=".", help="Target directory for initialization (default: current directory)")
     parser.add_argument("--type", choices=["single", "umbrella"], default="single", help="Project architecture type")
     parser.add_argument(
@@ -216,6 +223,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "validate":
+        print(f"Validator: kb-bootstrap {__version__}")
+        print()
         profile_report, profile_valid = validate_canonical_profile(args.dir)
         provenance_report, provenance_valid = validate_canonical_provenance(
             args.dir, args.now

@@ -1,6 +1,6 @@
 # ADR-007: Report the executing validator version from the package
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-15
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -153,15 +153,15 @@ Rejected as unnecessary scope. Issue #80 targets the top-level diagnostic and co
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Top-level `--version` emits exactly one stdout line, no stderr, and exits 0 | `test_top_level_version_contract` | not yet written |
-| Version reporting works from an unrelated directory without a consumer import or consumer files | `test_version_is_independent_of_consumer_directory` | not yet written |
-| Source-checkout execution reports the imported package constant despite stale installed metadata | `test_source_checkout_version_ignores_distribution_metadata` | not yet written |
-| Package runtime version equals static project metadata | `test_runtime_version_matches_pyproject` | not yet written |
-| Built wheel and sdist metadata/package constant agree | clean build and isolated artifact smoke tests | not yet run |
-| `validate` prints exactly one stable validator identity line before existing sections | `test_validate_reports_executing_validator_version` | not yet written |
-| Validator identity is present on both valid and invalid runs | `test_validate_version_present_on_success_and_failure` | not yet written |
-| Existing validation reports, errors, and exit codes remain unchanged apart from the identity line | focused CLI regressions and full suite | not yet run |
-| Version lookup performs no metadata, Git, network, QMD, or consumer access | `test_version_path_uses_package_constant_only` | not yet written |
+| Top-level `--version` emits exactly one stdout line, no stderr, and exits 0 | `test_top_level_version_contract` | passing |
+| Version reporting works from an unrelated directory without a consumer import or consumer files | `test_source_checkout_ignores_stale_metadata_and_consumer_access` | passing |
+| Source-checkout execution reports the imported package constant despite stale installed metadata | `test_source_checkout_ignores_stale_metadata_and_consumer_access` | passing |
+| Package runtime version equals static project metadata | `test_runtime_version_matches_pyproject` | passing |
+| Built wheel and sdist metadata/package constant agree | clean archive inspection and wheel CLI smoke test | manually verified |
+| `validate` prints exactly one stable validator identity line before existing sections | `test_validate_reports_version_once_on_success_and_failure` | passing |
+| Validator identity is present on both valid and invalid runs | `test_validate_reports_version_once_on_success_and_failure` | passing |
+| Existing validation sections, invalid-input error, and exit codes remain present apart from the identity line | `test_validate_reports_version_once_on_success_and_failure` plus full suite | passing |
+| Version lookup performs no metadata, Git, network, QMD, or consumer access | package-constant import plus source-checkout subprocess test | passing within the tested path |
 | Supported syntax remains compatible with Python 3.8 | compile/test in available runtimes; physical 3.8 when available | not yet run |
 
 ## Rollback

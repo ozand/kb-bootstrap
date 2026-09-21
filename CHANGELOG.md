@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### CLI observability
+
+- Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.
+
 ### Governance documentation
 
 - Define durable versus ephemeral workflow evidence, explicit retention and durable-receipt policies, and bounded non-claims for repository-tracked, externally retained, and runtime/session artifacts.
