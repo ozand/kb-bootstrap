@@ -9,4 +9,4 @@
 | ADR-005 | Export the canonical graph as versioned deterministic JSON | Accepted — Implemented |
 | ADR-006 | Validate canonical provenance and classify freshness with explicit time | Accepted — Implemented |
 | ADR-007 | Report the executing validator version from the package | Accepted — Implemented |
-| ADR-008 | Validate a logical published OKF bundle | Proposed |
+| ADR-008 | Validate a logical published OKF bundle | Accepted |
