@@ -6,6 +6,10 @@
 
 - Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.
 
+### Raw revision inventory
+
+- Add an opt-in `raw-manifest` command to hash raw-file bytes into a deterministic, versioned JSON snapshot and compare it with an explicit previous snapshot. The command does not run GLiNER/QMD or rewrite source files; manifests and path-bearing reports require private handling.
+
 ### Published OKF bundles
 
 - Add opt-in `export-published-bundle` for a deterministic, Markdown-only ZIP artifact containing eligible canonical concepts and exact lowercase reserved files while excluding `raw/`, `lessons/`, and non-Markdown content.
