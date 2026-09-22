@@ -1,6 +1,6 @@
 # ADR-011: Extract local entity candidate cards with an optional peer
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-23
 **Authors**: Pi coding agent
 **Supersedes**: None
