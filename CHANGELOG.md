@@ -6,6 +6,11 @@
 
 - Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.
 
+### Published OKF bundles
+
+- Add opt-in `export-published-bundle` for a deterministic, Markdown-only ZIP artifact containing eligible canonical concepts and exact lowercase reserved files while excluding `raw/`, `lessons/`, and non-Markdown content.
+- Preserve consumer source trees, QMD, lesson routing, existing `validate`, and graph export; fail closed on unsafe paths, source changes, invalid reserved structure, output races, and unavailable hard links.
+
 ### Governance documentation
 
 - Define durable versus ephemeral workflow evidence, explicit retention and durable-receipt policies, and bounded non-claims for repository-tracked, externally retained, and runtime/session artifacts.

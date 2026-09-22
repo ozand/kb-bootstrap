@@ -163,6 +163,19 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         export.assert_called_once_with("repo", "knowledge", "graph.json")
 
+    def test_export_published_bundle_dispatches_explicit_paths(self):
+        with patch(
+            "kb_bootstrap.cli.write_published_bundle", return_value=("RESULT: OK", True)
+        ) as bundle:
+            result = self.run_cli(
+                "export-published-bundle",
+                "--dir", "knowledge",
+                "--project-root", "repo",
+                "--output", "bundle.zip",
+            )
+        self.assertEqual(result, 0)
+        bundle.assert_called_once_with("repo", "knowledge", "bundle.zip")
+
     def test_search_command_defaults_to_canonical_mode(self):
         with patch(
             "kb_bootstrap.cli.search_qmd", return_value=("RESULT: OK", True)
