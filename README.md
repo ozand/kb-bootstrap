@@ -281,6 +281,14 @@ kb-bootstrap export-graph --project-root . --dir kb --output canonical-graph.jso
 
 The [canonical graph export contract](docs/CANONICAL_GRAPH_EXPORT.md) includes sorted ordinary concept nodes, exact normalized frontmatter payloads, and sorted normalized internal Markdown-link edges. Existing outputs, malformed/dead/escaping/symlinked local inputs, and unsafe paths block without overwrite; no UI, server, QMD update, or background process is involved.
 
+To create an opt-in published artifact without relocating consumer layers, export a new contained ZIP path:
+
+```bash
+kb-bootstrap export-published-bundle --project-root . --dir kb --output published-okf.zip
+```
+
+The ZIP contains eligible canonical Markdown plus exact lowercase `index.md` and `log.md`, excluding `raw/`, `lessons/`, and non-Markdown files. It never rewrites the working tree, QMD configuration, or lesson routing, and fails closed on unsafe paths, invalid reserved structure, source changes, existing outputs, or unsupported exclusive publication.
+
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 
 ```bash

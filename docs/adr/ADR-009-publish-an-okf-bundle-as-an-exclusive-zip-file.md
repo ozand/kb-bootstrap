@@ -1,6 +1,6 @@
 # ADR-009: Publish an OKF bundle as an exclusive ZIP file
 
-**Status**: Accepted
+**Status**: Accepted — Implemented
 **Date**: 2026-09-21
 **Authors**: Pi coding agent
 **Supersedes**: ADR-008 (accepted directory-publication mechanism)
@@ -88,14 +88,14 @@ Chosen. One complete staged file can be published exclusively with the proven gr
 
 | Claim in Decision | Test | Currently |
 |---|---|---|
-| Output ZIP includes only selected Markdown and excludes raw/lessons/non-Markdown | output member matrix | not yet written |
-| ZIP bytes are identical on repeated runs from unchanged source | deterministic ZIP fixture | not yet written |
-| Fixed member metadata contains no host timestamps, owner names, absolute paths, or directory entries | ZIP metadata inspection | not yet written |
-| Existing/race-created output is preserved and staging is cleaned | exclusive hard-link/race fixture | not yet written |
-| Unsupported hard links fail closed without output | hard-link failure fixture | not yet written |
-| Source changes during read block publication without output | identity/content recheck fixture | not yet written |
-| Reserved-file warnings/errors and report ordering are deterministic | bundle eligibility fixture matrix | not yet written |
-| Current validate, graph export, QMD, and lesson workflows remain unchanged | full regression suite | not yet run after implementation |
+| Output ZIP includes only selected Markdown and excludes raw/lessons/non-Markdown | `tests/test_published_bundle_export.py::test_members_metadata_determinism_and_source_immutability` | passing |
+| ZIP bytes are identical on repeated runs from unchanged source | `tests/test_published_bundle_export.py::test_members_metadata_determinism_and_source_immutability` | passing |
+| Fixed member metadata contains no host timestamps, owner names, absolute paths, or directory entries | `tests/test_published_bundle_export.py::test_members_metadata_determinism_and_source_immutability` | passing |
+| Existing/race-created output is preserved and staging is cleaned | `tests/test_published_bundle_export.py::test_race_created_output_is_preserved_and_staging_is_cleaned` | passing |
+| Unsupported hard links fail closed without output | `tests/test_published_bundle_export.py::test_output_safety_race_and_hard_link_failure` | passing |
+| Source changes during read block publication without output | `tests/test_published_bundle_export.py::test_source_change_blocks_without_output` | passing |
+| Reserved-file warnings/errors and report ordering are deterministic | `tests/test_published_bundle_export.py::test_reserved_rules_and_case_variants_block_deterministically` | passing |
+| Current validate, graph export, QMD, and lesson workflows remain unchanged | `python -m pytest -q` | passing (242 tests) |
 
 ## Rollback
 

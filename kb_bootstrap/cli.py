@@ -9,6 +9,7 @@ from .graph_linter import validate
 from .canonical_profile import validate_canonical_profile
 from .canonical_provenance import validate_canonical_provenance
 from .canonical_graph_export import write_canonical_graph
+from .published_bundle_export import write_published_bundle
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
 from .repository_doctor import inspect_repository
@@ -95,6 +96,19 @@ def main():
     )
     export_parser.add_argument(
         "--output", required=True, help="Repository-relative JSON output path"
+    )
+    bundle_parser = subparsers.add_parser(
+        "export-published-bundle",
+        help="Export the eligible OKF Markdown bundle as a deterministic ZIP file",
+    )
+    bundle_parser.add_argument(
+        "--dir", default="kb", help="Canonical knowledge directory (default: kb)"
+    )
+    bundle_parser.add_argument(
+        "--project-root", default=".", help="Repository root (default: current directory)"
+    )
+    bundle_parser.add_argument(
+        "--output", required=True, help="Repository-relative ZIP output path"
     )
     search_parser = subparsers.add_parser(
         "search", help="Search canonical knowledge or explicitly selected raw research"
@@ -244,6 +258,13 @@ def main():
 
     if args.command == "export-graph":
         report, is_valid = write_canonical_graph(
+            args.project_root, args.dir, args.output
+        )
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "export-published-bundle":
+        report, is_valid = write_published_bundle(
             args.project_root, args.dir, args.output
         )
         print(report)
