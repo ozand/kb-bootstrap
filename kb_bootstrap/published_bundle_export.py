@@ -111,7 +111,7 @@ def _reserved_result(relative: str, content: bytes, root: bool):
         dates = []
         for line in visible:
             match = _HEADING.match(line)
-            if match and match.group(1).startswith(("19", "20")):
+            if match and re.match(r"^\d{4}[-/]", match.group(1)):
                 if not _DATE.match(match.group(1)):
                     errors.append(f"{relative}: log date heading is invalid")
                     continue

@@ -53,6 +53,7 @@ class PublishedBundleTests(unittest.TestCase):
             ("log.md", "---\nkey: value\n---\n", "reserved file must not have frontmatter"),
             ("log.md", "## 2026-02-30\n", "log date heading is invalid"),
             ("log.md", "## 2026-09-2\n", "log date heading is invalid"),
+            ("log.md", "## 2026/09/21\n", "log date heading is invalid"),
         )
         for relative, content, message in fixtures:
             with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
