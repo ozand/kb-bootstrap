@@ -1,6 +1,6 @@
 # ADR-009: Publish an OKF bundle as an exclusive ZIP file
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-21
 **Authors**: Pi coding agent
 **Supersedes**: ADR-008 (accepted directory-publication mechanism)

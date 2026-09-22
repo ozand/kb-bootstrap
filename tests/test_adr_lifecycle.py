@@ -64,15 +64,15 @@ def test_implemented_adr_007_has_executable_test_evidence():
     assert "not yet run" in content
 
 
-def test_superseded_adr_008_and_proposed_adr_009_do_not_claim_implementation():
+def test_superseded_adr_008_and_accepted_adr_009_do_not_claim_implementation():
     superseded = (ADR_DIR / "ADR-008-validate-a-logical-published-okf-bundle.md").read_text(
         encoding="utf-8"
     )
-    proposed = (ADR_DIR / "ADR-009-publish-an-okf-bundle-as-an-exclusive-zip-file.md").read_text(
+    accepted = (ADR_DIR / "ADR-009-publish-an-okf-bundle-as-an-exclusive-zip-file.md").read_text(
         encoding="utf-8"
     )
     assert "**Status**: Superseded by ADR-009" in superseded
-    assert "**Status**: Proposed" in proposed
-    assert "not yet written" in proposed
-    assert "not yet run after implementation" in proposed
-    assert "Accepted — Implemented" not in proposed
+    assert "**Status**: Accepted" in accepted
+    assert "not yet written" in accepted
+    assert "not yet run after implementation" in accepted
+    assert "Accepted — Implemented" not in accepted
