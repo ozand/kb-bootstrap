@@ -12,4 +12,4 @@
 | ADR-008 | Validate a logical published OKF bundle | Superseded by ADR-009 |
 | ADR-009 | Publish an OKF bundle as an exclusive ZIP file | Accepted — Implemented |
 | ADR-010 | Record raw source revisions in an exclusive manifest | Accepted |
-| ADR-011 | Extract local entity candidate cards with an optional peer | Proposed |
+| ADR-011 | Extract local entity candidate cards with an optional peer | Accepted |
