@@ -22,6 +22,7 @@ from .project_lesson_registry import validate_project_registry
 from .project_lesson_enablement import enable_project_lessons
 from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
+from .raw_manifest import write_raw_manifest
 from .agents_governance import update_agents_file
 from . import __version__
 
@@ -110,6 +111,13 @@ def main():
     bundle_parser.add_argument(
         "--output", required=True, help="Repository-relative ZIP output path"
     )
+    raw_manifest_parser = subparsers.add_parser(
+        "raw-manifest", help="Publish a deterministic raw source revision manifest"
+    )
+    raw_manifest_parser.add_argument("--project-root", default=".")
+    raw_manifest_parser.add_argument("--dir", default="kb/raw")
+    raw_manifest_parser.add_argument("--output", required=True)
+    raw_manifest_parser.add_argument("--previous")
     search_parser = subparsers.add_parser(
         "search", help="Search canonical knowledge or explicitly selected raw research"
     )
@@ -266,6 +274,13 @@ def main():
     if args.command == "export-published-bundle":
         report, is_valid = write_published_bundle(
             args.project_root, args.dir, args.output
+        )
+        print(report)
+        return 0 if is_valid else 1
+
+    if args.command == "raw-manifest":
+        report, is_valid = write_raw_manifest(
+            args.project_root, args.dir, args.output, args.previous
         )
         print(report)
         return 0 if is_valid else 1

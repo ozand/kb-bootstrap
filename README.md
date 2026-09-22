@@ -289,6 +289,15 @@ kb-bootstrap export-published-bundle --project-root . --dir kb --output publishe
 
 The ZIP contains eligible canonical Markdown plus exact lowercase `index.md` and `log.md`, excluding `raw/`, `lessons/`, and non-Markdown files. It never rewrites the working tree, QMD configuration, or lesson routing, and fails closed on unsafe paths, invalid reserved structure, source changes, existing outputs, or unsupported exclusive publication.
 
+Raw-file revision inventory is a separate, opt-in operation. It hashes exact bytes under one explicit corpus root and publishes a new JSON snapshot outside that corpus without rewriting sources:
+
+```bash
+kb-bootstrap raw-manifest --project-root . --dir kb/raw --output raw-first.json
+kb-bootstrap raw-manifest --project-root . --dir kb/raw --previous raw-first.json --output raw-second.json
+```
+
+The report classifies new, changed, unchanged, and removed paths. Output paths and hashes may disclose sensitive metadata: store the manifest and captured stdout privately. Existing outputs are never overwritten; neither QMD nor GLiNER is required. Run only on a stable, locally controlled checkout: static symlinks and observed source changes block, but on Windows a hostile concurrent directory replacement may be enumerated before a post-enumeration check detects it. This is not a race-free filesystem snapshot or an adversarial-writer-safe scanner. See [ADR-010](docs/adr/ADR-010-record-raw-revisions-in-an-exclusive-manifest.md).
+
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 
 ```bash
