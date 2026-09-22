@@ -1,6 +1,6 @@
 # ADR-010: Record raw source revisions in an exclusive manifest
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-22
 **Authors**: Pi coding agent
 **Supersedes**: None
