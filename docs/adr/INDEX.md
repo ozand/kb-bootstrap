@@ -11,3 +11,4 @@
 | ADR-007 | Report the executing validator version from the package | Accepted — Implemented |
 | ADR-008 | Validate a logical published OKF bundle | Superseded by ADR-009 |
 | ADR-009 | Publish an OKF bundle as an exclusive ZIP file | Accepted — Implemented |
+| ADR-010 | Record raw source revisions in an exclusive manifest | Proposed |
