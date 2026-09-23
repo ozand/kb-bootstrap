@@ -13,3 +13,4 @@
 | ADR-009 | Publish an OKF bundle as an exclusive ZIP file | Accepted — Implemented |
 | ADR-010 | Record raw source revisions in an exclusive manifest | Accepted |
 | ADR-011 | Extract local entity candidate cards with an optional peer | Accepted |
+| ADR-012 | Provision an optional local GLiNER2 peer explicitly | Proposed |
