@@ -298,6 +298,15 @@ kb-bootstrap raw-manifest --project-root . --dir kb/raw --previous raw-first.jso
 
 The report classifies new, changed, unchanged, and removed paths. Output paths and hashes may disclose sensitive metadata: store the manifest and captured stdout privately. Existing outputs are never overwritten; neither QMD nor GLiNER is required. Run only on a stable, locally controlled checkout: static symlinks and observed source changes block, but on Windows a hostile concurrent directory replacement may be enumerated before a post-enumeration check detects it. This is not a race-free filesystem snapshot or an adversarial-writer-safe scanner. See [ADR-010](docs/adr/ADR-010-record-raw-revisions-in-an-exclusive-manifest.md).
 
+Optional GLiNER2 setup can be inspected without downloading a model or changing the core Python environment:
+
+```bash
+# Run this command using the optional peer environment's Python interpreter.
+python -m kb_bootstrap.cli inspect-gliner --model-dir /path/to/local-checkpoint
+```
+
+The result checks only the **current Python interpreter**, discoverability of a module named `gliner2` (not installation or version of the distribution), and a local `config.json`. It does not execute a user-supplied interpreter. It does **not** verify complete model assets, license, checkpoint digest, successful inference or network isolation; path checks assume a stable, locally controlled directory, not adversarial concurrent replacement. Missing requirements block with sanitized categories. Issue #109 requires separately consented, pinned provisioning and a real local model smoke before setup is complete; remote HTTP inference is a separate Issue #108 decision.
+
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 
 ```bash
