@@ -6,6 +6,10 @@
 
 - Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.
 
+### Offline GLiNER2 checkpoint integrity
+
+- Add an opt-in offline verifier for an explicitly approved complete checkpoint file set and an externally supplied ADR-011 full-byte digest. It reports only a local match/mismatch; it does not download, authorize, promote, load or smoke-test a model.
+
 ### Optional local GLiNER2 setup preflight
 
 - Add a read-only `inspect-gliner` check for the current Python interpreter and an explicit model path. It runs no supplied executable, never installs or downloads a package/model, and does not claim checkpoint or inference readiness. Consented provisioning and real offline smoke remain separate Issue #109 work.

@@ -307,6 +307,16 @@ python -m kb_bootstrap.cli inspect-gliner --model-dir /path/to/local-checkpoint
 
 The result checks only the **current Python interpreter**, discoverability of a module named `gliner2` (not installation or version of the distribution), and a local `config.json`. It does not execute a user-supplied interpreter. It does **not** verify complete model assets, license, checkpoint digest, successful inference or network isolation; path checks assume a stable, locally controlled directory, not adversarial concurrent replacement. Missing requirements block with sanitized categories. Issue #109 requires separately consented, pinned provisioning and a real local model smoke before setup is complete; remote HTTP inference is a separate Issue #108 decision.
 
+For an existing **locally controlled** directory, compare its entire selected file set against a previously established full-byte digest:
+
+```bash
+kb-bootstrap verify-gliner-checkpoint --model-dir /path/to/checkpoint \
+  --file config.json --file model.safetensors --file tokenizer.json \
+  --expected-model-digest <64-lowercase-hex-sha256>
+```
+
+List **every** file present in that directory, including nested and ancillary files; unlisted files block. The digest is ADR-011's length-framed stream over sorted relative POSIX names and actual file bytes, not a Git commit or single weight hash. A match proves only that the selected directory bytes match the supplied digest: it does **not** validate the acquisition plan, approved inventory, owner consent, publisher authenticity, model loading or denied network. It does not establish checkpoint eligibility. No acquisition or promotion occurs. Stable locally controlled directory required; Windows concurrent directory replacement is not adversarial-writer-safe. See [ADR-011](docs/adr/ADR-011-extract-local-entity-candidate-cards-as-an-optional-peer.md) and [ADR-013](docs/adr/ADR-013-quarantine-model-before-owner-digest-confirmation.md).
+
 Structural validation does not update the QMD index. Complete the actual verification pipeline:
 
 ```bash

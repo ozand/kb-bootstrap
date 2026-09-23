@@ -24,6 +24,7 @@ from .federated_lookup import federated_lookup
 from .repository_manifest import validate_manifest_file, write_manifest
 from .raw_manifest import write_raw_manifest
 from .gliner_inspect import inspect_gliner_environment
+from .gliner_checkpoint import verify_checkpoint
 from .agents_governance import update_agents_file
 from . import __version__
 
@@ -123,6 +124,12 @@ def main():
         "inspect-gliner", help="Inspect an explicit optional local GLiNER2 setup without downloading"
     )
     gliner_parser.add_argument("--model-dir", help="Explicit local model directory")
+    checkpoint_parser = subparsers.add_parser(
+        "verify-gliner-checkpoint", help="Verify exact local model bytes against an expected digest"
+    )
+    checkpoint_parser.add_argument("--model-dir", required=True)
+    checkpoint_parser.add_argument("--file", action="append", required=True, dest="files")
+    checkpoint_parser.add_argument("--expected-model-digest", required=True)
     search_parser = subparsers.add_parser(
         "search", help="Search canonical knowledge or explicitly selected raw research"
     )
@@ -294,6 +301,11 @@ def main():
         report, ready = inspect_gliner_environment(args.model_dir)
         print(report)
         return 0 if ready else 1
+
+    if args.command == "verify-gliner-checkpoint":
+        report, valid = verify_checkpoint(args.model_dir, args.files, args.expected_model_digest)
+        print(report)
+        return 0 if valid else 1
 
     if args.command == "search":
         report, is_valid = search_qmd(
