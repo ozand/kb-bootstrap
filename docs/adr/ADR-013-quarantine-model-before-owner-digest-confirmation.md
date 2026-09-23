@@ -1,6 +1,6 @@
 # ADR-013: Quarantine a consented checkpoint before confirming its full digest
 
-**Status**: Accepted
+**Status**: Superseded by ADR-014
 **Date**: 2026-09-23
 **Authors**: Pi coding agent
 **Supersedes**: ADR-012
