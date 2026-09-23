@@ -12,7 +12,7 @@
 | ADR-008 | Validate a logical published OKF bundle | Superseded by ADR-009 |
 | ADR-009 | Publish an OKF bundle as an exclusive ZIP file | Accepted — Implemented |
 | ADR-010 | Record raw source revisions in an exclusive manifest | Accepted |
-| ADR-011 | Extract local entity candidate cards with an optional peer | Accepted |
+| ADR-011 | Extract local entity candidate cards with an optional peer | Superseded by ADR-014 |
 | ADR-012 | Provision an optional local GLiNER2 peer explicitly | Superseded by ADR-013 |
-| ADR-013 | Quarantine a consented checkpoint before confirming its full digest | Accepted |
-| ADR-014 | Verify ordinary local inference without mandatory host egress denial | Proposed |
+| ADR-013 | Quarantine a consented checkpoint before confirming its full digest | Superseded by ADR-014 |
+| ADR-014 | Verify ordinary local inference without mandatory host egress denial | Accepted |

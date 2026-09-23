@@ -1,6 +1,6 @@
 # ADR-014: Verify ordinary local inference without mandatory host egress denial
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-09-23
 **Authors**: Pi coding agent
 **Supersedes**: ADR-011, ADR-013
