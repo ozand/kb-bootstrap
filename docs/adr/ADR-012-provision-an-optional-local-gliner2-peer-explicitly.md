@@ -1,6 +1,6 @@
 # ADR-012: Provision an optional local GLiNER2 peer explicitly
 
-**Status**: Accepted
+**Status**: Superseded by ADR-013
 **Date**: 2026-09-23
 **Authors**: Pi coding agent
 **Supersedes**: None
