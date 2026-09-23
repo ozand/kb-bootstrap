@@ -14,3 +14,4 @@
 | ADR-010 | Record raw source revisions in an exclusive manifest | Accepted |
 | ADR-011 | Extract local entity candidate cards with an optional peer | Accepted |
 | ADR-012 | Provision an optional local GLiNER2 peer explicitly | Accepted |
+| ADR-013 | Quarantine a consented checkpoint before confirming its full digest | Proposed |
