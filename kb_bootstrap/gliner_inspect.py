@@ -24,9 +24,9 @@ def inspect_gliner_environment(
         available = importlib.util.find_spec("gliner2") is not None
     except (ImportError, ValueError, AttributeError):
         available = False
-    lines.append("gliner2: available (not imported)" if available else "gliner2: not installed")
+    lines.append("gliner2: module discoverable (not imported or version-checked)" if available else "gliner2: module not discoverable")
     if not available:
-        errors.append("optional GLiNER2 runtime is not installed in this interpreter")
+        errors.append("optional GLiNER2 module is not discoverable in this interpreter")
 
     if model_dir is None:
         lines.append("model: not supplied")

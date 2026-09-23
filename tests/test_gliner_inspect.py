@@ -67,7 +67,7 @@ class GlinerInspectTests(unittest.TestCase):
             with patch("kb_bootstrap.gliner_inspect.importlib.util.find_spec", return_value=None):
                 report, ready = inspect_gliner_environment(model)
             self.assertFalse(ready)
-            self.assertIn("gliner2: not installed", report)
+            self.assertIn("gliner2: module not discoverable", report)
             self.assertNotIn("RESULT: OK", report)
 
     def test_old_python_blocks_without_model_loading(self):
