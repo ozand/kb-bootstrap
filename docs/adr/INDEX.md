@@ -15,3 +15,4 @@
 | ADR-011 | Extract local entity candidate cards with an optional peer | Accepted |
 | ADR-012 | Provision an optional local GLiNER2 peer explicitly | Superseded by ADR-013 |
 | ADR-013 | Quarantine a consented checkpoint before confirming its full digest | Accepted |
+| ADR-014 | Verify ordinary local inference without mandatory host egress denial | Proposed |
