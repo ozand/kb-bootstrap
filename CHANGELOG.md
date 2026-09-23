@@ -6,6 +6,10 @@
 
 - Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.
 
+### Optional local GLiNER2 setup preflight
+
+- Add a read-only `inspect-gliner` check for the current Python interpreter and an explicit model path. It runs no supplied executable, never installs or downloads a package/model, and does not claim checkpoint or inference readiness. Consented provisioning and real offline smoke remain separate Issue #109 work.
+
 ### Raw revision inventory
 
 - Add an opt-in `raw-manifest` command to hash raw-file bytes into a deterministic, versioned JSON snapshot and compare it with an explicit previous snapshot. The command does not run GLiNER/QMD or rewrite source files; manifests and path-bearing reports require private handling.
