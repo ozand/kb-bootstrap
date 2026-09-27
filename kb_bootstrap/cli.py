@@ -448,6 +448,13 @@ def main():
     shutil.copy2(skills_src / "qmd-operator" / "SKILL.md", target / ".agents/skills/qmd-operator/SKILL.md")
     shutil.copy2(skills_src / "kb-wiki-builder" / "SKILL.md", target / ".agents/skills/kb-wiki-builder/SKILL.md")
     shutil.copy2(skills_src / "kb-lookup" / "SKILL.md", target / ".agents/skills/kb-lookup/SKILL.md")
+    # market-research ships scripts, references and assets, so it is copied as a tree.
+    shutil.copytree(
+        skills_src / "market-research",
+        target / ".agents/skills/market-research",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
 
     if args.with_project_lessons:
         create_dirs(target, [".agents/skills/kb-capture"])
@@ -511,18 +518,22 @@ def main():
     with open(target / "qmd/collections/wiki.yaml", "w", encoding="utf-8") as f:
         f.write(
             "name: %s-wiki\npaths:\n  - ../../kb/\nexclude:\n"
-            "  - \"raw/**\"\n  - \"**/.DS_Store\"\n" % project_name
+            "  - \"raw/**\"\n  - \"research/**\"\n  - \"**/.DS_Store\"\n" % project_name
         )
     with open(target / "qmd/collections/raw.yaml", "w", encoding="utf-8") as f:
         f.write(
-            "name: %s-raw\npaths:\n  - ../../kb/raw/\nexclude:\n"
+            "name: %s-raw\npaths:\n  - ../../kb/raw/\n  - ../../kb/research/\nexclude:\n"
             "  - \"**/.DS_Store\"\n" % project_name
         )
 
     append_gitignore_rules(target)
     (target / "kb/raw/.gitkeep").touch(exist_ok=True)
+    # Layout used by the market-research skill: studies with raw evidence, shared wiki.
+    create_dirs(target, ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"])
+    for keep in ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"]:
+        (target / keep / ".gitkeep").touch(exist_ok=True)
 
-    installed_skills = "kb-wiki-builder, qmd-operator, and kb-lookup"
+    installed_skills = "kb-wiki-builder, qmd-operator, kb-lookup, and market-research"
     if args.with_project_lessons:
         print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
         installed_skills += ", plus kb-capture"

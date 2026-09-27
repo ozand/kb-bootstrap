@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 SKILLS_ROOT = Path("kb_bootstrap/templates/skills")
-SKILLS = ["kb-capture", "kb-lookup", "kb-wiki-builder", "qmd-operator"]
+SKILLS = ["kb-capture", "kb-lookup", "kb-wiki-builder", "market-research", "qmd-operator"]
 ROUTING_POLICY = Path("docs/LESSON_ROUTING_POLICY.md")
 PROMOTION_WORKFLOW = Path("docs/LESSON_PROMOTION_WORKFLOW.md")
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### market-research skill
+
+- Ship a universal `market-research` agent skill (Agent Skills format) and install it into `.agents/skills/market-research/` on every initialization: research process with a grounding gate, per-dimension references (sources, feature matrix, technology, UX patterns, positioning, JTBD/CJM, parallel studies and consolidation), brief/report templates, evals, and standard-library scripts to create a study, discover real article links, capture pages to Markdown with screenshots through the surf browser CLI, check claims against captured pages, and gate a study before its pull request.
+- Scaffold `kb/research/` (one folder per study with immutable `raw/`) and `kb/wiki/{entities,concepts,reports}/`; the raw QMD collection also indexes `kb/research/`, the wiki collection excludes it.
+
 ### CLI observability
 
 - Add `kb-bootstrap --version` and a leading validator identity line to composite validation output, identifying the executing package implementation without inspecting consumer files or installed distribution metadata.

@@ -1,4 +1,7 @@
 include kb_bootstrap/templates/skills/**/*.md
+include kb_bootstrap/templates/skills/**/*.py
+include kb_bootstrap/templates/skills/**/*.js
+include kb_bootstrap/templates/skills/**/*.json
 include kb_bootstrap/templates/qmd/**/*.template
 include kb_bootstrap/templates/lessons/*.md
 include kb_bootstrap/templates/lessons/*.yaml
