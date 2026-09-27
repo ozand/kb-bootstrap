@@ -1,0 +1,41 @@
+{
+  "skill_name": "market-research",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Look at how 5 note-taking meeting assistants handle search across past meetings and tell me what we should copy for our history page.",
+      "expected_output": "A study folder with a brief, raw captures of help-center pages (with UI screenshots) for at least 5 products, concept cards for the search patterns, and a report with a feature matrix whose first column is our product and must/should/nice recommendations.",
+      "assertions": [
+        "kb/research/<date>_<slug>/brief.md exists and lists the products and dimensions",
+        "At least 5 products appear in the report's feature matrix, the first column is the user's product",
+        "Most raw pages are help-center/docs articles, not product home pages",
+        "At least 8 screenshots of real product UI are linked from raw/wiki",
+        "Every checked ✅ cell has a raw page containing the key term (grep_claim.py finds it)",
+        "check_research.py prints OK"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "which speech-to-text APIs support speaker identification with voice enrollment, and what do they charge? need a quick tech comparison for choosing a vendor",
+      "expected_output": "A technology-focused study: technology table (engine, deployment, API, pricing) and feature matrix for enrollment/identification, no UX section, numbers only from captured pricing/docs pages, limitations listing what could not be verified.",
+      "assertions": [
+        "The report has a technology/pricing table with a source link per row",
+        "Every price or limit in the report is found in a raw page by grep_claim.py",
+        "No UX/UI section is forced into the report; the brief's dimensions exclude UX",
+        "check_research.py is run with --min-screenshots 0 and prints OK"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Split a competitor map for our product into 4 areas and run them with 4 agents in parallel, then give me one consolidated market map.",
+      "expected_output": "Four studies with identical report skeletons dispatched with absolute skill paths, parallel-mode rules in each brief, review by grep spot-checks, then a consolidation report with one merged matrix and entity cards created from the draft product cards.",
+      "assertions": [
+        "Each dispatch message contains an absolute path to .agents/skills/market-research/SKILL.md",
+        "Every brief contains the parallel-mode rules (no edits to kb/wiki/entities or index.md)",
+        "No area PR modifies kb/wiki/entities/ or kb/wiki/index.md",
+        "A consolidation report kb/wiki/reports/<date>_market-map.md links all area reports",
+        "kb/wiki/entities/ cards are created from the draft product cards with raw links"
+      ]
+    }
+  ]
+}

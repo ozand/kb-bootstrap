@@ -30,6 +30,9 @@ packages = ["kb_bootstrap"]
 [tool.setuptools.package-data]
 kb_bootstrap = [
     "templates/skills/**/*.md",
+    "templates/skills/**/*.py",
+    "templates/skills/**/*.js",
+    "templates/skills/**/*.json",
     "templates/qmd/**/*.template",
     "templates/lessons/*.md",
     "templates/lessons/*.yaml",

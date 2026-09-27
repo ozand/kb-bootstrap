@@ -70,7 +70,7 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
    `single` and `umbrella` describe the generated knowledge content topology. They do not describe where the repository is hosted or deployed.
 
 3. **Verify the generated scaffold:**
-   - Check that `.agents/skills/` contains `kb-lookup`, `kb-wiki-builder`, and `qmd-operator`; `kb-capture` is generated only with `--with-project-lessons`.
+   - Check that `.agents/skills/` contains `kb-lookup`, `kb-wiki-builder`, `qmd-operator`, and `market-research`; `kb-capture` is generated only with `--with-project-lessons`.
    - Check that `qmd.json`, `qmd/collections/wiki.yaml`, and `qmd/collections/raw.yaml` were created.
    - Run `kb-bootstrap validate --dir kb --project-root .`.
    - Run the project test command.
@@ -207,6 +207,7 @@ This generates:
 - `qmd/collections/<project>-raw` configuration in `raw.yaml`, indexing source captures under `kb/raw/`.
 - Anchored `.gitignore` rules for generated top-level artifacts and large raw files without hiding `kb/models/` or sanitized raw Markdown.
 - Read-only/search skills (`qmd-operator`, `kb-wiki-builder`, `kb-lookup`) placed in `.agents/skills/`; `kb-capture` is omitted until `--with-project-lessons` creates its local contract.
+- The `market-research` skill in `.agents/skills/market-research/` and its layout: `kb/research/<YYYY-MM-DD>_<slug>/` (brief + immutable `raw/` page captures with screenshots) and `kb/wiki/{entities,concepts,reports}/` for conclusions. See [Research studies](#research-studies-market-research-skill).
 
 Collection names are derived from the target directory name. Use `<project>-wiki` for canonical answers by default and query `<project>-raw` explicitly when inspecting source evidence.
 
@@ -221,6 +222,12 @@ kb-bootstrap search "original error trace" --mode raw --project-root .
 ```
 
 The wrapper runs `qmd search` against exactly one matching collection. Raw results are marked `[RAW]` and include sanitized QMD collection/source provenance. Missing or ambiguous mode collections block before QMD is called. The wrapper does not update indexes, write source files, canonicalize, or promote results.
+
+### Research studies (market-research skill)
+
+`market-research` runs competitive, technology and UX studies from public web sources: every analysed page is captured as Markdown (+ product screenshots) under `kb/research/<date>_<slug>/raw/`, conclusions become entities, concepts and a report under `kb/wiki/`. The skill covers feature and technology matrices, UX/UI patterns, positioning from public reviews, JTBD and customer journey maps, and multi-agent market maps with a consolidation step. It requires the [surf](https://github.com/nicobailon/surf-cli) browser CLI connected to Chrome/Chromium and Python 3.9+.
+
+Agents started outside the project do not discover project skills by name; when dispatching a study to another agent, pass the absolute path to `.agents/skills/market-research/SKILL.md`. To make it available in every session on a machine, link the installed copy into the user skill folders, e.g. `ln -s "$(python -c 'import kb_bootstrap,os;print(os.path.dirname(kb_bootstrap.__file__))')/templates/skills/market-research" ~/.agents/skills/market-research`.
 
 ### Optional project-local lessons
 
