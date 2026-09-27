@@ -18,6 +18,9 @@ ENCODED_UNSAFE_PATTERN = re.compile(
     r"%(?:0[0-9a-f]|1[0-9a-f]|2e|2f|5c|7f)", re.IGNORECASE
 )
 DEFAULT_IGNORED_DIRS = ("raw", "lessons")
+# Captured source pages may be cited from canonical knowledge (provenance), but are
+# never linted as sources themselves.
+EVIDENCE_DIRS = ("raw",)
 
 
 def _target_path(
@@ -59,8 +62,20 @@ def analyze_graph(
         graph.graph["invalid_targets"] = {"[unsafe canonical root]"}
         return graph, base_path
 
+    evidence_targets: Set[str] = set()
+    evidence_dirs = {directory.casefold() for directory in EVIDENCE_DIRS} & ignored
     for root, dirs, files in os.walk(base_path):
-        dirs[:] = [directory for directory in dirs if directory.casefold() not in ignored]
+        rel_parts = {part.casefold() for part in Path(root).relative_to(base_path).parts}
+        if rel_parts & evidence_dirs:
+            for filename in files:
+                absolute = Path(root) / filename
+                if filename.casefold().endswith(".md") and not absolute.is_symlink():
+                    evidence_targets.add(absolute.relative_to(base_path).as_posix())
+            continue
+        dirs[:] = [
+            directory for directory in dirs
+            if directory.casefold() not in ignored or directory.casefold() in evidence_dirs
+        ]
         for filename in files:
             if not filename.casefold().endswith(".md"):
                 continue
@@ -71,6 +86,7 @@ def analyze_graph(
             if filename.casefold() not in RESERVED_FILENAMES and not absolute.is_symlink():
                 eligible_targets.add(relative)
 
+    evidence_links: Set[Tuple[str, str]] = set()
     for absolute, relative in markdown_files:
         if absolute.is_symlink() or _traverses_symlink(absolute):
             invalid_targets.add("[unsafe source path]")
@@ -84,6 +100,9 @@ def analyze_graph(
             target, error = _target_path(link, absolute, base_path)
             target = error or target
             assert target is not None
+            if not error and target in evidence_targets:
+                evidence_links.add((relative, target))
+                continue
             if error or target not in eligible_targets:
                 invalid_targets.add(target)
                 continue
@@ -91,6 +110,7 @@ def analyze_graph(
                 graph.add_edge(relative, target)
 
     graph.graph["invalid_targets"] = invalid_targets
+    graph.graph["evidence_links"] = evidence_links
     return graph, base_path
 
 
@@ -118,6 +138,8 @@ def format_report(graph: nx.DiGraph, base_dir: Union[os.PathLike, str]) -> str:
         lines.extend(f"   - {target}" for target in sorted(invalid_targets)[:10])
     else:
         lines.append("DEAD LINKS: 0")
+    evidence = graph.graph.get("evidence_links", set())
+    lines.append(f"EVIDENCE LINKS (to raw/ captures): {len(evidence)}")
     lines.extend(["", f"ORPHANS (0 Incoming Links): {len(orphans)}"])
     lines.extend(f"   - {node}" for node in orphans[:5])
     return "\n".join(lines)
