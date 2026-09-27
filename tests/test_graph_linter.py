@@ -39,7 +39,8 @@ class GraphLinterTests(unittest.TestCase):
         cases = (
             ("/missing.md", "missing.md"),
             ("/index.md", "index.md"),
-            ("/raw/hidden.md", "raw/hidden.md"),
+            ("/raw/missing.md", "raw/missing.md"),
+            ("/lessons/item.md", "lessons/item.md"),
             ("/../outside.md", "[unsafe link target]"),
             ("%2e%2e/outside.md", "[unsafe link target]"),
             ("C:/outside.md", "[unsafe link target]"),
@@ -51,6 +52,7 @@ class GraphLinterTests(unittest.TestCase):
                 self.write(root, "source.md", "[Target](%s)\n" % link)
                 self.write(root, "index.md", "# Reserved\n")
                 self.write(root, "raw/hidden.md", "# Hidden\n")
+                self.write(root, "lessons/item.md", "# Lesson\n")
                 report, is_valid = validate(root)
                 self.assertFalse(is_valid)
                 self.assertIn(marker, report)
@@ -82,6 +84,19 @@ class GraphLinterTests(unittest.TestCase):
             self.assertTrue(is_valid)
             self.assertIn("Nodes (MD Files): 2", report)
             self.assertIn("DEAD LINKS: 0", report)
+
+    def test_links_to_existing_raw_captures_are_evidence_not_dead(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "reports/study.md",
+                       "[capture](../research/2026-01-01_x/raw/001-page.md) [top](../raw/src.md)\n")
+            self.write(root, "research/2026-01-01_x/raw/001-page.md", "[Missing](missing.md)\n")
+            self.write(root, "raw/src.md", "# Source\n")
+            report, is_valid = validate(root)
+            self.assertTrue(is_valid, report)
+            self.assertIn("DEAD LINKS: 0", report)
+            self.assertIn("EVIDENCE LINKS (to raw/ captures): 2", report)
+            self.assertIn("Nodes (MD Files): 1", report)
 
     def test_orphans_are_reported(self):
         with tempfile.TemporaryDirectory() as directory:

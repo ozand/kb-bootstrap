@@ -72,7 +72,10 @@ OKF v0.2 consumers must tolerate broken cross-links. `kb-bootstrap` intentionall
 
 - dead links fail;
 - orphan concepts are warnings;
-- `raw/` directories are excluded.
+- `raw/` directories are excluded from linting; a link from canonical knowledge to an existing
+  Markdown capture inside a `raw/` directory is valid provenance and is reported as an evidence
+  link, not a dead link (captured pages cited by research reports). A link to a missing raw
+  file is still dead. Published bundles exclude `raw/`, so evidence links do not resolve there.
 
 A dead-link failure therefore means the repository did not pass the kb-bootstrap graph-integrity extension. It does not mean the Markdown file is non-conformant with core OKF v0.2.
 
