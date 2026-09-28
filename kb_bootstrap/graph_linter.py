@@ -27,9 +27,18 @@ EVIDENCE_DIRS = ("raw",)
 
 def _without_fenced_code(content: str) -> str:
     """Hide fenced examples without changing the bounded inline-link grammar."""
-    visible: List[str] = []
+    lines = content.splitlines()
+    body_start = 0
+    if lines and lines[0] == "---":
+        try:
+            body_start = lines.index("---", 1) + 1
+        except ValueError:
+            pass  # No complete frontmatter; retain ordinary Markdown handling.
+    # Metadata is not Markdown code. Preserve its existing link checks without
+    # allowing YAML scalar content to open a fence that hides the document body.
+    visible: List[str] = lines[:body_start]
     fence: Optional[str] = None
-    for line in content.splitlines():
+    for line in lines[body_start:]:
         match = FENCE_PATTERN.match(line)
         if match:
             marker, tail = match.groups()
