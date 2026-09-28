@@ -10,10 +10,10 @@ from typing import Iterable, List, Optional, Set, Tuple, Union
 import networkx as nx
 
 from .canonical_profile import RESERVED_FILENAMES, _traverses_symlink
+from .markdown_fences import without_fenced_code
 
 
 LINK_PATTERN = re.compile(r"\[.*?\]\((.*?\.md)(?:#.*?)?\)")
-FENCE_PATTERN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 DRIVE_PATTERN = re.compile(r"^[A-Za-z]:[/\\]")
 ENCODED_UNSAFE_PATTERN = re.compile(
@@ -36,26 +36,10 @@ def _without_fenced_code(content: str) -> str:
             pass  # No complete frontmatter; retain ordinary Markdown handling.
     # Metadata is not Markdown code. Preserve its existing link checks without
     # allowing YAML scalar content to open a fence that hides the document body.
-    visible: List[str] = lines[:body_start]
-    fence: Optional[str] = None
-    for line in lines[body_start:]:
-        match = FENCE_PATTERN.match(line)
-        if match:
-            marker, tail = match.groups()
-            if fence is None:
-                # Backtick info strings cannot themselves contain backticks.
-                if marker[0] != "`" or "`" not in tail:
-                    fence = marker
-                    continue
-            elif (
-                marker[0] == fence[0]
-                and len(marker) >= len(fence)
-                and not tail.strip(" \t")
-            ):
-                fence = None
-                continue
-        if fence is None:
-            visible.append(line)
+    visible = lines[:body_start]
+    visible_body = without_fenced_code("\n".join(lines[body_start:]))
+    if visible_body:
+        visible.extend(visible_body.splitlines())
     return "\n".join(visible)
 
 
