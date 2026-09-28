@@ -42,11 +42,15 @@ Bind fragments to a specific representation revision. Page/slide/time/region coo
 
 Start with explicitly supplied local Markdown/text and an origin descriptor. Reuse ADR-010 raw hashes. Do not expand its schema in place. Recording external origins is not permission for a validator to open arbitrary paths or network resources. Conversion engines, external path adapters and network collectors are later separately bounded integrations.
 
+The proposed v1 local importer uses an explicitly operator-selected input root, which may be outside the Git checkout. Untrusted records cannot broaden that selection: reject absolute/drive/UNC references, parent traversal, symlinked files or ancestors, and outside-corpus targets before opening their contents, conversion or mutation. Safe path-metadata inspection needed for this gate is distinct from reading source contents. The [evaluation boundary fixtures](EVALUATION_PLAN.md#boundary-fixtures-for-w01w03w04w09) include positive controls, outside-content sentinels and read/converter/write observation; reports must not leak rejected contents or uncontrolled paths. This is a proposed contract and test requirement, not an assertion of current enforcement.
+
 ## 4. Capability and completion model (W01/W06)
 
 Document separate states for not configured, explicitly disabled, configured/available and configured/broken capabilities. Not configured is not a false success; configured failure is not silently skipped. Core content checks must eventually work without optional tooling, while a declared required consumer check remains binding.
 
 Separate local content validation, consumer policy, repository publication identity and retrieval/index readiness. Existing command defaults and reports remain current until an approved migration changes them. Keep the current remote doctor/publication checks; design a separate local ownership/path boundary instead of weakening them covertly.
+
+In the proposed local-core flow, import/read/update cannot trigger remote publication or network egress merely because a remote or adapter is configured. Publication is a separate authorized, explicitly targeted operation. Test both no-authorization and wrong/missing-target cases plus an authorized fake-target control, as specified in the [evaluation plan](EVALUATION_PLAN.md#boundary-fixtures-for-w01w03w04w09).
 
 Use compact discovery followed by selected reading. Default knowledge retrieval excludes evidence/workflow layers according to the accepted consumer boundary; raw reads are explicit. Return origin/layer and available revision/review state. Budget exhaustion is explicit, not silent content loss. A named but unavailable tool never triggers cloud fallback or unrestricted corpus selection.
 

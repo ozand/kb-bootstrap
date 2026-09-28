@@ -29,9 +29,17 @@ At T0, import explicit local captures, describe what was examined, synthesize a 
 | Handoff | Completed work is not repeated; unfinished checks remain visible |
 | Separation | Raw/candidate/workflow data do not acquire canonical status through indexing |
 | Permissions | Disallowed source or network fallback is not selected |
+| Local/publication separation | Even with a remote or publication adapter configured, local import/read/update invokes no remote mutation or network egress; publication requires a separately authorized operation with an explicit target |
+| Source containment | Reject untrusted absolute/drive/UNC references, parent traversal, symlinked source or ancestor, and outside-corpus targets before opening source contents, conversion or mutation; no outside contents reach output or receipts |
 | Mutation safety | Pre-existing content survives invalid input and interrupted publication |
 
 Deterministic checks should run without QMD, GLiNER, network or a live LLM. Human/model evaluations are a separately labelled layer. Judges can fail; unverified outcomes and evaluator completeness must be visible.
+
+### Boundary fixtures for W01/W03/W04/W09
+
+Configure a synthetic remote/publication adapter but provide no publication authorization. Run local import, read and update through instrumented network/publication interfaces and assert zero calls, including push, remote issue/PR creation and external inference. Add separately authorized, explicitly targeted publication and wrong/missing-target controls using local fakes only: the former selects exactly the authorized target, the latter blocks before invocation. If a requested operation or capability would require networking, it must return a truthful unavailable/blocked outcome rather than silently falling back. These tests observe application-side calls; they do not certify host-wide egress isolation.
+
+For the proposed v1 local capture path, select the input root explicitly as an operator action, then test untrusted references within supplied records. Include POSIX absolute paths, Windows drive and UNC paths, `../` traversal, a source-file symlink, a symlinked ancestor and a sibling outside the selected root. Put a unique harmless sentinel in an outside fixture and use read/converter/write spies to verify rejection before opening that content or producing output. Assert that diagnostics and receipts contain neither the sentinel nor uncontrolled absolute paths. Include an ordinary permitted file as a positive control; report unsupported symlink fixtures as skipped, not passed. The operator may select an input root outside the Git checkout: that explicit choice is not the same as granting arbitrary metadata references access outside that root. These are acceptance fixtures to implement with the approved contracts, not claims that new enforcement already exists.
 
 ## 3. Metrics
 

@@ -108,6 +108,12 @@ below and leave unrelated acceptance boxes untouched.
 
 Record repository, task/Issue, base and head commit, governing contract, changed paths, before/after reproduction, commands/results, checks not run, security/privacy boundary tested, migration/rollback implications and PR URL. Separate structural correctness from semantic review and model/runtime measurements. Never include credentials, private source contents, unrestricted paths or full transcripts.
 
+## Cloud result delivery
+
+A completed cloud chat and a published GitHub commit are separate delivery stages. The official [cloud environment guide](https://learn.chatgpt.com/docs/environments/cloud-environment) describes a final answer plus diff and a separate PR or follow-up step; the [cloud workflow](https://learn.chatgpt.com/docs/cloud) requires inspecting the result before publication. A missing shell remote alone does not establish a broken environment. Never add credentials, widen permissions or recreate an environment just to make terminal push possible.
+
+Before claiming delivery, verify the target repository, PR head and changed-file list through GitHub. A local commit ID, `make_pr` metadata or links to unchanged seed files do not prove publication. Use supported platform publication when available; otherwise retain the exact patch from the original completed task for the authorized coordinator. Export a complete diff from the verified base to the result commit, restricted to the approved paths, and report base/head IDs, changed paths, SHA-256 of the patch bytes and actual test results. Check the export command's exit status before hashing: empty output after a Git error is not an artifact. Do not infer that a new PR comment can access an earlier task's local commit; if absent, return that limitation without reconstructing the patch or reusing old test results as new evidence. A new implementation attempt requires an explicit decision and must not be labelled recovery of the original artifact.
+
 ## Dispatching and reviewing with Codex
 
 Paste one task into a Codex environment connected to this repository. GitHub access from another tool does not prove that a Codex environment is configured. Do not assign all packages at once.
