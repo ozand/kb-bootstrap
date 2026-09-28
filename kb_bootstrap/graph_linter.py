@@ -13,6 +13,8 @@ from .canonical_profile import RESERVED_FILENAMES, _traverses_symlink
 
 
 LINK_PATTERN = re.compile(r"\[.*?\]\((.*?\.md)(?:#.*?)?\)")
+FENCE_PATTERN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 DRIVE_PATTERN = re.compile(r"^[A-Za-z]:[/\\]")
 ENCODED_UNSAFE_PATTERN = re.compile(
     r"%(?:0[0-9a-f]|1[0-9a-f]|2e|2f|5c|7f)", re.IGNORECASE
@@ -21,6 +23,31 @@ DEFAULT_IGNORED_DIRS = ("raw", "lessons")
 # Captured source pages may be cited from canonical knowledge (provenance), but are
 # never linted as sources themselves.
 EVIDENCE_DIRS = ("raw",)
+
+
+def _without_fenced_code(content: str) -> str:
+    """Hide fenced examples without changing the bounded inline-link grammar."""
+    visible: List[str] = []
+    fence: Optional[str] = None
+    for line in content.splitlines():
+        match = FENCE_PATTERN.match(line)
+        if match:
+            marker, tail = match.groups()
+            if fence is None:
+                # Backtick info strings cannot themselves contain backticks.
+                if marker[0] != "`" or "`" not in tail:
+                    fence = marker
+                    continue
+            elif (
+                marker[0] == fence[0]
+                and len(marker) >= len(fence)
+                and not tail.strip(" \t")
+            ):
+                fence = None
+                continue
+        if fence is None:
+            visible.append(line)
+    return "\n".join(visible)
 
 
 def _target_path(
@@ -96,7 +123,16 @@ def analyze_graph(
         except (OSError, UnicodeError):
             invalid_targets.add("[unreadable source path]")
             continue
-        for link in LINK_PATTERN.findall(content):
+        for link in LINK_PATTERN.findall(_without_fenced_code(content)):
+            # Classify URIs lexically: never fetch or probe them as local paths.
+            # Preserve existing rejection of drive paths, backslashes and NULs.
+            if (
+                SCHEME_PATTERN.match(link)
+                and not DRIVE_PATTERN.match(link)
+                and "\\" not in link
+                and "\x00" not in link
+            ):
+                continue
             target, error = _target_path(link, absolute, base_path)
             target = error or target
             assert target is not None
