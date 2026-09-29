@@ -15,12 +15,13 @@ collapsing six independent facts:
 2. `original_revision` identifies one observed revision of the original by a
    digest when bytes are available, or by an explicit opaque owner label when they
    are not. It is never a path, URI, timestamp, or capture digest.
-3. `representation_revision` is the SHA-256 of the exact retained representation
-   bytes. A conversion can change while the original does not, and vice versa.
+3. A representation `revision` is the SHA-256 of its exact retained bytes. A
+   conversion can change while the original does not, and vice versa.
 4. `fidelity` declares `exact`, `partial`, `manual-summary`, or `blocked` plus
    coverage and losses. Length and a matching media type do not prove fidelity.
-5. `coordinates` address a named representation revision. Optional original
-   coordinates are separate and may be unknown; converters must not invent them.
+5. Representation-local `coordinates` inherit the identity and revision of their
+   containing representation. Optional original coordinates are separate and may
+   be unknown; converters must not invent them.
 6. `permissions` records owner declarations about access, retention, and
    redistribution. It does not follow from possession, fidelity, or a digest.
 
@@ -46,24 +47,32 @@ validator rather than be guessed. Each source entry contains:
   available original bytes or `{opaque: ...}` supplied by the owner, plus optional
   `observed_at`, `media_type`, and `language`. Unknown values stay absent or
   explicitly `unknown`; a capture timestamp is not substituted.
-- `representations`: zero or more records containing a unique `representation_id`,
-  exact-byte `revision: {algorithm: sha256, digest: ...}`, `media_type`, optional
-  `language`, and `retention` (`retained` or `reference-only`). Retained bytes are
-  addressed by a safe corpus-relative `raw_path`; reference-only records have no
-  `raw_path` and do not pretend reverse navigation succeeded.
-- `capture`: `captured_at` and a `method` of `direct`, `converted`,
-  `manual-summary`, or `blocked`. Converted records include converter
-  `identity`, `version`, and deterministic `parameters`; model-derived output must
-  say so in the identity and remains distinct from a manual summary. `blocked`
-  records contain a bounded reason category and no representation revision.
-- `fidelity`: `class`, a declared `coverage`, and a `losses` array. `exact`
+- `original_retention`: required and independent of representation retention;
+  it is `retained`, `reference-only`, or `unknown`. It says whether original
+  bytes, rather than a derived representation, are locally retained.
+- `capture`: a required capture-attempt object with a `method` of `direct`,
+  `converted`, `manual-summary`, or `blocked`. `captured_at` is optional and must
+  be omitted when no trustworthy observation was supplied. Converted records
+  include required converter `identity` and `version`; deterministic `parameters`
+  are optional metadata and must not be fabricated. Model-derived output must say
+  so in the identity and remains distinct from a manual summary. A `blocked`
+  capture contains a bounded `reason` and requires `representations: []`.
+- `fidelity`: a required capture-attempt object with `class`, a declared
+  `coverage`, and a `losses` array. `exact`
   requires byte-for-byte identity with the available original; `partial` names
   included scope; `manual-summary` never claims extraction; `blocked` records no
-  successful capture. Unknown fidelity is represented explicitly, not upgraded
-  from text length or converter success.
-- `coordinates`: optional mappings from representation-local, half-open units to
-  separately labelled original coordinates. Every local coordinate names the
-  representation and its digest. Original coordinates may be `unknown`.
+  successful capture. Use `class: unknown`, `coverage: unknown`, and declared
+  losses (possibly `[]`) when fidelity was not established; omission is invalid.
+- `representations`: a required array of zero or more records containing a unique
+  `representation_id`, exact-byte `revision: {algorithm: sha256, digest: ...}`,
+  `media_type`, optional `language`, and `retention` (`retained` or
+  `reference-only`). Retained bytes require a safe corpus-relative `raw_path`;
+  reference-only records prohibit it. A retained zero-byte payload is a normal
+  record whose SHA-256 is the empty-byte digest; it is not an empty array.
+- `coordinates`: optional within a representation. Local coordinates inherit that
+  containing record's `representation_id` and `revision`; they do not repeat them.
+  Separately labelled original coordinates address the parent `original_revision`
+  and may be `unknown`.
 - `permissions`: independent owner declarations for `access`, `retention`, and
   `redistribution`, each allowing an explicit `unknown`. These are labels for
   policy evaluation, not authorization created by this document.
@@ -72,6 +81,20 @@ Timestamps, when supplied, are offset-aware RFC 3339 observations rather than
 revision identities. Repeated uses refer to the same `source_id` and revision;
 study-specific notes do not mint a second source. Distinct origins remain distinct
 even when their bytes and SHA-256 digests match.
+
+`representations` is always present. `[]` means the capture attempt is known to
+have produced no representation; a missing array is invalid, not “unknown”. A
+retained zero-byte payload instead has one representation with digest
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` and a
+`raw_path`. Unknown scalar facts use the explicit `unknown` value where allowed;
+an empty `losses: []` means no losses were declared, not that fidelity is known.
+
+All coordinate ranges are half-open `[start, end)`. `byte` and
+`unicode-code-point` offsets are zero-based; byte offsets address the exact UTF-8
+payload bytes, while code-point offsets address decoded Unicode scalar values.
+`line` numbers are one-based and line ranges are half-open. An LF terminator is a
+byte/code point for byte and code-point ranges, but is not a separate line; a
+terminal LF therefore does not create another addressable content line.
 
 ## ADR-010 relationship and lifecycle
 
