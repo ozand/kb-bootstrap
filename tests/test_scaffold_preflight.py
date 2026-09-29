@@ -90,6 +90,26 @@ class SyntheticInventoryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_managed_file_map(root, {"qmd.json": b"partial"})
 
+    def test_inventory_enumeration_failure_is_not_silently_omitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = fixture_package(Path(tmp))
+            market = root / "templates/skills/market-research"
+            locked = market / "locked"
+            locked.mkdir()
+            (locked / "hidden.md").write_bytes(b"must not disappear\n")
+            real_scandir = os.scandir
+
+            def failing_scandir(path):
+                if Path(path) == locked:
+                    raise PermissionError("/synthetic-private-root/locked")
+                return real_scandir(path)
+
+            with patch("tools.scaffold_preflight.os.scandir", side_effect=failing_scandir):
+                with self.assertRaises(ValueError) as caught:
+                    build_managed_file_map(root, qmd_payloads())
+            self.assertEqual(str(caught.exception), "trusted inventory is unavailable")
+            self.assertNotIn("synthetic-private", str(caught.exception))
+
     def test_unsafe_names_do_not_leak_values(self):
         for name in (".", "/synthetic-private-root/file", "../escape", "a/../b", "a//b", "./a", "a\\b", "nul\0value"):
             with self.subTest(name=name), self.assertRaises(ValueError) as caught:
