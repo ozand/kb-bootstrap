@@ -184,3 +184,16 @@ def test_bom_and_trailing_space_are_not_silently_stripped(specification, prefix)
     )
     with pytest.raises(ValueError):
         materialize_question_manifest(malformed)
+
+
+@pytest.mark.parametrize("level", range(1, 7))
+@pytest.mark.parametrize("has_title", (False, True))
+def test_every_heading_ends_payload_before_unselected_text(authoring, level, has_title):
+    marker = b"unselected-synthetic-marker"
+    heading = b"#" * level + (b" BOUNDARY" if has_title else b"")
+    boundary = heading + b"\n" + marker + b"\n\n"
+    altered = authoring.replace(b"### PM-S4 ", boundary + b"### PM-S4 ", 1)
+    original_view = materialize_revision(authoring, "T1")
+    altered_view = materialize_revision(altered, "T1")
+    assert altered_view == original_view
+    assert marker not in altered_view.content

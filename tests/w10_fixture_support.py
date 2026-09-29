@@ -31,7 +31,7 @@ QUESTION_MANIFEST_SIZE = 763
 QUESTION_MANIFEST_SHA256 = "9260c853e7a76abc925131b41f35e48f95570c6429e99e71a078fbf9627804b0"
 
 _FRAGMENT_HEADING = re.compile(rb"^### ([A-Z]+-[A-Z0-9]+) [^\r\n]+$", re.MULTILINE)
-_ANY_HEADING = re.compile(rb"^#{1,3} .+$", re.MULTILINE)
+_ANY_HEADING = re.compile(rb"^#{1,6}(?:[ \t]+[^\r\n]*)?$", re.MULTILINE)
 _QUESTION_ROW = re.compile(
     rb"^\| (Q(?:[1-9]|10)) \| ([^|\r\n]+) \| [^|\r\n]+ \|$",
     re.MULTILINE,
