@@ -21,7 +21,7 @@ retention:
   storage_reference: local-owned-record/synthetic-river
   retention_rule: delete only after an owner-approved disposition decision
   access: owner can read/amend/dispose; continuation agent gets explicit read access
-  integrity: sha256 of exact UTF-8 record bytes
+  integrity: sha256 of exact UTF-8 payload bytes excluding the result-id envelope
   availability: not-verified
   disposal: synthetic-research-owner under the stated rule
 assumptions:
@@ -30,7 +30,8 @@ assumptions:
   - W09 publication and retention permissions are not accepted
 ```
 
-The `source:*`, `capture:*`, and `output:*` strings below are opaque placeholders;
+Every field and value in these fixtures is illustrative, not accepted. The
+`source:*`, `capture:*`, `output:*`, and evidence strings are opaque placeholders;
 they deliberately do not define or duplicate the dependency-owned schemas.
 
 ## Case 1 — resume after interruption with no chat history
@@ -45,9 +46,9 @@ result_id: R0
 materials:
   - {ref: capture:amber, revision: rev-a1, observation: read,
      analyzed_scope: none, remainder: analysis not started}
-  - {ref: capture:blue, revision: rev-b1, observation: partially-analyzed,
-     analyzed_scope: heading terminology only,
-     remainder: defined-terms section not read or analyzed}
+  - {ref: capture:blue, revision: rev-b1, observation: partially-read,
+     analyzed_scope: none,
+     remainder: defined-terms section not read; analysis not started}
 outputs: []
 steps:
   - step_id: retain-inputs
@@ -109,52 +110,60 @@ publication: {local_revision: R1, github_state: not-requested, github_ref: none}
 Expected: continuation succeeds; the output remains provisional and the study is
 not declared accepted, published, or canonical.
 
-## Case 2 — source revision changed after partial analysis (negative)
+## Case 2 — source revision changed after completed analysis (negative)
 
-Start from `R0`, but the W03-owned comparison reports `capture:blue@rev-b2`
+Start from `R1`, but the W03-owned comparison reports `capture:blue@rev-b2`
 instead of recorded `rev-b1`.
 
 ```yaml
-baseline_id: R0
+baseline_id: R1
 result_id: R2-drift
 observed_change: capture:blue expected rev-b1, observed rev-b2
 affected_steps:
   - step_id: compare-terms
-    state: blocked
+    attempts:
+      - {attempt: cmp-attempt-1, historical_state: complete,
+         input_revisions: [capture:amber@rev-a1, capture:blue@rev-b1],
+         output_revisions: [output:term-note@out-1],
+         observed_evidence: [comparison-check@cmp-1:pass]}
+    current_resumability: blocked
     blocker: recorded input revision does not match retained input
     next_step: obtain permission and re-read the bounded material at rev-b2
-preserved_unaffected_step: retain-inputs history for rev-a1
+preserved_history: retain-inputs and cmp-attempt-1 remain historical observations
 checks:
-  run: [record-shape:R0:pass, revision-match:capture-blue:fail]
+  run: [record-shape:R1:pass, revision-match:capture-blue:fail]
   not_run: [comparison-check:stale input, publication-check:blocked]
-publication: {local_revision: R0, github_state: not-requested, github_ref: none}
+publication: {local_revision: R2-drift, github_state: not-requested, github_ref: none}
 ```
 
 Expected: no stale analysis is replayed, no output is accepted or published, and
 the changed material returns to bounded re-read/re-analysis. The record does not
 guess whether `rev-b2` is equivalent.
 
-## Case 3 — matching output but missing completion evidence (negative)
+## Case 3 — matching output but expired completion evidence (negative)
 
 The provisional bytes `output:term-note@out-1` exist, but `comparison-check@cmp-1`
-is absent after interruption.
+has expired and is unavailable after interruption.
 
 ```yaml
-baseline_id: R0
+baseline_id: R1
 result_id: R3-missing-evidence
 step_id: compare-terms
-state: blocked
-output_revisions: [output:term-note@out-1]
-required_evidence: [comparison-check@cmp-1]
-observed_evidence: []
+attempts:
+  - {attempt: cmp-attempt-1, historical_state: complete,
+     output_revisions: [output:term-note@out-1],
+     observed_evidence: [comparison-check@cmp-1:pass]}
+current_resumability: blocked
+current_required_evidence: [comparison-check@cmp-1]
 blocker: required evidence is unavailable
 checks:
   run: [output-revision:out-1:pass, evidence-availability:cmp-1:fail]
   not_run: [acceptance-check:no evidence, publication-check:not requested]
 ```
 
-Expected: saved text and a matching output revision do not imply completion.
-The next process may rerun the bounded check only with current authorization.
+Expected: saved text and a matching output revision do not imply current
+completion. The historical attempt is not erased. The next process may rerun
+the bounded check only with current authorization.
 
 ## Case 4 — repeated completed step is idempotent
 
@@ -170,13 +179,18 @@ retry:
   output_revisions: [output:term-note@out-1]
 decision: existing identical completed step observed; no append and no rewrite
 checks:
-  run: [step-identity:pass, input-output-revisions:pass]
-  not_run: [comparison-check:already evidenced by cmp-1,
+  run: [step-identity:pass, input-output-revisions:pass,
+        evidence-availability:cmp-1:pass, evidence-revision:cmp-1:pass,
+        evidence-validity:cmp-1:pass]
+  not_run: [comparison-work:not rerun after current evidence revalidation,
             publication-check:not requested]
 ```
 
-Expected: the result stays byte-identical `R1`. Reusing `compare-terms` with
-`out-2`, different inputs, or different intent is a conflict, not an update.
+Expected: the result stays byte-identical `R1`. If evidence is unavailable,
+expired, revoked, superseded, or revision-mismatched, the old attempt remains in
+history but is not currently reusable; the retry does not automatically rerun
+the comparison. Reusing `compare-terms` with `out-2`, different inputs, or
+different intent is a conflict, not an update.
 
 ## Case 5 — two agents contend for one record
 
@@ -206,18 +220,20 @@ baseline_id: R1
 result_id: R5-publication-incomplete
 publication:
   local_revision: R1
-  github_state: failed
+  github_state: unknown
   github_ref: none
 owned_output: output:term-note@out-1 remains local and provisional
 checks:
   run: [local-output-revision:out-1:pass]
-  not_run: [github-containment-check:no observable publication,
+  not_run: [github-containment-check:acknowledgement lost; outcome unknown,
             acceptance-check:no W05 evidence]
-next_step: coordinator decides whether a separately authorized retry is allowed
+next_step: authorized coordinator reconciles the exact intended remote object read-only
 ```
 
-Expected: local progress is preserved; there is no implicit retry, duplicate
-publication, acceptance, canonical promotion, index update, or completion claim.
+Expected: local progress is preserved, but neither publication nor failure is
+proven. An authorized read-only reconciliation must precede a separately
+authorized retry, preventing an avoidable duplicate. There is no implicit retry,
+acceptance, canonical promotion, index update, or completion claim.
 
 ## Case 7 — accepted-standing claim does not match evidence (negative)
 
@@ -235,6 +251,8 @@ preserved_record: R1 with standing provisional
 
 Expected: save cannot manufacture acceptance. Publication, if separately proven,
 would still not cure the missing acceptance evidence or promote canonical data.
+If a later W05-owned check instead verifies acceptance evidence bound to `out-1`,
+a save may record that external observation; the save does not grant acceptance.
 
 ## Fixture-wide privacy and retention assertions
 
