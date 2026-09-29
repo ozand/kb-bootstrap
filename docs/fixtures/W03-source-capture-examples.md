@@ -6,9 +6,9 @@ below are synthetic. Nothing is fetched or authorized.
 
 ## Literal byte fixtures
 
-Each fenced payload below denotes exactly its UTF-8 content between the fence
-lines, including the single LF after the visible text. Digests were computed over
-those literal bytes, not over the Markdown fences or labels.
+Each non-empty fenced payload below denotes exactly its UTF-8 content between the
+fence lines, including the single LF after the visible text. Digests were computed
+over those literal bytes, not over the Markdown fences or labels.
 
 `shared.txt` (also used by two distinct origins):
 
@@ -55,101 +55,112 @@ ALPHA
 - bytes: `6`
 - SHA-256: `1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005`
 
+`empty.bin` contains zero bytes (there is deliberately no payload fence whose
+Markdown newline could be mistaken for content):
+
+- bytes: `0`
+- SHA-256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+
 ## Records and expected distinctions
 
-These compact pseudo-records intentionally omit envelope repetition. A digest is
-always SHA-256; every `raw_path` is corpus-relative and can be independently
-inventoried by unchanged ADR-010 raw-manifest v1.
+The following is one complete illustrative instance of the proposed envelope, not
+an installed schema. Every `raw_path` is corpus-relative and can be independently
+inventoried by unchanged ADR-010 raw-manifest v1. The two supplied timestamps are
+synthetic fixture values; absent timestamps and metadata remain absent rather than
+being inferred.
 
-### Exact, retained, and known coordinates
-
-```yaml
-source_id: synthetic:letter-a
-origin: {kind: public-url, reference: "https://example.invalid/letter-a.txt"}
-original_revision: {digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060, media_type: text/plain, language: en}
-representation_id: direct-v1
-representation_revision: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060
-raw_path: letter-a/shared.txt
-retention: retained
-capture: {method: direct, captured_at: "2026-01-02T03:04:05Z"}
-fidelity: {class: exact, coverage: all-bytes, losses: []}
-coordinates: {representation: {unit: unicode-code-point, range: [0, 5]}, original: {unit: line, range: [1, 2]}}
-permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: unknown}
-```
-
-Reverse navigation resolves the retained six bytes. The local range addresses
-`direct-v1` at its stated digest; the original line range is a distinct claim.
-
-### Duplicate bytes, distinct origin
+### Complete proposed instance
 
 ```yaml
-source_id: synthetic:letter-b
-origin: {kind: bundle-relative, reference: supplied/letter-b.txt}
-original_revision: {digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060}
-representation_id: direct-v1
-representation_revision: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060
-raw_path: letter-b/shared.txt
-retention: retained
-fidelity: {class: exact, coverage: all-bytes, losses: []}
-permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: prohibited}
+schema: kb-bootstrap.source-capture
+version: 1
+sources:
+- source_id: synthetic:letter-a
+  origin: {kind: public-url, reference: "https://example.invalid/letter-a.txt"}
+  original_revision: {algorithm: sha256, digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060, media_type: text/plain, language: en}
+  original_retention: retained
+  capture: {method: direct, captured_at: "2026-01-02T03:04:05Z"}
+  fidelity: {class: exact, coverage: all-bytes, losses: []}
+  representations:
+  - representation_id: direct-v1
+    revision: {algorithm: sha256, digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060}
+    media_type: text/plain
+    language: en
+    raw_path: letter-a/shared.txt
+    retention: retained
+    coordinates: {local: {unit: unicode-code-point, range: [0, 5]}, original: {unit: line, range: [1, 2]}}
+  permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: unknown}
+- source_id: synthetic:letter-b
+  origin: {kind: bundle-relative, reference: supplied/letter-b.txt}
+  original_revision: {algorithm: sha256, digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060}
+  original_retention: retained
+  capture: {method: direct}
+  fidelity: {class: exact, coverage: all-bytes, losses: []}
+  representations:
+  - representation_id: direct-v1
+    revision: {algorithm: sha256, digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060}
+    media_type: text/plain
+    raw_path: letter-b/shared.txt
+    retention: retained
+  permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: prohibited}
+- source_id: synthetic:three-paragraph-note
+  origin: {kind: opaque-owner-reference, reference: NOTE-7}
+  original_revision: {opaque: supplied-revision-3, media_type: text/plain, language: en}
+  original_retention: unknown
+  capture: {method: converted, converter: {identity: synthetic-selector, version: "1", parameters: {selection: paragraph-2}}}
+  fidelity: {class: partial, coverage: paragraph-2-only, losses: [paragraphs-1-and-3-omitted]}
+  representations:
+  - representation_id: paragraph-2-v1
+    revision: {algorithm: sha256, digest: 82641ee88dd2e26449f7ca30f9ecafeac2ceaa73f5834fa17a1dd588a12872ef}
+    media_type: text/plain
+    raw_path: note-7/partial.txt
+    retention: retained
+    coordinates: {local: {unit: byte, range: [0, 17]}, original: unknown}
+  permissions: {access: restricted, retention: retained-by-owner, redistribution: prohibited}
+- source_id: synthetic:briefing
+  origin: {kind: opaque-owner-reference, reference: BRIEF-9}
+  original_revision: {opaque: owner-label-r1, media_type: audio/ogg, language: en}
+  original_retention: reference-only
+  capture: {method: manual-summary, captured_at: "2026-02-03T04:05:06+00:00"}
+  fidelity: {class: manual-summary, coverage: selected-topics, losses: [wording, timing, non-selected-topics]}
+  representations:
+  - representation_id: operator-summary-v1
+    revision: {algorithm: sha256, digest: 2857c000e63dab3596026f2c317dedad64ca30163fe2b59d4466253ec4908c18}
+    media_type: text/markdown
+    raw_path: briefing/summary.md
+    retention: retained
+    coordinates: {local: {unit: unicode-code-point, range: [0, 17]}, original: unknown}
+  permissions: {access: restricted, retention: summary-only, redistribution: unknown}
+- source_id: synthetic:missing-origin
+  origin: {kind: unavailable, reason: no-safe-reference-supplied}
+  original_revision: {opaque: unknown}
+  original_retention: unknown
+  capture: {method: blocked, reason: origin-unavailable}
+  fidelity: {class: blocked, coverage: none, losses: [all-content-unavailable]}
+  representations: []
+  permissions: {access: unknown, retention: none, redistribution: unknown}
+- source_id: synthetic:empty-control
+  origin: {kind: bundle-relative, reference: supplied/empty.bin}
+  original_revision: {algorithm: sha256, digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, media_type: application/octet-stream}
+  original_retention: retained
+  capture: {method: direct}
+  fidelity: {class: unknown, coverage: unknown, losses: []}
+  representations:
+  - representation_id: empty-direct-v1
+    revision: {algorithm: sha256, digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
+    media_type: application/octet-stream
+    raw_path: empty/empty.bin
+    retention: retained
+    coordinates: {local: {unit: byte, range: [0, 0]}, original: unknown}
+  permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: unknown}
 ```
 
-The digest equals `letter-a`, but `source_id` and origin differ; these records must
-not be merged or counted as independent corroboration merely from byte equality.
-
-### Partial conversion and unknown original coordinates
-
-```yaml
-source_id: synthetic:three-paragraph-note
-origin: {kind: opaque-owner-reference, reference: NOTE-7}
-original_revision: {opaque: supplied-revision-3, media_type: text/plain, language: en}
-representation_id: paragraph-2-v1
-representation_revision: 82641ee88dd2e26449f7ca30f9ecafeac2ceaa73f5834fa17a1dd588a12872ef
-raw_path: note-7/partial.txt
-retention: retained
-capture: {method: converted, converter: {identity: synthetic-selector, version: "1", parameters: {selection: paragraph-2}}}
-fidelity: {class: partial, coverage: paragraph-2-only, losses: [paragraphs-1-and-3-omitted]}
-coordinates: {representation: {unit: byte, range: [0, 17]}, original: unknown}
-permissions: {access: restricted, retention: retained-by-owner, redistribution: prohibited}
-```
-
-Seventeen bytes do not establish completeness. The representation coordinates are
-known; no page, line, or byte position is invented for the unavailable original.
-
-### Manual summary, reference-only original
-
-```yaml
-source_id: synthetic:briefing
-origin: {kind: opaque-owner-reference, reference: BRIEF-9}
-original_revision: {opaque: owner-label-r1, media_type: audio/ogg, language: en}
-representation_id: operator-summary-v1
-representation_revision: 2857c000e63dab3596026f2c317dedad64ca30163fe2b59d4466253ec4908c18
-raw_path: briefing/summary.md
-retention: retained
-capture: {method: manual-summary, captured_at: "2026-02-03T04:05:06+00:00"}
-fidelity: {class: manual-summary, coverage: selected-topics, losses: [wording, timing, non-selected-topics]}
-coordinates: {representation: {unit: unicode-code-point, range: [0, 17]}, original: unknown}
-original_retention: reference-only
-permissions: {access: restricted, retention: summary-only, redistribution: unknown}
-```
-
-Reverse navigation reaches only the summary; the original audio is honestly
-unavailable. This is neither an extraction nor a model-derived description.
-
-### Blocked capture and missing origin
-
-```yaml
-source_id: synthetic:missing-origin
-origin: {kind: unavailable, reason: no-safe-reference-supplied}
-original_revision: {opaque: unknown}
-representations: []
-capture: {method: blocked, reason: origin-unavailable}
-fidelity: {class: blocked, coverage: none, losses: [all-content-unavailable]}
-permissions: {access: unknown, retention: none, redistribution: unknown}
-```
-
-There is no digest, coordinate, or retained evidence to fabricate, and reverse
-navigation returns unavailable without trying a path or network reference.
+The records use one nested shape. Local coordinates inherit the enclosing
+representation identity/revision. Original coordinates remain separate and
+unknown where unavailable. `letter-b` and the zero-byte control intentionally
+omit `captured_at`; no time is implied. The blocked `[]` means known-no-output,
+whereas the zero-byte control has one retained representation and `[0, 0)` range.
+Its `class: unknown` does not infer exact fidelity from matching digests.
 
 ### Changed original versus changed conversion
 
@@ -168,7 +179,8 @@ relabels the baseline, changes permissions, or implies deletion/refetch.
 
 ## Fixture assertions
 
-1. Literal byte counts and SHA-256 values recompute exactly.
+1. Literal byte counts and SHA-256 values, including the zero-byte control,
+   recompute exactly.
 2. The two distinct origins using `shared.txt` retain separate `source_id` values.
 3. Exact, partial, blocked, and manual-summary fidelity remain distinguishable.
 4. Original and representation revision changes occupy independent axes.
@@ -176,3 +188,5 @@ relabels the baseline, changes permissions, or implies deletion/refetch.
    evidence does not claim successful reverse navigation.
 6. Representation-local coordinates never stand in for unknown original
    coordinates, and permission labels remain independent of every revision.
+7. The envelope and every source use the proposal's single nested shape; missing
+   `representations`, `capture`, or `fidelity` is invalid.
