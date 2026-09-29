@@ -52,6 +52,34 @@ def _managed_name(name: str) -> str:
     return name
 
 
+
+def _inventory_files(root: Path) -> tuple[Path, ...]:
+    """Enumerate trusted regular files deterministically and fail on incomplete traversal."""
+    files: list[Path] = []
+    pending = [Path(root)]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as scan:
+            entries = sorted(scan, key=lambda entry: entry.name)
+        child_directories: list[Path] = []
+        for entry in entries:
+            path = Path(entry.path)
+            relative = path.relative_to(root)
+            if "__pycache__" in relative.parts:
+                continue
+            if entry.is_symlink():
+                raise ValueError("trusted inventory contains an unsafe entry")
+            if entry.is_dir(follow_symlinks=False):
+                child_directories.append(path)
+                continue
+            if entry.is_file(follow_symlinks=False):
+                if path.suffix != ".pyc":
+                    files.append(path)
+                continue
+            raise ValueError("trusted inventory contains an unsafe entry")
+        pending.extend(reversed(child_directories))
+    return tuple(files)
+
 def _build_managed_file_map(
     installed_package_root: Path,
     generated_qmd_payloads: Mapping[str, bytes],
@@ -83,14 +111,9 @@ def _build_managed_file_map(
     if (market.is_symlink() or not market.is_dir()
             or entrypoint.is_symlink() or not entrypoint.is_file()):
         raise ValueError("required research inventory is unavailable")
-    for source in sorted(market.rglob("*"), key=lambda item: item.as_posix()):
+    for source in _inventory_files(market):
         relative = source.relative_to(market)
-        if "__pycache__" in relative.parts or source.suffix == ".pyc":
-            continue
-        if source.is_symlink() or (source.exists() and not source.is_file() and not source.is_dir()):
-            raise ValueError("trusted inventory contains an unsafe entry")
-        if source.is_file():
-            sources.append((source, f".agents/skills/market-research/{relative.as_posix()}"))
+        sources.append((source, f".agents/skills/market-research/{relative.as_posix()}"))
 
     for source, destination in sources:
         destination = _managed_name(destination)
