@@ -10,11 +10,17 @@ The agent-visible corpus is only [W10-AGENT-INPUTS.md](W10-AGENT-INPUTS.md). Exp
 
 ## Fixture grammar and revisions
 
-A fragment begins with an exact unique heading `### <ID>`; references use that ID and must resolve to exactly one heading in the input file. Text between that heading and the next heading of equal or higher level is the fragment. `T0` uses every fragment marked `T0`. `T1` keeps unmentioned T0 fragments byte-identical, replaces fragments explicitly marked `T1 replaces …`, and adds fragments marked `T1 adds …`. A replacement makes the earlier fragment stale, not absent. `AR-S4` is unavailable in both revisions: only its blocked-record text is visible, so answers may describe the gap but may not invent its contents.
+A fragment begins with an exact unique heading `### <ID>`; references use that ID and must resolve to exactly one heading in the input file. Its materialized bytes are the UTF-8 bytes of that heading, one LF, its following nonblank content lines through the last nonblank line before the next heading, and one LF. Fragments are concatenated in the explicit order below with one additional LF between them. No document title, section heading, handoff fragment, BOM, CR, trailing spaces, or final extra blank line is included.
 
-The fixture labels `exact capture`, `manual summary`, and `converted representation` describe supplied synthetic forms; they do not claim a converter or capture tool ran. Raw inputs, notes, candidate statements, and handoff state do not become canonical merely because retrieval finds them.
+The exact active sets and order are:
 
-## Tasks
+- T0: `PM-S1, PM-S2, PM-S3, AR-S1, AR-S2, AR-S3, AR-S4, IO-S1, IO-S2, IO-S3`.
+- T1: `PM-S1R, PM-S2, PM-S3, PM-S4, AR-S1R, AR-S2, AR-S3, AR-S4, AR-S5, IO-S1, IO-S2, IO-S3R, IO-S4`.
+- T1 history: `PM-S1, AR-S1, IO-S3`, in that order, and only for dual-revision questions.
+
+T1 replaces the three history fragments in the active view; stale means retained in the separately labelled history channel, not active or silently co-present. Unchanged fragments are byte-identical. `AR-S4` is active in both revisions only as a blocked-evidence record: its unavailable artifact is never supplied. The fixture labels `exact capture`, `manual summary`, and `converted representation` describe supplied synthetic forms, not independent proof that a converter, capture tool, or runtime behaviour exists. Static code descriptions and supplied test-path observations remain distinct.
+
+## Tasks and safe question delivery
 
 For each selected revision, give concise answers with fragment IDs and preserve uncertainty, provenance type, conditions, dates, and negation.
 
@@ -31,7 +37,9 @@ For each selected revision, give concise answers with fragment IDs and preserve 
 | Q9 | Resume the interrupted work: what is complete, what remains, and what must not be repeated? | two-process handoff |
 | Q10 | List important claims that cannot be concluded from available evidence. | missing evidence, calibrated abstention |
 
-For Q3, Q6, and Q8 the runner supplies both revisions. Other questions are scored at the stated revision (default T1). Retrieval evaluation additionally asks the system to return the smallest sufficient fragment-ID set before answering.
+The future runner may parse this withheld file only before sandbox construction. It MUST match exactly ten UTF-8/LF table rows with the anchored ASCII regular expression `^\| (Q(?:[1-9]|10)) \| ([^|\r\n]+) \| [^|\r\n]+ \|$`, reject duplicate/missing/out-of-order IDs, and serialize only capture groups 1 and 2 as `ID<TAB>Reader task<LF>` in Q1…Q10 order. The resulting question manifest SHA-256 is `9260c853e7a76abc925131b41f35e48f95570c6429e99e71a078fbf9627804b0`. Only the selected manifest line and declared revision label enter the evaluated prompt; the capability column, this specification, and the key remain withheld.
+
+Q3, Q5, Q6, and Q8 receive active T0 followed by active T1 as separately labelled channels; the three T1-history IDs are available only in the T0 channel and are not duplicated into active T1; all other domain questions receive active T1 only. Q9 follows the special handoff procedure below. Retrieval evaluation asks for the smallest sufficient fragment-ID set before the answer.
 
 ## Deterministic baseline and proposed comparisons
 
@@ -47,21 +55,25 @@ Report QMD as one fixed value (`absent`, or a pinned version/config/index) acros
 
 ## Scoring
 
-The evaluator performs claim-level review against the withheld key.
+Scoring is deterministic at claim level. Each key bullet is one equal-weight claim even when its required citation set contains several IDs. Let `Nq` be the required-claim count for question q: Q1–Q10 use `3,3,3,2,3,3,3,3,3,4`. For Q10, select and pad its four slots exactly as the key directs. For each q, let `Cq` be supported required claims present, `Eq` be distinct contradicted/invented/stale-as-current claim errors (each erroneous assertion counted once, capped at `Nq`), `Jq` be claims whose complete required ID set is cited on that claim and actually supports it, and `Dq` be required claims with at least one omitted required state/provenance qualifier. All variables are integers in `[0,Nq]`; an error cannot count in `Cq` or `Jq`.
 
-- **Factuality (40 points):** 2 points for each supported required claim, normalized to 40; subtract the same normalized claim weight for each contradiction, invented fact, or stale claim stated as current. Floor 0.
-- **Evidence coverage (35 points):** weighted required claims present / weighted required claims in the key. Unsupported abstention does not satisfy a supported claim. Thus an empty answer scores 0 here.
-- **Citation quality (15 points):** weighted required fragment IDs correctly cited / required IDs; a citation that does not support its claim earns 0 and counts as an irrelevant read.
-- **State/provenance discipline (10 points):** preserves conditions, negation, revision, desired-vs-observed status, unavailable/manual-summary labels, and non-authorization. Deduct one point per omitted required qualifier, floor 0.
+The four per-question scores are:
 
-Overall score is the sum. Also report, without hiding them in the aggregate: supported-answer rate; expected-topic coverage; relevant-fragment recall; relevant fragments missed by filtering; irrelevant fragments returned/read; contradicted, stale, unsupported, and unanswered claim counts; changed fragments correctly identified; unaffected fragments incorrectly marked/re-written; and repeated reads. A response cannot pass merely by making no false statements. Thresholds and a holdout policy must be agreed before optional-model results are viewed; none is asserted here.
+- factuality `Fq = 40 × max(0, Cq − Eq) / Nq`;
+- evidence coverage `Vq = 35 × Cq / Nq`;
+- citation quality `Iq = 15 × Jq / Nq` (all IDs for a multi-ID claim are one all-or-zero unit);
+- state/provenance discipline `Pq = 10 × (Nq − Dq) / Nq`, except an unanswered claim is also a qualifier defect, so blank answers have `Dq=Nq`.
+
+The question score is `Sq=Fq+Vq+Iq+Pq`. The global score is the unweighted arithmetic mean `(S1+…+S10)/10`, not a pooled-claim score; retain exact rational values and round only the displayed category/question/global values to two decimals, half up. Controls: a blank response has `C=E=J=0, D=N` and scores `0`; a wholly correct, fully cited and qualified response has `C=J=N, E=D=0` and scores `100`; a response contradicting every required claim has `C=J=0, E=D=N` and scores `0`. Thus unsupported abstention cannot score well.
+
+Separately report relevant-fragment recall as `required gold IDs returned / distinct required gold IDs` per question and its unweighted mean across questions; a multi-ID claim contributes each distinct ID here, unlike citation scoring. Also report relevant fragments missed by filtering, irrelevant fragments returned/read, contradicted, stale, unsupported and unanswered counts, changed fragments correctly identified, unaffected fragments incorrectly rewritten, and repeated reads. Thresholds and a holdout policy must be agreed before optional-model results are viewed; none is asserted here.
 
 ## Revision and interruption procedure
 
-1. Materialize T0 and run the tasks; retain answers and the list of consulted IDs.
-2. Materialize T1 by the declared replacements/additions only. Verify the unchanged-fragment hashes remain equal.
-3. Stop after the first handoff event in `X-H1`. Start a clean second process with input plus handoff state but without conversation history. It must use `X-H2`, avoid repeating completed checks, and expose unfinished work.
-4. Score T0 and T1 separately. A T0 claim contradicted by T1 is `stale`; a claim with no available support is `unsupported`; neither is automatically `false` for all time.
+1. Materialize the exact active sets with the byte rule above; dual-revision questions receive the explicitly labelled history channel, never an implicit union.
+2. For Q9, process A receives active T1 only. It cannot read `X-H1` or `X-H2`; the harness records `X-H1` only when the stated interruption occurs.
+3. After interruption, process B starts without A's conversation history and receives, in order, active T1, then `X-H1`, then `X-H2`. Neither handoff fragment is domain evidence or part of the active-T1 digest. B recomputes SHA-256 over active-T1 bytes and repeats completed checks only on mismatch.
+4. Score T0 and T1 answers separately where both are requested. A T0 claim contradicted by T1 is `stale`; a claim with no available support is `unsupported`; neither is automatically false for all time.
 
 ## Limitations
 
