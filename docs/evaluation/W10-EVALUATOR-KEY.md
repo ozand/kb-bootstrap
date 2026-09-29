@@ -4,7 +4,7 @@ Status: **Draft; synthetic and withheld from evaluated agents.** This file conta
 
 ## Expected answer matrix
 
-Each bullet is a required claim. Parentheses give the exact supporting fragment IDs. Qualifiers in bold are required for full state/provenance credit.
+Each bullet is one equally weighted required claim, regardless of how many supporting IDs it lists. Parentheses give the complete citation set required for that claim; every listed ID is required together, but multiple IDs do not create multiple claims. Qualifiers in bold are required for full state/provenance credit.
 
 ### Q1 — Pulse applicability
 
@@ -16,7 +16,7 @@ Each bullet is a required claim. Parentheses give the exact supporting fragment 
 
 - Mira Volkova facilitates the stated Northstar pilot (April at T0, May at T1). (`PM-S1` or `PM-S1R`, according to revision)
 - Morgan Lee appears only in a manual summary whose recording and speaker cannot be checked; it must not override the exact note. (`PM-S2`)
-- No evidence establishes a facilitator outside the stated pilot.
+- No evidence establishes a facilitator outside the stated pilot. (`PM-S1R`, `PM-S2`)
 
 ### Q3 — Pulse revision impact
 
@@ -61,7 +61,7 @@ Each bullet is a required claim. Parentheses give the exact supporting fragment 
 
 ### Q10 — unavailable conclusions
 
-Any four of the following, accurately scoped, give full coverage:
+Any four distinct alternatives from the following, accurately scoped, give full coverage. The evaluator maps each response limitation to at most one alternative; duplicates do not fill another slot. It deterministically takes the first four valid distinct alternatives in the response's byte order and ignores later valid alternatives for scoring. If fewer than four are present, append zero-credit unanswered placeholders to make the Q10 denominator exactly four.
 
 - Whether the unavailable workshop actually named Morgan or said Pulse was mandatory. (`PM-S2`)
 - A generally valid Pulse facilitator outside the dated pilot. (`PM-S1R`, `PM-S2`)
@@ -92,7 +92,7 @@ A relevant-source false negative is any required ID unavailable to answer constr
 
 ## Grading notes
 
-Apply the formula in the specification at claim level. Treat a required claim's listed fragments as its evidence requirement. For Q10, four valid limitations are the required-claim denominator. Equivalent paraphrase is acceptable; invented precision is not. Correctly saying “unknown” earns factuality and coverage only where this key requires a limitation; blanket abstention earns no supported-claim coverage elsewhere.
+Apply the formulas in the specification at claim level. Treat each required claim's full listed ID set as one indivisible citation requirement. Q1–Q9 have respectively `3,3,3,2,3,3,3,3,3` claims; Q10 always has four scoring slots under the selection rule above. Equivalent paraphrase is acceptable; invented precision is not. Correctly saying “unknown” earns factuality and coverage only where this key requires a limitation; blanket abstention earns no supported-claim coverage elsewhere.
 
 Keep classifications distinct:
 
