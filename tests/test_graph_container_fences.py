@@ -106,6 +106,10 @@ class GraphContainerFenceTests(unittest.TestCase):
         for body in bodies:
             with self.subTest(body=body):
                 self.assert_graph(body, False)
+                # A valid outside link must remain visible while Hidden stays
+                # suppressed; invalid-only assertions could conceal that bug.
+                valid_body = body.replace("[Missing](missing.md)", "[Target](target.md)")
+                self.assert_graph(valid_body, True, {("source.md", "target.md")})
 
     def test_list_body_links_remain_visible(self):
         self.assert_graph("100. [Missing](missing.md)\n", False)
