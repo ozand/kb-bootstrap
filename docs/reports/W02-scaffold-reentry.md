@@ -24,6 +24,11 @@ also written or copied unconditionally by the same code path.
 Both invocations printed a normal success message. No message identified the
 overwritten paths or distinguished a first initialization from re-entry.
 
+The historical `qmd.json` edit above appended a `#` comment and therefore made
+that JSON document syntactically invalid. Those observed hashes and commands are
+preserved as historical evidence; they are not relabeled as a valid
+configuration edit. A fresh valid-JSON control is recorded separately below.
+
 ## Commands actually run
 
 The following is the runnable reproduction used from the repository root. The
@@ -77,17 +82,134 @@ Created single project structure: kb/raw/, qmd.json
 Success! Agent skills kb-wiki-builder, qmd-operator, kb-lookup, and market-research installed to <temporary>/synthetic-consumer/.agents/skills
 ```
 
+## Fresh valid-JSON control (2026-09-29)
+
+This is a new run from published base
+`bf61ba916630e0a52cf80002f8890e4dae6c5f48`, not recovery or reuse of the
+unpublished `b22720e` result. It used a new synthetic directory
+`/tmp/kb-w02-valid-json.uRMsaS`, changed `models.embedding` through Python's JSON
+parser, validated the edited document before re-entry, and then edited the same
+skill class as the historical run.
+
+```bash
+set -euo pipefail
+repo=$PWD
+work=$(mktemp -d /tmp/kb-w02-valid-json.XXXXXX)
+target="$work/synthetic-consumer"
+mkdir "$target"
+
+PYTHONPATH="$repo" python -m kb_bootstrap.cli \
+  --target "$target" --type single \
+  >"$work/first.stdout" 2>"$work/first.stderr"
+sha256sum "$target/qmd.json" \
+  "$target/.agents/skills/kb-lookup/SKILL.md" >"$work/first.sha256"
+
+python - "$target/qmd.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+data["models"]["embedding"] = "user-valid-w02-control"
+path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+PY
+printf '\n<!-- user-edit-w02-valid-control -->\n' \
+  >> "$target/.agents/skills/kb-lookup/SKILL.md"
+python -m json.tool "$target/qmd.json" >/dev/null
+sha256sum "$target/qmd.json" \
+  "$target/.agents/skills/kb-lookup/SKILL.md" >"$work/edited.sha256"
+
+PYTHONPATH="$repo" python -m kb_bootstrap.cli \
+  --target "$target" --type single \
+  >"$work/repeat.stdout" 2>"$work/repeat.stderr"
+python -m json.tool "$target/qmd.json" >/dev/null
+sha256sum "$target/qmd.json" \
+  "$target/.agents/skills/kb-lookup/SKILL.md" >"$work/final.sha256"
+
+diff -u "$work/first.stdout" "$work/repeat.stdout"
+test ! -s "$work/first.stderr" && test ! -s "$work/repeat.stderr"
+diff -u "$work/first.sha256" "$work/final.sha256"
+```
+
+| Relative path | First-init SHA-256 | Valid user-edited SHA-256 | Final SHA-256 |
+|---|---|---|---|
+| `qmd.json` | `2cab784f67ea09655a815d479ddf91be914fee912415d549d364e8c6b48afda6` | `797cf432cc2f9b38de26578e7ae0092d409d06917e5793c55f29f70ef8fe1224` | `2cab784f67ea09655a815d479ddf91be914fee912415d549d364e8c6b48afda6` |
+| `.agents/skills/kb-lookup/SKILL.md` | `0e179d3a0e1245058ecb162f954666521e1b70828505105dc7fc7f3ab781f7e1` | `e155fe87340af0389794e915087b7d8aa3264fe9627fe17f385c90cf7f93d59e` | `0e179d3a0e1245058ecb162f954666521e1b70828505105dc7fc7f3ab781f7e1` |
+
+Both initializer invocations exited 0, both stderr files were empty, and their
+stdout files were identical. `python -m json.tool` accepted the user-edited
+configuration before repeat and the restored configuration afterward. The
+final two-file manifest equaled the first manifest, so the repeat destroyed the
+valid configuration edit and the skill edit. This control remains limited to a
+synthetic `single` layout and these two paths; it is not an exhaustive platform,
+layout, concurrency, or failure-injection test.
+
+## Fresh packaged-tree control (2026-09-29)
+
+A second new run from the same published base used synthetic directory
+`/tmp/kb-w02-market-tree.8w4xFn`. It edited one packaged script, reference, and
+asset, then added a consumer-owned file beside the packaged tree:
+
+```bash
+set -euo pipefail
+repo=$PWD
+work=$(mktemp -d /tmp/kb-w02-market-tree.XXXXXX)
+target="$work/synthetic-consumer"
+mkdir "$target"
+PYTHONPATH="$repo" python -m kb_bootstrap.cli \
+  --target "$target" --type single \
+  >"$work/first.stdout" 2>"$work/first.stderr"
+paths=(
+  .agents/skills/market-research/scripts/check_research.py
+  .agents/skills/market-research/references/formats.md
+  .agents/skills/market-research/assets/brief-template.md
+)
+( cd "$target"; sha256sum "${paths[@]}" ) >"$work/first.sha256"
+printf '\n# user script edit w02\n' >> "$target/${paths[0]}"
+printf '\n<!-- user reference edit w02 -->\n' >> "$target/${paths[1]}"
+printf '\n<!-- user asset edit w02 -->\n' >> "$target/${paths[2]}"
+printf 'consumer-owned\n' \
+  > "$target/.agents/skills/market-research/consumer-note.txt"
+( cd "$target"; sha256sum "${paths[@]}" \
+  .agents/skills/market-research/consumer-note.txt ) >"$work/edited.sha256"
+PYTHONPATH="$repo" python -m kb_bootstrap.cli \
+  --target "$target" --type single \
+  >"$work/repeat.stdout" 2>"$work/repeat.stderr"
+( cd "$target"; sha256sum "${paths[@]}" \
+  .agents/skills/market-research/consumer-note.txt ) >"$work/final.sha256"
+diff -u "$work/first.stdout" "$work/repeat.stdout"
+test ! -s "$work/first.stderr" && test ! -s "$work/repeat.stderr"
+```
+
+| Relative path | First-init SHA-256 | User-edited SHA-256 | Final SHA-256 |
+|---|---|---|---|
+| `.agents/skills/market-research/scripts/check_research.py` | `a9c5976ad3e5d34c39f00295c25caf357adde6b9baacd24bc672e04291982b76` | `707bd79617d376072e91ee0f538bd059353bc07fc87c8c722b86eecb3f3845d3` | `a9c5976ad3e5d34c39f00295c25caf357adde6b9baacd24bc672e04291982b76` |
+| `.agents/skills/market-research/references/formats.md` | `086f9777d4f9aed94a1f089b400a8b9041d88bb2354eb72ee95a6c74e8abacf0` | `0cfc5270fb2602e04000c4e952cc18246fda92ad0271e5cbd4e4aa92a6fdd035` | `086f9777d4f9aed94a1f089b400a8b9041d88bb2354eb72ee95a6c74e8abacf0` |
+| `.agents/skills/market-research/assets/brief-template.md` | `434333bebb659ead98677efc7517c80a32f25cd9da0dec0828473f9757e596dd` | `9390039085a4fd040fadb1c639e6cc79747b03386a370bbb82d3b1def5d9b348` | `434333bebb659ead98677efc7517c80a32f25cd9da0dec0828473f9757e596dd` |
+| `.agents/skills/market-research/consumer-note.txt` | absent | `9044adf28312d9154f7bee1f8c334923a318e90f18f15a95dadff599efbf273a` | `9044adf28312d9154f7bee1f8c334923a318e90f18f15a95dadff599efbf273a` |
+
+Both initializer invocations exited 0 with identical stdout and empty stderr.
+The repeat restored all three packaged files to their first-init bytes while the
+consumer-added file remained byte-for-byte unchanged. This demonstrates both
+why the managed map must include the whole packaged tree and why directory
+membership must not make an unrecognized consumer file an `extra` conflict.
+The control is limited to these representative file classes in a synthetic
+`single` layout.
+
 ## Code-path characterization
 
 The initializer currently:
 
 - copies the three always-available single-file skills with `shutil.copy2`;
-- copies the `market-research` tree with `dirs_exist_ok=True`;
+- copies every packaged file in the `market-research` tree with
+  `dirs_exist_ok=True`, excluding only `__pycache__` and `*.pyc`, so scripts,
+  references, assets, and eval data are overwrite destinations too;
 - opens `qmd.json`, `qmd/collections/wiki.yaml`, and
   `qmd/collections/raw.yaml` with mode `w`;
 - preserves an already marked `.gitignore`, touches existing `.gitkeep` files,
   and conditionally preserves the three lesson data/routing files; and
-- overwrites the optional `kb-capture` skill when that option is selected.
+- when ordinary initialization uses `--with-project-lessons`, overwrites
+  `kb-capture/SKILL.md` but only copies the other three lesson artifacts when
+  absent; this branch does not call the separate accepted ADR-002
+  `enable-project-lessons` validation/enablement helper.
 
 This is a characterization, not an exhaustive safety test. It did not exercise
 `umbrella`, `--with-project-lessons`, partial trees, type changes, symlinks,
