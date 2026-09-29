@@ -44,10 +44,11 @@ integrity, and local lesson validation when selected. It must remain usable offl
 must not invoke an optional executable, authenticate, access the network, register an
 index, acquire a model, mutate a remote, or infer consumer policy.
 
-Conversion, indexing, extraction, synthesis, viewing, collection, inference, and remote
-publication are a broader **local-processing workflow** when they use explicitly selected
-local adapters; naming them “local” does not make them part of the required core or grant
-permission to read, execute, write, acquire a model, or use the network.
+Conversion, indexing, extraction, synthesis, viewing, collection, and inference can form
+a broader **local-processing workflow** when they use explicitly selected local adapters;
+naming them “local” does not make them part of the required core or grant permission to
+read, execute, write, acquire a model, or use the network. Remote publication is not a
+local-processing workflow merely because its client runs locally.
 
 ### Stable operations and adapter identity
 
@@ -56,9 +57,10 @@ Configuration identifies a stable operation such as `search`, `collect`,
 QMD, Surf, GLiNER, or GitHub. Alternative adapters and consumer-owned names are allowed
 as data identifiers, subject to an accepted extension contract. An unknown identifier
 is never an executable name, import path, command template, discovery request, or
-permission to load arbitrary plugin code. Core only dispatches adapters implemented and
-registered by reviewed code; an unsupported selection is reported as invalid
-configuration without execution.
+permission to load arbitrary plugin code. The required core never dispatches optional
+adapters. A separately invoked integration/orchestration layer may dispatch only adapters
+implemented and registered by reviewed code; an unsupported selection is reported as
+invalid configuration without execution.
 
 The exact public operation vocabulary, adapter namespace, registration mechanism,
 versioning rules, and schema are still **proposals requiring owner review**. This
@@ -134,16 +136,20 @@ weights is an active probe and cannot occur under that inspection permission.
    requires repository doctor and applicable consumer authorization.
 
 An outbound-publication denial does not deny a separately authorized local export. A
-trusted operator may explicitly choose an external input/output root; this choice is
-not untrusted document metadata and grants no path outside that bounded root. Absolute
-or traversal paths found inside documents cannot select new roots or destinations.
+trusted operator-selected external input/output root is eligible only when the accepted
+contract of that specific operation permits it; this does not broaden existing exports.
+In particular, ADR-009 output remains relative to and contained by its explicit project
+root. An eligible root choice is not untrusted document metadata and grants no path
+outside that bounded root. Absolute or traversal paths found inside documents cannot
+select new roots or destinations.
 
 Counterexamples:
 
 - policy denying upload of a bundle leaves an independently authorized local ADR-009 ZIP
   possible; local ZIP success still makes no claim that upload is allowed or succeeded;
-- `/mnt/approved-corpus` explicitly supplied by a trusted operator may be a bounded root,
-  while metadata containing `output: /tmp/leak` cannot authorize or redirect a write;
+- `/mnt/approved-corpus` may be a bounded root only for an operation whose own accepted
+  contract allows external roots; it is not a valid ADR-009 output root, and metadata
+  containing `output: /tmp/leak` cannot authorize or redirect a write;
 - recorded provenance for a remote corpus does not authorize fetching it: provenance
   describes origin, while acquisition needs a separate allowed operation.
 
