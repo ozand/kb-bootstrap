@@ -32,7 +32,7 @@ Use quotation marks only for actual, traceable quoted text. Paraphrases remain a
 
 State the question, intended audience, time/version boundary, and consumer that can accept the result. Separate reusable scope (“could this help several projects?”) from access scope (“who may read this source?”). Broad applicability never makes restricted material publishable, and public access never makes a claim broadly applicable.
 
-Stop before drafting if source access, output ownership, or the reviewing authority is ambiguous. Record unknowns rather than inventing an owner or policy.
+Stop before drafting if source access or authority to prepare the draft is ambiguous. An authorized provisional draft need not wait for assignment of its final accepting reviewer; acceptance and publication still require their proper approval. Record unknowns rather than inventing an owner or policy.
 
 ### 2. Inventory sources without flattening them
 
@@ -40,10 +40,11 @@ Give each source a stable local reference sufficient to navigate back to the cap
 
 Source handling involves different questions:
 
-1. **Exact-file deduplication:** are the bytes (or a defined canonical byte representation) identical?
-2. **Capture similarity:** do captures substantially overlap or derive from one another?
-3. **Entity identity:** do two names refer to the same real-world thing?
-4. **Claim equivalence:** do two statements make the same assertion with the same conditions, polarity, and scope?
+1. **Exact-file deduplication:** are the original bytes identical?
+2. **Normalized representation equivalence:** are the representations equal after a specified normalization, without erasing their distinct source identity or provenance?
+3. **Capture similarity:** do captures substantially overlap or derive from one another?
+4. **Entity identity:** do two names refer to the same real-world thing?
+5. **Claim equivalence:** do two statements make the same assertion with the same conditions, polarity, and scope?
 
 Success at one level does not prove another. Two differently formatted captures may be the same revision; one document may mention two distinct entities with similar names; two claims may look similar while differing by a negation or version. When identity is unresolved, retain separate candidates and state the ambiguity.
 
@@ -181,7 +182,7 @@ Illustrative lesson candidate:
 
 Reviewers should confirm that the lesson does not overstate causality, hide the disruptive failed remedy, or broaden versions. They should also check redaction, ownership, duplication, and whether the destination scope is appropriate.
 
-Lesson reuse scope remains separate from access and ownership. Existing project and workspace lesson IDs remain local to their owners. Capture resolves exactly one destination; lookup behavior is unchanged; project-to-workspace promotion or demotion remains a separate, manual, reviewed operation. Promotion preserves the source and does not create automatic synchronization, dual writes, or authority for future action.
+Lesson reuse scope remains separate from access and ownership. Existing project and workspace lesson IDs remain local to their owners. Capture resolves exactly one destination; lookup behavior is unchanged; project-to-workspace promotion or demotion remains a separate, manual, reviewed operation. Promotion itself does not delete its source; continued retention is subject to a separately reviewed retention, retraction, or deletion decision under existing contracts. Promotion does not create automatic synchronization, dual writes, or authority for future action.
 
 ## Reviewer checklist
 
