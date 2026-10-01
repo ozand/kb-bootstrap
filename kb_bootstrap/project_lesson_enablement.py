@@ -46,7 +46,7 @@ def _regular_file(path: Path) -> bool:
 
 
 def _file_identity(path: Path) -> Tuple[int, int]:
-    stat = path.stat(follow_symlinks=False)
+    stat = os.stat(path, follow_symlinks=False)
     return stat.st_dev, stat.st_ino
 
 
