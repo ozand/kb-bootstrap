@@ -38,7 +38,7 @@ class _Document(NamedTuple):
 
 
 def _identity(path: Path) -> Tuple[int, int]:
-    details = path.stat(follow_symlinks=False)
+    details = os.stat(path, follow_symlinks=False)
     return details.st_dev, details.st_ino
 
 
@@ -54,9 +54,9 @@ def _read_document(path: Path) -> Tuple[Optional[_Document], str]:
     if path.is_symlink() or _traverses_symlink(path) or not path.is_file():
         return None, "concept path is unavailable or unsafe"
     try:
-        before = path.stat(follow_symlinks=False)
+        before = os.stat(path, follow_symlinks=False)
         content = path.read_bytes()
-        after = path.stat(follow_symlinks=False)
+        after = os.stat(path, follow_symlinks=False)
         text = content.decode("utf-8")
     except (OSError, UnicodeError):
         return None, "concept is not readable UTF-8 Markdown"
