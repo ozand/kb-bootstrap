@@ -111,6 +111,22 @@ class GraphContainerFenceTests(unittest.TestCase):
                 valid_body = body.replace("[Missing](missing.md)", "[Target](target.md)")
                 self.assert_graph(valid_body, True, {("source.md", "target.md")})
 
+    def test_nested_wide_list_fence_keeps_visible_sibling(self):
+        self.assert_graph(
+            "- Outer\n  100. Example\n\n       ````md\n"
+            "       ```\n       [Hidden](missing.md)\n       ````\n"
+            "  [Sibling](target.md)\n",
+            True, {("source.md", "target.md")},
+        )
+
+    def test_nested_unclosed_fence_exits_at_sibling_and_top_level(self):
+        prefix = "- Outer\n  - Inner\n\n    ```md\n    [Hidden](missing.md)\n\n"
+        for outside in ("  - [Outside]", "  [Outside]", "[Outside]"):
+            with self.subTest(outside=outside):
+                self.assert_graph(prefix + outside + "(target.md)\n", True,
+                                  {("source.md", "target.md")})
+                self.assert_graph(prefix + outside + "(outside-missing.md)\n", False)
+
     def test_list_body_links_remain_visible(self):
         self.assert_graph("100. [Missing](missing.md)\n", False)
         self.assert_graph(

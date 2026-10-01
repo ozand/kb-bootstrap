@@ -14,25 +14,25 @@ def without_fenced_code(body: str) -> str:
     """Return body lines outside bounded backtick or tilde fences."""
     visible: List[str] = []
     fence: Optional[str] = None
-    container_indent: Optional[int] = None
+    container_indents: List[int] = []
     for line in body.splitlines():
         candidate = line
-        item_match = LIST_ITEM_PATTERN.match(line)
-        if container_indent is not None:
-            if not line.strip():
-                candidate = ""
-            elif line.startswith(" " * container_indent):
-                candidate = line[container_indent:]
-            else:
-                # A list-relative fence ends with its container even when it has
-                # no explicit closing marker. Reprocess the outdented line as
-                # ordinary Markdown (or as the start of a sibling list item).
+        if line.strip():
+            while container_indents and not line.startswith(" " * container_indents[-1]):
+                # Exiting an inner item also ends its unclosed fence. Retain
+                # outer items so a sibling's real links remain visible.
+                container_indents.pop()
                 fence = None
-                container_indent = None
-        if fence is None and container_indent is None and item_match:
-            content = item_match.group(3)
-            container_indent = len(line) - len(content)
-            candidate = content
+            base_indent = container_indents[-1] if container_indents else 0
+            candidate = line[base_indent:]
+            if fence is None:
+                item_match = LIST_ITEM_PATTERN.match(candidate)
+                if item_match:
+                    content = item_match.group(3)
+                    container_indents.append(base_indent + len(candidate) - len(content))
+                    candidate = content
+        elif container_indents:
+            candidate = ""
 
         match = FENCE_PATTERN.match(candidate)
         if match:
