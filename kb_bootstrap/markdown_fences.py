@@ -15,6 +15,7 @@ def without_fenced_code(body: str) -> str:
     visible: List[str] = []
     fence: Optional[str] = None
     container_indents: List[int] = []
+    paragraph = False
     for line in body.splitlines():
         candidate = line
         if line.strip():
@@ -29,10 +30,16 @@ def without_fenced_code(body: str) -> str:
                 item_match = LIST_ITEM_PATTERN.match(candidate)
                 if item_match:
                     content = item_match.group(3)
-                    container_indents.append(base_indent + len(candidate) - len(content))
-                    candidate = content
-        elif container_indents:
-            candidate = ""
+                    marker = candidate[len(item_match.group(1)):].split()[0]
+                    ordered = marker[0].isdigit()
+                    can_interrupt = (not ordered or marker[:-1] == "1") and bool(content)
+                    if not paragraph or can_interrupt:
+                        container_indents.append(base_indent + len(candidate) - len(content))
+                        candidate = content
+        else:
+            paragraph = False
+            if container_indents:
+                candidate = ""
 
         match = FENCE_PATTERN.match(candidate)
         if match:
@@ -41,6 +48,7 @@ def without_fenced_code(body: str) -> str:
                 # Backtick info strings cannot themselves contain backticks.
                 if marker[0] != "`" or "`" not in tail:
                     fence = marker
+                    paragraph = False
                     continue
             elif (
                 marker[0] == fence[0]
@@ -48,7 +56,9 @@ def without_fenced_code(body: str) -> str:
                 and not tail.strip(" \t")
             ):
                 fence = None
+                paragraph = False
                 continue
         if fence is None:
             visible.append(line)
+            paragraph = bool(candidate.strip())
     return "\n".join(visible)

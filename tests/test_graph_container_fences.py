@@ -113,7 +113,7 @@ class GraphContainerFenceTests(unittest.TestCase):
 
     def test_nested_wide_list_fence_keeps_visible_sibling(self):
         self.assert_graph(
-            "- Outer\n  100. Example\n\n       ````md\n"
+            "- Outer\n\n  100. Example\n\n       ````md\n"
             "       ```\n       [Hidden](missing.md)\n       ````\n"
             "  [Sibling](target.md)\n",
             True, {("source.md", "target.md")},
@@ -126,6 +126,20 @@ class GraphContainerFenceTests(unittest.TestCase):
                 self.assert_graph(prefix + outside + "(target.md)\n", True,
                                   {("source.md", "target.md")})
                 self.assert_graph(prefix + outside + "(outside-missing.md)\n", False)
+
+    def test_non_one_ordered_marker_cannot_interrupt_paragraph(self):
+        for marker in ("2.", "100)"):
+            prefix = "Paragraph\n" + marker + " ~~~\n"
+            indent = " " * (len(marker) + 1)
+            self.assert_graph(prefix + indent + "[Missing](missing.md)\n", False)
+            self.assert_graph(prefix + indent + "[Target](target.md)\n", True,
+                              {("source.md", "target.md")})
+
+    def test_ordered_fence_starts_after_blank_or_marker_one(self):
+        for prefix in ("Paragraph\n\n2. ~~~\n", "Paragraph\n1. ~~~\n"):
+            self.assert_graph(prefix + "   [Hidden](missing.md)\n   ~~~\n\n"
+                              + "[Target](target.md)\n", True,
+                              {("source.md", "target.md")})
 
     def test_list_body_links_remain_visible(self):
         self.assert_graph("100. [Missing](missing.md)\n", False)
