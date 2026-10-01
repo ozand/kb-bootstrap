@@ -66,7 +66,7 @@ def verify_checkpoint(
         for name in sorted(names):
             path = root.joinpath(*name.split("/"))
             before = _signature(path)
-            if not stat.S_ISREG(path.stat(follow_symlinks=False).st_mode):
+            if not stat.S_ISREG(os.stat(path, follow_symlinks=False).st_mode):
                 return _blocked("checkpoint entry is not a regular file")
             encoded = name.encode("utf-8")
             digest.update(len(encoded).to_bytes(8, "big"))
