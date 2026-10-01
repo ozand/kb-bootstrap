@@ -80,7 +80,7 @@ def _contained_target(
 
 
 def _identity(path: Path) -> Tuple[int, int]:
-    details = path.stat(follow_symlinks=False)
+    details = os.stat(path, follow_symlinks=False)
     return details.st_dev, details.st_ino
 
 
@@ -92,9 +92,9 @@ def _observe(path: Path) -> Tuple[Optional[_Observation], str]:
     if path.is_symlink() or _traverses_symlink(path) or not path.is_file():
         return None, "managed file is unavailable or unsafe"
     try:
-        before = path.stat(follow_symlinks=False)
+        before = os.stat(path, follow_symlinks=False)
         content = path.read_bytes()
-        after = path.stat(follow_symlinks=False)
+        after = os.stat(path, follow_symlinks=False)
     except OSError:
         return None, "managed file is unavailable or unsafe"
     if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
