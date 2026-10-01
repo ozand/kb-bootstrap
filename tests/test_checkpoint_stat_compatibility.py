@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,27 @@ class _LegacyPath(type(Path())):
 
     def lstat(self):
         return os.lstat(self)
+
+    # Modern pathlib predicates pass a keyword to self.stat internally.
+    # Emulate the old predicates as well, so the double only rejects the
+    # production call this regression targets, not modern host internals.
+    def is_dir(self):
+        try:
+            return stat.S_ISDIR(self.stat().st_mode)
+        except OSError:
+            return False
+
+    def is_file(self):
+        try:
+            return stat.S_ISREG(self.stat().st_mode)
+        except OSError:
+            return False
+
+    def is_symlink(self):
+        try:
+            return stat.S_ISLNK(self.lstat().st_mode)
+        except OSError:
+            return False
 
 
 def _digest(items):
@@ -75,6 +97,7 @@ class CheckpointStatCompatibilityTests(unittest.TestCase):
             except (OSError, NotImplementedError):
                 self.skipTest("symlink unavailable")
 
+            original_link = os.readlink(link)
             with mock.patch("kb_bootstrap.gliner_checkpoint.Path", _LegacyPath):
                 report, ok = verify_checkpoint(
                     root, ["weights.bin"], _digest({"weights.bin": payload})
@@ -82,7 +105,7 @@ class CheckpointStatCompatibilityTests(unittest.TestCase):
 
             self.assertFalse(ok, report)
             self.assertIn("RESULT: BLOCKED", report)
-            self.assertEqual(os.readlink(link), str(foreign))
+            self.assertEqual(os.readlink(link), original_link)
             self.assertEqual(foreign.read_bytes(), payload)
 
 
