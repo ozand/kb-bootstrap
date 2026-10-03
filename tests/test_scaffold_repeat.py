@@ -1,0 +1,273 @@
+"""ADR-016 scaffold preflight regressions using synthetic targets."""
+import hashlib
+import json
+import os
+import subprocess
+import tempfile
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from kb_bootstrap.cli import main
+from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files
+
+
+class ScaffoldRepeatTests(unittest.TestCase):
+    def setUp(self):
+        self.package = Path(__file__).parents[1] / "kb_bootstrap"
+
+    def run_cli(self, *args):
+        with patch("sys.argv", ["kb-bootstrap", *args]):
+            return main()
+
+    def snapshot(self, root):
+        return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in root.rglob("*") if p.is_file() and not p.is_symlink()}
+
+    def test_qmd_payload_matches_text_writer_bytes(self):
+        expected = qmd_payloads("single", "sample")
+        config = """{\n  \"version\": \"1.0\",\n  \"workspace\": {\n    \"name\": \"sample_kb\",\n    \"collections_dir\": \"./qmd/collections\",\n    \"db_path\": \".qmd/vector.db\"\n  },\n  \"models\": {\n    \"embedding\": \"text-embedding-3-small\"\n  }\n}"""
+        wiki = "name: sample-wiki\npaths:\n  - ../../kb/\nexclude:\n  - \"raw/**\"\n  - \"research/**\"\n  - \"**/.DS_Store\"\n"
+        raw = "name: sample-raw\npaths:\n  - ../../kb/raw/\n  - ../../kb/research/\nexclude:\n  - \"**/.DS_Store\"\n"
+        eol = os.linesep.encode()
+        self.assertEqual(expected["qmd.json"], config.replace("\n", os.linesep).encode())
+        self.assertEqual(expected["qmd/collections/wiki.yaml"], wiki.replace("\n", os.linesep).encode())
+        self.assertEqual(expected["qmd/collections/raw.yaml"], raw.replace("\n", os.linesep).encode())
+
+    def test_inventory_uses_all_packaged_files(self):
+        mapping = _inventory_files(self.package)
+        market = self.package / "templates/skills/market-research"
+        actual = {".agents/skills/market-research/" + p.relative_to(market).as_posix()
+                  for p in market.rglob("*") if p.is_file() and "__pycache__" not in p.parts
+                  and not p.name.endswith(".pyc")}
+        self.assertEqual({p for p in mapping if "/market-research/" in p}, actual)
+
+    def test_first_init_then_repeat_is_zero_write_noop_both_layouts(self):
+        for layout in ("single", "umbrella"):
+            with self.subTest(layout=layout), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "consumer"
+                self.assertIsNone(self.run_cli("--target", str(root), "--type", layout))
+                before = self.snapshot(root)
+                mtimes = {p.relative_to(root).as_posix(): p.stat().st_mtime_ns
+                          for p in root.rglob("*") if p.is_file()}
+                self.assertEqual(self.run_cli("--target", str(root), "--type", layout), 0)
+                self.assertEqual(before, self.snapshot(root))
+                self.assertEqual(mtimes, {p.relative_to(root).as_posix(): p.stat().st_mtime_ns
+                                          for p in root.rglob("*") if p.is_file()})
+
+    def test_matching_repeat_does_not_rewrite_gitignore_or_touch_markers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            ignore = root / ".gitignore"
+            ignore.write_text("# custom\r\n# kb-bootstrap generated artifacts\r\n/keep\r\n", encoding="utf-8")
+            before_bytes = self.snapshot(root)
+            before_times = {p.relative_to(root).as_posix(): p.stat().st_mtime_ns
+                            for p in root.rglob("*") if p.is_file()}
+            self.assertEqual(self.run_cli("--target", str(root)), 0)
+            self.assertEqual(before_bytes, self.snapshot(root))
+            self.assertEqual(before_times, {p.relative_to(root).as_posix(): p.stat().st_mtime_ns
+                                            for p in root.rglob("*") if p.is_file()})
+
+    def test_conflict_blocks_before_any_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            before = self.snapshot(root)
+            qmd = root / "qmd.json"
+            qmd.write_text('{"models":{"embedding":"custom"}}\n', encoding="utf-8")
+            conflicted = self.snapshot(root)
+            result = self.run_cli("--target", str(root))
+            self.assertEqual(result, 1)
+            self.assertEqual(conflicted, self.snapshot(root))
+            self.assertNotEqual(before, conflicted)
+
+    def test_repeated_optin_without_lessons_blocks_but_explicit_enable_works(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            before = self.snapshot(root)
+            result = self.run_cli("--target", str(root), "--with-project-lessons")
+            self.assertEqual(result, 1)
+            self.assertEqual(before, self.snapshot(root))
+            self.assertEqual(self.run_cli("enable-project-lessons", "--target", str(root)), 0)
+            lesson_before = {name: (root / name).read_bytes() for name in (
+                "kb/lessons/SCHEMA.md", "kb/lessons/index.yaml", "lesson-stores.json",
+                ".agents/skills/kb-capture/SKILL.md")}
+            self.assertEqual(self.run_cli("--target", str(root), "--with-project-lessons"), 0)
+            self.assertEqual(lesson_before, {n: (root / n).read_bytes() for n in lesson_before})
+
+    def test_partial_lesson_contract_blocks_without_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            (root / "lesson-stores.json").write_text("{}", encoding="utf-8")
+            before = self.snapshot(root)
+            self.assertEqual(self.run_cli("--target", str(root)), 1)
+            self.assertEqual(before, self.snapshot(root))
+
+    def test_optin_absent_lesson_contract_on_fresh_init_is_installed_after_preflight(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "fresh"
+            self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
+            self.assertTrue((root / "lesson-stores.json").is_file())
+            self.assertTrue((root / "kb/lessons/index.yaml").is_file())
+
+    def test_complete_populated_lessons_survive_flag_removal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
+            index = root / "kb/lessons/index.yaml"
+            lesson = root / "kb/lessons/PROJECT-0001-example.md"
+            lesson.write_text("---\nid: PROJECT-0001\n---\n# Example\n", encoding="utf-8")
+            index.write_text("version: 1\nscope: project\nid_prefix: PROJECT-\nlessons:\n  - id: PROJECT-0001\n    path: kb/lessons/PROJECT-0001-example.md\n", encoding="utf-8")
+            stores = root / "lesson-stores.json"
+            data = json.loads(stores.read_text(encoding="utf-8"))
+            data["shared"] = {"path": "shared", "read_only": True}
+            stores.write_text(json.dumps(data), encoding="utf-8")
+            preserved = {name: (root / name).read_bytes() for name in (
+                "kb/lessons/SCHEMA.md", "kb/lessons/index.yaml", "lesson-stores.json",
+                ".agents/skills/kb-capture/SKILL.md")}
+            self.assertEqual(self.run_cli("--target", str(root)), 0)
+            self.assertEqual(preserved, {name: (root / name).read_bytes() for name in preserved})
+
+    def test_noop_invokes_no_initializer_mutation_primitives(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            with patch("kb_bootstrap.cli.create_dirs", side_effect=AssertionError("mkdir")), \
+                 patch("kb_bootstrap.cli.append_gitignore_rules", side_effect=AssertionError("gitignore")), \
+                 patch("kb_bootstrap.cli.shutil.copy2", side_effect=AssertionError("copy2")), \
+                 patch("kb_bootstrap.cli.shutil.copytree", side_effect=AssertionError("copytree")), \
+                 patch("kb_bootstrap.cli.enable_project_lessons", side_effect=AssertionError("lesson write")), \
+                 patch("pathlib.Path.touch", side_effect=AssertionError("touch")):
+                self.assertEqual(self.run_cli("--target", str(root)), 0)
+
+    def test_cli_subprocess_single_and_umbrella_success_and_repeat(self):
+        for layout in ("single", "umbrella"):
+            with self.subTest(layout=layout), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / "consumer"
+                command = [sys.executable, "-m", "kb_bootstrap.cli", "--target", str(target), "--type", layout]
+                first = subprocess.run(command, capture_output=True, text=True, timeout=30)
+                self.assertEqual(first.returncode, 0, first.stderr + first.stdout)
+                snapshot = self.snapshot(target)
+                second = subprocess.run(command, capture_output=True, text=True, timeout=30)
+                self.assertEqual(second.returncode, 0, second.stderr + second.stdout)
+                self.assertIn("OK (NO-OP)", second.stdout)
+                self.assertEqual(snapshot, self.snapshot(target))
+
+    def test_first_init_lesson_installer_failure_is_reported_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "fresh"
+            with patch("kb_bootstrap.cli.enable_project_lessons", side_effect=OSError("private path")):
+                self.assertEqual(self.run_cli("--target", str(root), "--with-project-lessons"), 1)
+            self.assertTrue(root.is_dir())
+
+    def test_every_fixed_file_conflict_blocks_without_mutation(self):
+        for relative in ("qmd.json", "qmd/collections/wiki.yaml", "qmd/collections/raw.yaml"):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "consumer"
+                self.assertIsNone(self.run_cli("--target", str(root)))
+                target = root / relative
+                target.write_bytes(target.read_bytes() + b"user edit\\n")
+                before = self.snapshot(root)
+                self.assertEqual(self.run_cli("--target", str(root)), 1)
+                self.assertEqual(before, self.snapshot(root))
+
+    def test_every_managed_file_conflict_blocks_without_any_writes(self):
+        managed = {**_inventory_files(self.package), **qmd_payloads("single", "consumer")}
+        for relative in managed:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "consumer"
+                self.assertIsNone(self.run_cli("--target", str(root)))
+                path = root / relative
+                path.write_bytes(path.read_bytes() + b"consumer edit\\n")
+                before = self.snapshot(root)
+                with patch("kb_bootstrap.cli.create_dirs", side_effect=AssertionError("mkdir")), \
+                     patch("kb_bootstrap.cli.append_gitignore_rules", side_effect=AssertionError("gitignore")), \
+                     patch("kb_bootstrap.cli.shutil.copy2", side_effect=AssertionError("copy2")), \
+                     patch("kb_bootstrap.cli.shutil.copytree", side_effect=AssertionError("copytree")), \
+                     patch("pathlib.Path.touch", side_effect=AssertionError("touch")):
+                    self.assertEqual(self.run_cli("--target", str(root)), 1)
+                self.assertEqual(before, self.snapshot(root))
+
+    def test_absent_ancillary_state_blocks_and_unrelated_files_survive_noop(self):
+        for relative in ("kb/raw/.gitkeep", "kb/research/.gitkeep", "qmd/collections/wiki.yaml"):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "consumer"
+                self.assertIsNone(self.run_cli("--target", str(root)))
+                path = root / relative
+                path.unlink()
+                before = self.snapshot(root)
+                self.assertEqual(self.run_cli("--target", str(root)), 1)
+                self.assertEqual(before, self.snapshot(root))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root)))
+            (root / "AGENTS.md").write_text("consumer instructions\\n", encoding="utf-8")
+            extra_skill = root / ".agents/skills/custom/SKILL.md"
+            extra_skill.parent.mkdir()
+            extra_skill.write_text("custom skill\\n", encoding="utf-8")
+            source = self.package / "templates/skills/market-research/SKILL.md"
+            nested = root / ".agents/skills/market-research/custom-extra.md"
+            nested.write_bytes(source.read_bytes())
+            before = self.snapshot(root)
+            self.assertEqual(self.run_cli("--target", str(root)), 0)
+            self.assertEqual(before, self.snapshot(root))
+
+    def test_reparse_lesson_artifact_blocks_before_registry_read(self):
+        from kb_bootstrap.project_lesson_enablement import inspect_project_lessons
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
+            module = __import__("kb_bootstrap.project_lesson_enablement", fromlist=["os"])
+            real_lstat = module.os.lstat
+            def reparse_lstat(path):
+                details = real_lstat(path)
+                if Path(path) == root / "kb/lessons":
+                    from types import SimpleNamespace
+                    details = SimpleNamespace(**{name: getattr(details, name) for name in dir(details)
+                                                 if name.startswith("st_")})
+                    details.st_file_attributes = 0x400
+                return details
+            with patch.object(module.os, "lstat", side_effect=reparse_lstat), \
+                 patch("kb_bootstrap.project_lesson_enablement.validate_project_registry", side_effect=AssertionError("must not read")):
+                state, _ = inspect_project_lessons(root, self.package, require_initialized=False)
+            self.assertEqual(state, "blocked")
+
+    def test_lesson_diagnostic_does_not_echo_malicious_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
+            secret = "PRIVATE-ID-DO-NOT-LEAK"
+            index = root / "kb/lessons/index.yaml"
+            index.write_text(f"version: 1\nscope: project\nid_prefix: PROJECT-\nlessons:\n  - id: {secret}\n    path: kb/lessons/PROJECT-0001-example.md\n", encoding="utf-8")
+            with patch("sys.stdout", new_callable=__import__("io").StringIO) as output:
+                self.assertEqual(self.run_cli("--target", str(root)), 1)
+            self.assertNotIn(secret, output.getvalue())
+
+    def test_first_init_copy_failure_is_sanitized_and_preserves_unrelated_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "consumer"
+            root.mkdir()
+            unrelated = root / "notes.txt"
+            unrelated.write_bytes(b"consumer-owned\\n")
+            with patch("kb_bootstrap.cli.shutil.copy2", side_effect=OSError("private path")):
+                self.assertEqual(self.run_cli("--target", str(root)), 1)
+            self.assertEqual(unrelated.read_bytes(), b"consumer-owned\\n")
+
+    def test_target_with_parent_escape_or_symlink_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertEqual(preflight(root / ".." / "escape", self.package, "single")[0], "blocked")
+            target = root / "linked"
+            try:
+                target.symlink_to(root, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symlink unavailable")
+            self.assertEqual(preflight(target, self.package, "single")[0], "blocked")
+
+
+if __name__ == "__main__":
+    unittest.main()

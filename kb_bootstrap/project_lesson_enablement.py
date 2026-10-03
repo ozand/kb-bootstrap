@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
@@ -24,11 +25,21 @@ INITIALIZED_MARKERS = (
 
 
 def _traverses_symlink(path: Path) -> bool:
-    absolute = path.absolute()
+    raw = Path(path)
+    if ".." in raw.parts:
+        return True
+    absolute = Path(os.path.abspath(os.fspath(raw)))
     current = Path(absolute.anchor)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     for part in absolute.parts[1:]:
         current /= part
-        if current.is_symlink():
+        try:
+            details = os.lstat(current)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return True
+        if stat.S_ISLNK(details.st_mode) or getattr(details, "st_file_attributes", 0) & reparse_flag:
             return True
     return False
 
@@ -127,57 +138,88 @@ def _format(status: str, artifacts: Tuple[str, ...] = (), errors: List[str] = No
     return "\n".join(lines)
 
 
+def inspect_project_lessons(
+    target: Union[str, Path],
+    package_dir: Union[str, Path],
+    *,
+    require_initialized: bool = True,
+) -> Tuple[str, List[str]]:
+    """Read-only lesson state classification for coordinated scaffold preflight.
+
+    Returns ``absent``, ``valid``, or ``blocked`` without staging or writing.
+    The public enable command keeps ADR-002's initialized-marker requirement;
+    first scaffold initialization may opt out while its complete map is preflighted.
+    """
+    raw_target = Path(target).absolute()
+    package_root = Path(package_dir).absolute()
+    if _traverses_symlink(raw_target):
+        return "blocked", ["target traverses a symlink"]
+    target_root = raw_target.resolve()
+    if not target_root.exists():
+        if require_initialized:
+            return "blocked", ["target repository is unavailable"]
+        template_plan, template_errors = _template_plan(package_root)
+        if template_errors or len(template_plan) != len(ARTIFACTS):
+            return "blocked", ["lesson templates are unavailable"]
+        return "absent", []
+    if not target_root.is_dir():
+        return "blocked", ["target repository is unavailable"]
+
+    if require_initialized:
+        for relative in INITIALIZED_MARKERS:
+            marker = target_root / relative
+            if not _inside(marker, target_root) or not _regular_file(marker):
+                return "blocked", [f"initialized marker is unavailable: {relative}"]
+
+    states = []
+    for relative in ARTIFACTS:
+        destination = target_root / relative
+        if not _inside(destination, target_root) or _traverses_symlink(destination):
+            return "blocked", [f"artifact path is unsafe: {relative}"]
+        try:
+            details = os.lstat(destination)
+        except FileNotFoundError:
+            states.append(False)
+            continue
+        except OSError:
+            return "blocked", [f"artifact is unavailable: {relative}"]
+        if (not stat.S_ISREG(details.st_mode)
+                or getattr(details, "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            return "blocked", [f"artifact is not a regular file: {relative}"]
+        states.append(True)
+
+    if not any(states):
+        _, errors = _template_plan(package_root)
+        return ("absent", []) if not errors else ("blocked", errors)
+    if not all(states):
+        return "blocked", ["project lesson contract is partial or conflicting"]
+
+    errors, _ = validate_project_registry(target_root / "kb/lessons", target_root)
+    errors.extend(_routing_errors(target_root / "lesson-stores.json"))
+    errors.extend(_capture_skill_errors(target_root / ".agents/skills/kb-capture/SKILL.md"))
+    # Keep only stable error categories; registry errors may contain indexed user paths.
+    safe_errors = sorted({error.split(":", 1)[0] for error in errors})
+    return ("valid", []) if not safe_errors else ("blocked", safe_errors)
+
+
 def enable_project_lessons(
     target: Union[str, Path], package_dir: Union[str, Path]
 ) -> Tuple[str, bool]:
     """Enable project-local lessons without touching unrelated repository files."""
     raw_target = Path(target).absolute()
     package_root = Path(package_dir).absolute()
-    if _traverses_symlink(raw_target):
-        return _format("blocked", errors=["target traverses a symlink"]), False
+    state, errors = inspect_project_lessons(raw_target, package_root)
+    if state == "blocked":
+        return _format("blocked", errors=errors), False
     target_root = raw_target.resolve()
-    if not target_root.is_dir():
-        return _format("blocked", errors=["target repository is unavailable"]), False
-
-    marker_errors = []
-    for relative in INITIALIZED_MARKERS:
-        marker = target_root / relative
-        if not _inside(marker, target_root) or not _regular_file(marker):
-            marker_errors.append(f"initialized marker is unavailable: {relative}")
-    if marker_errors:
-        return _format("blocked", errors=marker_errors), False
-
-    destinations = {relative: target_root / relative for relative in ARTIFACTS}
-    states = []
-    destination_errors = []
-    for relative, destination in destinations.items():
-        if not _inside(destination, target_root) or _traverses_symlink(destination):
-            destination_errors.append(f"artifact path is unsafe: {relative}")
-            continue
-        if destination.exists():
-            if not destination.is_file():
-                destination_errors.append(f"artifact is not a regular file: {relative}")
-            states.append(True)
-        else:
-            states.append(False)
-    if destination_errors:
-        return _format("blocked", errors=destination_errors), False
-    if any(states) and not all(states):
-        return _format("blocked", errors=["project lesson contract is partial or conflicting"]), False
-
-    if all(states):
-        errors, _ = validate_project_registry(target_root / "kb/lessons", target_root)
-        errors.extend(_routing_errors(target_root / "lesson-stores.json"))
-        errors.extend(
-            _capture_skill_errors(target_root / ".agents/skills/kb-capture/SKILL.md")
-        )
-        if errors:
-            return _format("blocked", errors=errors), False
+    if state == "valid":
         return _format("already enabled", ARTIFACTS), True
 
     plan, template_errors = _template_plan(package_root)
     if template_errors:
         return _format("blocked", errors=template_errors), False
+    destinations = {relative: target_root / relative for relative in ARTIFACTS}
 
     created_dirs: List[Path] = []
     created_files: List[Tuple[Path, Tuple[int, int]]] = []
