@@ -217,9 +217,12 @@ to the required deterministic core. Its outbound-publication and path rules requ
 local-artifact and trusted-root distinctions above. W01 does not modify W09 or require
 its unfinished follow-up.
 
-Before acceptance, the owner must approve the public operation vocabulary, adapter
-namespace/extension contract, exact authorization and aggregation names, applicability
-rules, and any persisted schema. Consumer policy remains consumer-owned and versioned;
+For the first additive core-only validation slice, review the separate
+[Proposed ADR-015](../adr/ADR-015-add-core-only-validation-without-changing-legacy-validate.md).
+That slice needs only the local-check boundary and compatible CLI contract; it does
+not depend on this wider proposal's capability vocabulary, adapter namespace,
+authorization aggregation or persisted schema. Those remain separate decisions
+requiring approval before their own implementation. Consumer policy remains consumer-owned and versioned;
 no universal policy engine is introduced.
 
 ## Alternatives (not accepted defaults)
