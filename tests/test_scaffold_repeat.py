@@ -1,4 +1,5 @@
 """ADR-016 scaffold preflight regressions using synthetic targets."""
+import contextlib
 import hashlib
 import json
 import os
@@ -7,6 +8,7 @@ import tempfile
 import sys
 import unittest
 from pathlib import Path
+import shutil
 from unittest.mock import patch
 
 from kb_bootstrap.cli import main
@@ -256,6 +258,133 @@ class ScaffoldRepeatTests(unittest.TestCase):
             with patch("kb_bootstrap.cli.shutil.copy2", side_effect=OSError("private path")):
                 self.assertEqual(self.run_cli("--target", str(root)), 1)
             self.assertEqual(unrelated.read_bytes(), b"consumer-owned\\n")
+
+    @contextlib.contextmanager
+    def _junction_fixture(self):
+        if os.name != "nt":
+            self.skipTest("Windows junction behavior is Windows-only")
+        base = Path(tempfile.mkdtemp(prefix="kb-bootstrap-junction-test-"))
+        aliases = []
+        try:
+            yield base, aliases
+        finally:
+            unresolved = []
+            for alias in aliases:
+                try:
+                    details = os.lstat(alias)
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    unresolved.append(alias)
+                    continue
+                if not (getattr(details, "st_file_attributes", 0) & 0x400):
+                    unresolved.append(alias)
+                    continue
+                try:
+                    os.rmdir(alias)  # Remove this junction only; never follow it.
+                    if os.path.lexists(alias):
+                        unresolved.append(alias)
+                except OSError:
+                    unresolved.append(alias)
+            if unresolved:
+                raise RuntimeError("junction cleanup could not prove aliases absent; owned temp tree preserved")
+            shutil.rmtree(base)
+
+    def _make_junction(self, link, target, aliases):
+        aliases.append(link)  # Register before invoking mklink, including partial-failure cases.
+        result = subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode:
+            self.fail("mklink /J failed for invocation-owned temporary paths")
+        details = os.lstat(link)
+        if not (getattr(details, "st_file_attributes", 0) & 0x400):
+            self.fail("mklink /J did not expose FILE_ATTRIBUTE_REPARSE_POINT")
+
+    def test_junction_cleanup_failure_preserves_owned_tree(self):
+        fixture = self._junction_fixture()
+        base, aliases = fixture.__enter__()
+        alias = base / "alias"
+        alias.mkdir()
+        aliases.append(alias)
+        with patch("shutil.rmtree") as remove_tree:
+            with patch("os.lstat", side_effect=PermissionError("injected")):
+                with self.assertRaisesRegex(RuntimeError, "tree preserved"):
+                    fixture.__exit__(None, None, None)
+            remove_tree.assert_not_called()
+            self.assertTrue(base.is_dir())
+            self.assertTrue(alias.is_dir())
+            alias.rmdir()
+            shutil.rmtree(base)
+
+    def test_windows_junction_target_root_blocks_without_target_mutation(self):
+        with self._junction_fixture() as (base, aliases):
+            foreign = base / "foreign"
+            foreign.mkdir()
+            sentinel = foreign / "sentinel.txt"
+            sentinel.write_bytes(b"owned target sentinel")
+            alias = base / "target-link"
+            self._make_junction(alias, foreign, aliases)
+            before = sentinel.read_bytes()
+            real_lstat = os.lstat
+            def guarded_lstat(path):
+                if str(path).startswith(str(alias) + os.sep):
+                    raise AssertionError("attempted inspect through target junction")
+                return real_lstat(path)
+            with patch("kb_bootstrap.scaffold_repeat.os.lstat", side_effect=guarded_lstat):
+                action, report = preflight(alias, self.package, "single")
+            self.assertEqual(action, "blocked")
+            self.assertIn("BLOCKED", report)
+            self.assertEqual(sentinel.read_bytes(), before)
+
+    def test_windows_junction_managed_ancestor_blocks_without_external_reads(self):
+        with self._junction_fixture() as (base, aliases):
+            root = base / "consumer"
+            root.mkdir()
+            foreign = base / "foreign-skills"
+            foreign.mkdir()
+            sentinel = foreign / "sentinel.txt"
+            sentinel.write_bytes(b"owned target sentinel")
+            alias = root / ".agents"
+            self._make_junction(alias, foreign, aliases)
+            before = sentinel.read_bytes()
+            real_open = os.open
+            def guarded_open(path, *args, **kwargs):
+                if str(path).startswith(str(alias)):
+                    raise AssertionError("attempted read through managed junction")
+                return real_open(path, *args, **kwargs)
+            with patch("kb_bootstrap.scaffold_repeat.os.open", side_effect=guarded_open):
+                action, report = preflight(root, self.package, "single")
+            self.assertEqual(action, "blocked")
+            self.assertIn("BLOCKED", report)
+            self.assertEqual(sentinel.read_bytes(), before)
+
+    def test_windows_junction_delegated_lesson_directory_blocks(self):
+        from kb_bootstrap.project_lesson_enablement import inspect_project_lessons
+        with self._junction_fixture() as (base, aliases):
+            root = base / "consumer"
+            self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
+            foreign = base / "foreign-lessons"
+            foreign.mkdir()
+            sentinel = foreign / "sentinel.txt"
+            sentinel.write_bytes(b"owned target sentinel")
+            alias = root / "kb/lessons"
+            for artifact in (alias / "SCHEMA.md", alias / "index.yaml"):
+                artifact.unlink()
+            alias.rmdir()
+            self._make_junction(alias, foreign, aliases)
+            real_lstat = os.lstat
+            def guarded_lstat(path):
+                if str(path).startswith(str(alias) + os.sep):
+                    raise AssertionError("attempted inspect through delegated junction")
+                return real_lstat(path)
+            with patch("kb_bootstrap.project_lesson_enablement.os.lstat", side_effect=guarded_lstat), \
+                 patch("kb_bootstrap.project_lesson_enablement.validate_project_registry", side_effect=AssertionError("must not read delegated junction")):
+                state, errors = inspect_project_lessons(root, self.package, require_initialized=False)
+            self.assertEqual(state, "blocked")
+            self.assertTrue(errors)
+            self.assertEqual(sentinel.read_bytes(), b"owned target sentinel")
 
     def test_target_with_parent_escape_or_symlink_blocks(self):
         with tempfile.TemporaryDirectory() as tmp:
