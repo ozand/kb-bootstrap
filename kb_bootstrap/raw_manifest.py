@@ -42,7 +42,7 @@ def _pairs(pairs):
 
 
 def _signature(path: Path):
-    details = path.stat(follow_symlinks=False)
+    details = os.stat(path, follow_symlinks=False)
     return details.st_dev, details.st_ino, details.st_size, details.st_mtime_ns
 
 

@@ -17,11 +17,12 @@ from .canonical_profile import (
     canonical_metadata_errors,
     validate_canonical_profile,
 )
+from .markdown_fences import without_fenced_code
 
 import yaml
 
 LINK_START_PATTERN = re.compile(r"(?<!!)\[[^\]]*\]\(")
-FENCE_PATTERN = re.compile(r"^\s*(```|~~~)")
+SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 ENCODED_UNSAFE_PATTERN = re.compile(
     r"%(?:0[0-9a-f]|1[0-9a-f]|2e|2f|5c|7f)", re.IGNORECASE
 )
@@ -37,7 +38,7 @@ class _Document(NamedTuple):
 
 
 def _identity(path: Path) -> Tuple[int, int]:
-    details = path.stat(follow_symlinks=False)
+    details = os.stat(path, follow_symlinks=False)
     return details.st_dev, details.st_ino
 
 
@@ -53,9 +54,9 @@ def _read_document(path: Path) -> Tuple[Optional[_Document], str]:
     if path.is_symlink() or _traverses_symlink(path) or not path.is_file():
         return None, "concept path is unavailable or unsafe"
     try:
-        before = path.stat(follow_symlinks=False)
+        before = os.stat(path, follow_symlinks=False)
         content = path.read_bytes()
-        after = path.stat(follow_symlinks=False)
+        after = os.stat(path, follow_symlinks=False)
         text = content.decode("utf-8")
     except (OSError, UnicodeError):
         return None, "concept is not readable UTF-8 Markdown"
@@ -106,17 +107,10 @@ def _link_destinations(body: str) -> Tuple[List[str], List[str]]:
     """Extract bounded v1 links and report malformed recognized local syntax."""
     destinations: List[str] = []
     errors: List[str] = []
-    visible_lines: List[str] = []
-    fence: Optional[str] = None
-    for line in body.splitlines():
-        fence_match = FENCE_PATTERN.match(line)
-        if fence_match:
-            marker = fence_match.group(1)
-            fence = None if fence == marker[:3] else marker[:3]
-            continue
-        if fence is not None:
-            continue
-        visible_lines.append(re.sub(r"`[^`]*`", "", line))
+    visible_lines = [
+        re.sub(r"`[^`]*`", "", line)
+        for line in without_fenced_code(body).splitlines()
+    ]
     visible_body = "\n".join(visible_lines)
     for match in LINK_START_PATTERN.finditer(visible_body):
         position = match.end()
@@ -174,9 +168,11 @@ def _local_target(
         return None, "local link path is invalid"
     if DRIVE_PATTERN.match(destination):
         return None, "local link path is absolute"
-    parsed = urlsplit(destination)
-    if parsed.scheme or destination.startswith("//"):
+    # Classify external and protocol-relative targets lexically before URL host
+    # parsing, which can reject malformed hosts that are irrelevant to export.
+    if SCHEME_PATTERN.match(destination) or destination.startswith("//"):
         return None, ""
+    parsed = urlsplit(destination)
     if parsed.query:
         return None, "local Markdown link query is unsupported"
     if ENCODED_UNSAFE_PATTERN.search(parsed.path):
