@@ -16,4 +16,4 @@
 | ADR-012 | Provision an optional local GLiNER2 peer explicitly | Superseded by ADR-013 |
 | ADR-013 | Quarantine a consented checkpoint before confirming its full digest | Superseded by ADR-014 |
 | ADR-014 | Verify ordinary local inference without mandatory host egress denial | Accepted |
-| ADR-015 | Add core-only validation without changing legacy validate | Proposed |
+| ADR-015 | Add core-only validation without changing legacy validate | Accepted |

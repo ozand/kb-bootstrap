@@ -1,6 +1,6 @@
 # ADR-015: Add core-only validation without changing legacy validate
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-03
 **Authors**: Pi coding agent
 **Supersedes**: None
