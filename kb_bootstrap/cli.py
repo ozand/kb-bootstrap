@@ -26,6 +26,7 @@ from .raw_manifest import write_raw_manifest
 from .gliner_inspect import inspect_gliner_environment
 from .gliner_checkpoint import verify_checkpoint
 from .agents_governance import update_agents_file
+from .scaffold_repeat import preflight as scaffold_preflight
 from . import __version__
 
 def create_dirs(base_path: Path, dirs: list):
@@ -440,57 +441,49 @@ def main():
         print(report)
         return 0 if is_valid else 1
 
-    target = Path(args.target).resolve()
-    # The package directory is where this cli.py is located
+    target = Path(args.target)
     pkg_dir = Path(__file__).parent.resolve()
-
-    print(f"Initializing {args.type} Knowledge Base in {target}...")
-
-    # Create the always-available read-only and wiki skill directories.
-    create_dirs(target, [
-        ".agents/skills/qmd-operator",
-        ".agents/skills/kb-wiki-builder",
-        ".agents/skills/kb-lookup",
-    ])
-
-    # Copy the always-available skills. Capture is installed only with its local contract.
-    skills_src = pkg_dir / "templates" / "skills"
-    shutil.copy2(skills_src / "qmd-operator" / "SKILL.md", target / ".agents/skills/qmd-operator/SKILL.md")
-    shutil.copy2(skills_src / "kb-wiki-builder" / "SKILL.md", target / ".agents/skills/kb-wiki-builder/SKILL.md")
-    shutil.copy2(skills_src / "kb-lookup" / "SKILL.md", target / ".agents/skills/kb-lookup/SKILL.md")
-    # market-research ships scripts, references and assets, so it is copied as a tree.
-    shutil.copytree(
-        skills_src / "market-research",
-        target / ".agents/skills/market-research",
-        dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    action, guard_report = scaffold_preflight(
+        target, pkg_dir, args.type, args.with_project_lessons
     )
+    if action == "blocked":
+        print(guard_report)
+        return 1
+    if action == "noop":
+        print(guard_report)
+        return 0
+    target = Path(os.path.abspath(os.fspath(target)))
+    print(f"Initializing {args.type} Knowledge Base in {target}...")
+    try:
+        # Create the always-available read-only and wiki skill directories.
+        create_dirs(target, [
+            ".agents/skills/qmd-operator",
+            ".agents/skills/kb-wiki-builder",
+            ".agents/skills/kb-lookup",
+        ])
 
-    if args.with_project_lessons:
-        create_dirs(target, [".agents/skills/kb-capture"])
-        shutil.copy2(
-            skills_src / "kb-capture" / "SKILL.md",
-            target / ".agents/skills/kb-capture/SKILL.md",
+        # Copy the always-available skills. Capture is installed only with its local contract.
+        skills_src = pkg_dir / "templates" / "skills"
+        shutil.copy2(skills_src / "qmd-operator" / "SKILL.md", target / ".agents/skills/qmd-operator/SKILL.md")
+        shutil.copy2(skills_src / "kb-wiki-builder" / "SKILL.md", target / ".agents/skills/kb-wiki-builder/SKILL.md")
+        shutil.copy2(skills_src / "kb-lookup" / "SKILL.md", target / ".agents/skills/kb-lookup/SKILL.md")
+        # market-research ships scripts, references and assets, so it is copied as a tree.
+        shutil.copytree(
+            skills_src / "market-research",
+            target / ".agents/skills/market-research",
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
-        lessons_src = pkg_dir / "templates" / "lessons"
-        create_dirs(target, ["kb/lessons"])
-        for source, destination in [
-            (lessons_src / "SCHEMA.md", target / "kb/lessons/SCHEMA.md"),
-            (lessons_src / "index.yaml", target / "kb/lessons/index.yaml"),
-            (lessons_src / "lesson-stores.json", target / "lesson-stores.json"),
-        ]:
-            if not destination.exists():
-                shutil.copy2(source, destination)
 
-    project_name = project_slug(target)
+        project_name = project_slug(target)
 
-    if args.type == "umbrella":
-        create_dirs(
-            target,
-            ["qmd/collections", "kb/apps", "kb/systems", "kb/architecture", "kb/raw"],
-        )
+        if args.type == "umbrella":
+            create_dirs(
+                target,
+                ["qmd/collections", "kb/apps", "kb/systems", "kb/architecture", "kb/raw"],
+            )
 
-        qmd_config = """{
+            qmd_config = """{
   "version": "1.0",
   "workspace": {
     "name": "%s_kb",
@@ -501,15 +494,15 @@ def main():
     "embedding": "text-embedding-3-small"
   }
 }""" % project_name
-        with open(target / "qmd.json", "w", encoding="utf-8") as f:
-            f.write(qmd_config)
+            with open(target / "qmd.json", "w", encoding="utf-8") as f:
+                f.write(qmd_config)
 
-        print("Created umbrella structure: qmd/collections/, kb/apps/, kb/systems/, kb/architecture/")
+            print("Created umbrella structure: qmd/collections/, kb/apps/, kb/systems/, kb/architecture/")
 
-    elif args.type == "single":
-        create_dirs(target, ["kb/raw", "qmd/collections"])
+        elif args.type == "single":
+            create_dirs(target, ["kb/raw", "qmd/collections"])
 
-        qmd_config = """{
+            qmd_config = """{
   "version": "1.0",
   "workspace": {
     "name": "%s_kb",
@@ -520,35 +513,47 @@ def main():
     "embedding": "text-embedding-3-small"
   }
 }""" % project_name
-        with open(target / "qmd.json", "w", encoding="utf-8") as f:
-            f.write(qmd_config)
+            with open(target / "qmd.json", "w", encoding="utf-8") as f:
+                f.write(qmd_config)
 
-        print("Created single project structure: kb/raw/, qmd.json")
+            print("Created single project structure: kb/raw/, qmd.json")
 
-    with open(target / "qmd/collections/wiki.yaml", "w", encoding="utf-8") as f:
-        f.write(
-            "name: %s-wiki\npaths:\n  - ../../kb/\nexclude:\n"
-            "  - \"raw/**\"\n  - \"research/**\"\n  - \"**/.DS_Store\"\n" % project_name
-        )
-    with open(target / "qmd/collections/raw.yaml", "w", encoding="utf-8") as f:
-        f.write(
-            "name: %s-raw\npaths:\n  - ../../kb/raw/\n  - ../../kb/research/\nexclude:\n"
-            "  - \"**/.DS_Store\"\n" % project_name
-        )
+        with open(target / "qmd/collections/wiki.yaml", "w", encoding="utf-8") as f:
+            f.write(
+                "name: %s-wiki\npaths:\n  - ../../kb/\nexclude:\n"
+                "  - \"raw/**\"\n  - \"research/**\"\n  - \"**/.DS_Store\"\n" % project_name
+            )
+        with open(target / "qmd/collections/raw.yaml", "w", encoding="utf-8") as f:
+            f.write(
+                "name: %s-raw\npaths:\n  - ../../kb/raw/\n  - ../../kb/research/\nexclude:\n"
+                "  - \"**/.DS_Store\"\n" % project_name
+            )
 
-    append_gitignore_rules(target)
-    (target / "kb/raw/.gitkeep").touch(exist_ok=True)
-    # Layout used by the market-research skill: studies with raw evidence, shared wiki.
-    create_dirs(target, ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"])
-    for keep in ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"]:
-        (target / keep / ".gitkeep").touch(exist_ok=True)
+        append_gitignore_rules(target)
+        raw_keep = target / "kb/raw/.gitkeep"
+        if not raw_keep.exists():
+            raw_keep.touch()
+        # Layout used by the market-research skill: studies with raw evidence, shared wiki.
+        create_dirs(target, ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"])
+        for keep in ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"]:
+            marker = target / keep / ".gitkeep"
+            if not marker.exists():
+                marker.touch()
 
-    installed_skills = "kb-wiki-builder, qmd-operator, kb-lookup, and market-research"
-    if args.with_project_lessons:
-        print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
-        installed_skills += ", plus kb-capture"
+        installed_skills = "kb-wiki-builder, qmd-operator, kb-lookup, and market-research"
+        if action == "initialize-lessons":
+            lesson_report, lesson_ok = enable_project_lessons(target, pkg_dir)
+            if not lesson_ok:
+                print(lesson_report)
+                raise OSError("lesson installation blocked")
+        if args.with_project_lessons:
+            print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
+            installed_skills += ", plus kb-capture"
 
-    print(f"Success! Agent skills {installed_skills} installed to {target / '.agents/skills/'}")
+        print(f"Success! Agent skills {installed_skills} installed to {target / '.agents/skills/'}")
+    except (OSError, UnicodeError):
+        print("RESULT: BLOCKED (first initialization incomplete; owned files may remain; inspect managed paths before retry)")
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main() or 0)

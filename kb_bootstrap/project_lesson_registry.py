@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import os
+import stat
 from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Union
@@ -32,12 +34,23 @@ def _frontmatter(path: Path) -> Dict[str, object]:
 
 
 def _traverses_symlink(path: Path) -> bool:
-    """Return whether any existing component of ``path`` is a symlink."""
-    absolute = path.absolute()
+    """Reject lexical parent traversal and symlink/junction ancestors."""
+    raw = Path(path)
+    absolute = raw if raw.is_absolute() else Path.cwd() / raw
     current = Path(absolute.anchor)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     for part in absolute.parts[1:]:
+        if part == "..":
+            current = current.parent
+            continue
         current /= part
-        if current.is_symlink():
+        try:
+            details = os.lstat(current)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return True
+        if stat.S_ISLNK(details.st_mode) or getattr(details, "st_file_attributes", 0) & reparse_flag:
             return True
     return False
 
@@ -137,12 +150,27 @@ def validate_project_registry(
                 f"project-local index entry {lesson_id or position} traverses a symlink"
             )
             continue
-        resolved = unresolved.resolve()
         try:
+            resolved = unresolved.resolve(strict=False)
             resolved.relative_to(repository_root)
             resolved.relative_to(lessons_dir)
-        except ValueError:
+        except (OSError, ValueError):
             errors.append(f"project-local index path is outside lessons directory: {lesson_path}")
+            continue
+        try:
+            index_details = os.lstat(unresolved)
+        except OSError:
+            errors.append(f"project-local index entry {lesson_id or position} is unavailable")
+            continue
+        if (not stat.S_ISREG(index_details.st_mode)
+                or getattr(index_details, "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            errors.append(f"project-local index entry {lesson_id or position} is unsafe")
+            continue
+        try:
+            resolved = unresolved.resolve(strict=True)
+        except OSError:
+            errors.append(f"project-local index entry {lesson_id or position} is unavailable")
             continue
         normalized = _relative_path(resolved, repository_root)
         index_paths.append(normalized)

@@ -202,6 +202,9 @@ For knowledge centered on one application or tool.
 cd /path/to/your-project
 kb-bootstrap --type single
 ```
+
+Repeating initialization is read-only: an exact matching scaffold reports a no-op; conflicting, partial, unsafe, or unavailable managed paths block without automatic repair or template upgrade. If project lessons are requested on a repeat but their four-artifact contract is absent, run `kb-bootstrap enable-project-lessons --target .` explicitly. A first-initialization I/O failure may leave files created by that invocation; inspect the target before retrying. This is a guard against accidental overwrites, not a transaction or protection against concurrent/hostile writers: run it against a stable target you control. It does not roll back or delete consumer-owned files.
+
 This generates:
 - Local `kb/raw/` directory retained by `kb/raw/.gitkeep` in fresh Git checkouts.
 - Root `qmd.json` with `collections_dir` set to `./qmd/collections`.
