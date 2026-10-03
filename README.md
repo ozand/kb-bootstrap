@@ -28,10 +28,9 @@ Before using this framework, ensure your host environment has the required toolc
 
 3. **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**
    - The core engine for semantic search across the knowledge base.
-   - *Installation:* Currently, QMD is distributed via Go.
-     - Prerequisite: [Install Go](https://go.dev/doc/install)
-     - Install QMD: `go install github.com/tobi/qmd@latest`
-     - *(Ensure your Go binary path `~/go/bin` is in your system `$PATH`)*
+   - *Installation:* The npm installation requires [Node.js 22 or newer](https://nodejs.org/).
+     - Install QMD globally: `npm install -g @tobilu/qmd` (or `bun install -g @tobilu/qmd`).
+     - Ensure the installed `qmd` executable is available on your system `PATH`.
 
 The read-only `kb-bootstrap search` wrapper resolves the QMD executable through the
 host `PATH` before invoking it without a shell. This supports Windows executable
@@ -51,7 +50,7 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
 
 ### Phase 1: Environment Check
 1. Verify `python` and `pipx` are installed. If missing, guide the user to install them or run the installation commands if you have host access.
-2. Verify `qmd` is available (`qmd --version`). If missing, instruct the user to install Go and run `go install github.com/tobi/qmd@latest`.
+2. Verify `qmd` is available (`qmd --version`). If missing, explain that the npm installation requires Node.js 22 or newer, instruct the user to install QMD with `npm install -g @tobilu/qmd` (or `bun install -g @tobilu/qmd`) and verify it is on `PATH`.
 
 ### Phase 2: Tool Installation
 1. **Install the CLI tool globally:**
