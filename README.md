@@ -1,5 +1,7 @@
 # Knowledge Base (OKF + QMD) Bootstrap Framework
 
+For local checks without QMD configuration, use `kb-bootstrap validate-core --dir kb` (optionally `--now <offset-aware-time>`). It checks canonical structure, provenance and graph integrity only; it does not check retrieval/index freshness, source truth or publication readiness. Existing `validate` still requires its QMD declaration checks. No capability configuration, model or network operation is created by `validate-core`.
+
 Current release: **0.4.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes and the [existing-consumer migration procedure](docs/MIGRATING_EXISTING_CONSUMERS.md) for staged adoption and rollback guidance.
 
 A portable CLI tool to instantly initialize a local Knowledge Base architecture in any repository. This framework combines the **Open Knowledge Format (OKF)** for structured documentation and **QMD** for semantic search.
