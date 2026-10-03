@@ -88,6 +88,11 @@ def main():
         "--now",
         help="Explicit offset-aware comparison time for deterministic freshness",
     )
+    core_parser = subparsers.add_parser(
+        "validate-core", help="Validate local canonical structure, provenance and graph only"
+    )
+    core_parser.add_argument("--dir", default="kb", help="Canonical knowledge directory (default: kb)")
+    core_parser.add_argument("--now", help="Explicit offset-aware comparison time")
     export_parser = subparsers.add_parser(
         "export-graph", help="Export the canonical Markdown graph as deterministic JSON"
     )
@@ -256,7 +261,7 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.command == "validate":
+    if args.command in ("validate", "validate-core"):
         print(f"Validator: kb-bootstrap {__version__}")
         print()
         profile_report, profile_valid = validate_canonical_profile(args.dir)
@@ -264,7 +269,8 @@ def main():
             args.dir, args.now
         )
         graph_report, graph_valid = validate(args.dir)
-        qmd_report, qmd_valid = validate_qmd_collections(args.project_root)
+        if args.command == "validate":
+            qmd_report, qmd_valid = validate_qmd_collections(args.project_root)
         print(profile_report)
         print()
         print(provenance_report)
@@ -273,6 +279,10 @@ def main():
         print("Dead links fail this local check even though OKF v0.2 tolerates them.")
         print(graph_report)
         print()
+        if args.command == "validate-core":
+            print("=== Core Validation Scope ===")
+            print("Local checks only; retrieval, index freshness and publication readiness: not checked.")
+            return 0 if profile_valid and provenance_valid and graph_valid else 1
         print(qmd_report)
         return 0 if profile_valid and provenance_valid and graph_valid and qmd_valid else 1
 

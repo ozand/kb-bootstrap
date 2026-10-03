@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Additive local core validation
+
+- Add `validate-core --dir ... --now ...` for existing local profile, provenance and graph checks without QMD declaration requirements. Legacy `validate` and initialization remain unchanged; core success is not retrieval or publication readiness.
+
 ### Evidence links to raw captures
 
 - `kb-bootstrap validate` accepts links from canonical knowledge to existing Markdown captures inside `raw/` directories as provenance (reported as `EVIDENCE LINKS`), instead of failing them as dead links. Raw files are still not linted; missing raw targets and `lessons/` targets still fail.
