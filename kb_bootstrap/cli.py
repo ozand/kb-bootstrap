@@ -13,6 +13,7 @@ from .published_bundle_export import write_published_bundle
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
 from .local_retrieval import search_local, read_local
+from .qmd_adapter import search_qmd_bounded
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .contribution_candidate import prepare_candidate
@@ -178,6 +179,13 @@ def main():
     read_local_parser.add_argument("path")
     read_local_parser.add_argument("--dir", required=True, help="Explicit canonical root")
     read_local_parser.add_argument("--max-bytes", type=int, default=16 * 1024)
+    bounded_qmd_parser = subparsers.add_parser("search-qmd", help="Explicit bounded lexical QMD 2.8.3 adapter")
+    bounded_qmd_parser.add_argument("query")
+    bounded_qmd_parser.add_argument("--dir", required=True)
+    bounded_qmd_parser.add_argument("--collection", required=True)
+    bounded_qmd_parser.add_argument("--index", required=True)
+    bounded_qmd_parser.add_argument("--state-dir", required=True)
+    bounded_qmd_parser.add_argument("--limit", type=int, default=10)
     doctor_parser = subparsers.add_parser(
         "doctor", help="Check repository identity before GitHub work"
     )
@@ -341,6 +349,11 @@ def main():
         report, valid = verify_checkpoint(args.model_dir, args.files, args.expected_model_digest)
         print(report)
         return 0 if valid else 1
+
+    if args.command == "search-qmd":
+        report, code = search_qmd_bounded(args.query, args.dir, args.collection, args.index, args.state_dir, args.limit)
+        _print_local_json(report)
+        return code
 
     if args.command == "search-local":
         report, code = search_local(args.query, Path(args.dir), args.limit)
