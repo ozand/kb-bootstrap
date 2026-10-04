@@ -1,6 +1,6 @@
 # ADR-019: Accept pinned QMD index selectors and inert model defaults
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-04
 **Authors**: Pi coding agent
 **Supersedes**: None
