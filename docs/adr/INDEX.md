@@ -18,3 +18,4 @@
 | ADR-014 | Verify ordinary local inference without mandatory host egress denial | Accepted |
 | ADR-015 | Add core-only validation without changing legacy validate | Accepted |
 | ADR-016 | Block conflicting scaffold repeat without upgrading templates | Accepted |
+| ADR-017 | Add bounded canonical local search and read commands | Accepted |
