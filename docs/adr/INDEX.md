@@ -19,3 +19,4 @@
 | ADR-015 | Add core-only validation without changing legacy validate | Accepted |
 | ADR-016 | Block conflicting scaffold repeat without upgrading templates | Accepted |
 | ADR-017 | Add bounded canonical local search and read commands | Accepted |
+| ADR-018 | Add an explicit bounded lexical QMD adapter | Proposed |
