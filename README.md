@@ -234,6 +234,14 @@ kb-bootstrap read-local "services/api.md" --dir kb --max-bytes 16384
 
 Local search uses literal Unicode case-folded substring matching and returns relative paths, a matched line/snippet, and available authored context. Resource ceilings can produce `PARTIAL`/exit 3; inspect `limiting_budget` before treating no returned match as complete. Reads return a bounded UTF-8 prefix and disclose truncation. See [ADR-017](docs/adr/ADR-017-add-bounded-local-search-and-read-commands.md) for the full contract. The existing `search` command remains the QMD-backed canonical/raw wrapper.
 
+For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
+
+```bash
+kb-bootstrap search-qmd "connection timeout" --dir kb --collection wiki --index project --state-dir /path/to/qmd-state
+```
+
+The state layout is `config/project.yml` and `cache/qmd/project.sqlite`; see [ADR-018](docs/adr/ADR-018-add-an-explicit-bounded-lexical-qmd-adapter.md) and [ADR-019](docs/adr/ADR-019-accept-pinned-qmd-index-selectors-and-inert-model-defaults.md). Search never registers collections or installs QMD/models. Missing QMD reports `OPTIONAL_UNAVAILABLE`; invalid state, timeout, excessive output or invalid records report `FAILED`, without automatic fallback. External QMD startup can write bookkeeping in the selected state; this is not a zero-write or no-egress sandbox. Hits are navigation, not source verification or index-freshness evidence. Real smoke verified only a synthetic one-file allowlist; general QMD exclusion membership remains unverified because `collection add` overwrites authored ignore rules.
+
 The wrapper runs `qmd search` against exactly one matching collection. Raw results are marked `[RAW]` and include sanitized QMD collection/source provenance. Missing or ambiguous mode collections block before QMD is called. The wrapper does not update indexes, write source files, canonicalize, or promote results.
 
 ### Research studies (market-research skill)
