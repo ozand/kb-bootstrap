@@ -12,6 +12,7 @@ from .canonical_graph_export import write_canonical_graph
 from .published_bundle_export import write_published_bundle
 from .qmd_validator import validate_qmd_collections
 from .qmd_search import search_qmd
+from .local_retrieval import search_local, read_local
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
 from .contribution_candidate import prepare_candidate
@@ -56,6 +57,17 @@ def append_gitignore_rules(target: Path) -> None:
             "/models/\n/artifacts/\n"
             "/kb/raw/**/*.log\n/kb/raw/**/*.bin\n/kb/raw/**/*.jsonl\n"
         )
+
+
+def _print_local_json(report):
+    """Emit the local contract as UTF-8 independently of console code page."""
+    text = json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n"
+    binary = getattr(sys.stdout, "buffer", None)
+    if binary is not None:
+        binary.write(text.encode("utf-8"))
+        binary.flush()
+    else:
+        sys.stdout.write(text)
 
 
 def main():
@@ -154,6 +166,18 @@ def main():
     search_parser.add_argument(
         "--limit", type=int, default=5, help="Maximum results (default: 5)"
     )
+    search_local_parser = subparsers.add_parser(
+        "search-local", help="Search bounded canonical files without QMD"
+    )
+    search_local_parser.add_argument("query")
+    search_local_parser.add_argument("--dir", required=True, help="Explicit canonical root")
+    search_local_parser.add_argument("--limit", type=int, default=10)
+    read_local_parser = subparsers.add_parser(
+        "read-local", help="Read a bounded canonical Markdown file without QMD"
+    )
+    read_local_parser.add_argument("path")
+    read_local_parser.add_argument("--dir", required=True, help="Explicit canonical root")
+    read_local_parser.add_argument("--max-bytes", type=int, default=16 * 1024)
     doctor_parser = subparsers.add_parser(
         "doctor", help="Check repository identity before GitHub work"
     )
@@ -317,6 +341,16 @@ def main():
         report, valid = verify_checkpoint(args.model_dir, args.files, args.expected_model_digest)
         print(report)
         return 0 if valid else 1
+
+    if args.command == "search-local":
+        report, code = search_local(args.query, Path(args.dir), args.limit)
+        _print_local_json(report)
+        return code
+
+    if args.command == "read-local":
+        report, code = read_local(args.path, Path(args.dir), args.max_bytes)
+        _print_local_json(report)
+        return code
 
     if args.command == "search":
         report, is_valid = search_qmd(
