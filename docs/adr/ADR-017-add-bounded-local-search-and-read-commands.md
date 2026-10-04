@@ -1,6 +1,6 @@
 # ADR-017: Add bounded canonical local search and read commands
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-03
 **Authors**: Pi coding agent
 **Supersedes**: None
