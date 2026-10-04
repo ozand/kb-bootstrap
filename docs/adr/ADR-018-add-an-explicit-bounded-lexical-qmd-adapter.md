@@ -1,6 +1,6 @@
 # ADR-018: Add an explicit bounded lexical QMD adapter
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-04
 **Authors**: Pi coding agent
 **Supersedes**: None
