@@ -9,7 +9,7 @@ A portable CLI tool to instantly initialize a local Knowledge Base architecture 
 ## Core Concepts
 
 - **[Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)**: A vendor-neutral Markdown and YAML-frontmatter format. The [kb-bootstrap canonical profile](docs/OKF_V0_2_CANONICAL_PROFILE.md) requires non-empty `type`, recommends `title`, `description`, `tags`, and `status: stable`, accepts unknown extensions, and keeps stricter dead-link checks separate from OKF conformance.
-- **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**: A CLI tool for blazing-fast local semantic search (RAG) over your markdown files. It indexes your `raw/` and `wiki/` layers so agents can instantly find context.
+- **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**: An optional CLI for local semantic search. For bounded file-only discovery when QMD is unavailable, use `search-local` and `read-local`; neither command changes QMD state.
 
 ## Prerequisites & System Requirements
 
@@ -224,6 +224,15 @@ kb-bootstrap search "how is setup configured?" --project-root .
 # Raw research requires explicit opt-in.
 kb-bootstrap search "original error trace" --mode raw --project-root .
 ```
+
+For bounded offline discovery from canonical Markdown, use `search-local` and read a selected file separately with `read-local`. Both commands require an explicit canonical root; they do not use QMD, include raw/research/lesson layers, or assert that a matching line is verified knowledge. Canonical discovery is limited to visible Markdown files; budget exhaustion reports `PARTIAL` rather than claiming a complete search:
+
+```bash
+kb-bootstrap search-local "connection timeout" --dir kb
+kb-bootstrap read-local "services/api.md" --dir kb --max-bytes 16384
+```
+
+Local search uses literal Unicode case-folded substring matching and returns relative paths, a matched line/snippet, and available authored context. Resource ceilings can produce `PARTIAL`/exit 3; inspect `limiting_budget` before treating no returned match as complete. Reads return a bounded UTF-8 prefix and disclose truncation. See [ADR-017](docs/adr/ADR-017-add-bounded-local-search-and-read-commands.md) for the full contract. The existing `search` command remains the QMD-backed canonical/raw wrapper.
 
 The wrapper runs `qmd search` against exactly one matching collection. Raw results are marked `[RAW]` and include sanitized QMD collection/source provenance. Missing or ambiguous mode collections block before QMD is called. The wrapper does not update indexes, write source files, canonicalize, or promote results.
 
