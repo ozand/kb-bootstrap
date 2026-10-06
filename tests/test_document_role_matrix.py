@@ -3,6 +3,8 @@ import io
 import json
 import tempfile
 import unittest
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from kb_bootstrap.canonical_profile import validate_canonical_profile
@@ -58,6 +60,64 @@ class DocumentRoleMatrixTests(unittest.TestCase):
                 else:
                     self.assertEqual((data, bundle), (b'', b''))
                     self.assertIn('status must be draft, stable, or deprecated', reports)
+
+    def test_generated_research_workflow_role_boundaries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            root = workspace / 'kb'
+            (root / 'wiki').mkdir(parents=True)
+            creator = (Path(__file__).parents[1] / 'kb_bootstrap' / 'templates' / 'skills'
+                       / 'market-research' / 'scripts' / 'new_research.py')
+            completed = subprocess.run(
+                [sys.executable, str(creator), 'workflow-study', '--title', 'Workflow study',
+                 '--kb', str(root)], cwd=workspace, capture_output=True, text=True, check=True,
+            )
+            brief = Path(completed.stdout.strip()) / 'brief.md'
+            self.assertTrue(brief.is_file())
+            self.assertTrue((brief.parent / 'raw' / 'img').is_dir())
+            self.assertIn('status: in-progress', brief.read_text(encoding='utf-8'))
+
+            # Retrieval deliberately excludes research, regardless of document role.
+            self.write(root, 'research/study.md', CONCEPT)
+            generated_path = brief.relative_to(root).as_posix()
+            report = root / 'wiki' / 'reports' / f'{brief.parent.name}.md'
+            self.write(
+                root, report.relative_to(root).as_posix(),
+                CONCEPT + f'[{brief.name}](../../{generated_path})\n',
+            )
+            self.write(root, 'research/study.md', CONCEPT + 'workflow study canonical counterexample\n')
+            self.write(root, 'outside.md', CONCEPT + 'workflow study safe canonical counterexample\n')
+            before = {p.relative_to(root).as_posix(): p.read_bytes()
+                      for p in root.rglob('*') if p.is_file()}
+            profile, profile_ok = validate_canonical_profile(root)
+            _, lint_validation_ok = validate(root)
+            graph = analyze_graph(root)[0]
+            lint_ok = lint_validation_ok
+            exported, export_report, export_ok = build_canonical_graph(root)
+            bundle, bundle_report, bundle_ok = build_published_bundle(root)
+            results, search_code = search_local('workflow study', root)
+            concept_results, concept_search_code = search_local('canonical counterexample', root)
+            after = {p.relative_to(root).as_posix(): p.read_bytes()
+                     for p in root.rglob('*') if p.is_file()}
+
+            self.assertFalse(profile_ok)
+            self.assertIn('status must be draft, stable, or deprecated', profile)
+            self.assertTrue(lint_ok)
+            self.assertIn(generated_path, graph.nodes)
+            self.assertIn(report.relative_to(root).as_posix(), graph.nodes)
+            self.assertFalse(export_ok)
+            self.assertEqual(exported, b'')
+            self.assertIn('status must be draft, stable, or deprecated', export_report)
+            self.assertFalse(bundle_ok)
+            self.assertEqual(bundle, b'')
+            self.assertIn('status must be draft, stable, or deprecated', bundle_report)
+            self.assertEqual(search_code, 0)
+            result_paths = {row['path'] for row in results['results']}
+            self.assertNotIn(generated_path, result_paths)
+            self.assertIn('outside.md', result_paths)
+            self.assertEqual(concept_search_code, 0)
+            self.assertNotIn('research/study.md', {row['path'] for row in concept_results['results']})
+            self.assertEqual(before, after)
 
     def test_link_grammar_and_output_boundaries(self):
         cases = (
