@@ -86,6 +86,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
                 CONCEPT + f'[{brief.name}](../../{generated_path})\n',
             )
             self.write(root, 'research/study.md', CONCEPT + 'workflow study canonical counterexample\n')
+            self.write(root, 'outside.md', CONCEPT + 'workflow study safe canonical counterexample\n')
             before = {p.relative_to(root).as_posix(): p.read_bytes()
                       for p in root.rglob('*') if p.is_file()}
             profile, profile_ok = validate_canonical_profile(root)
@@ -113,6 +114,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             self.assertEqual(search_code, 0)
             result_paths = {row['path'] for row in results['results']}
             self.assertNotIn(generated_path, result_paths)
+            self.assertIn('outside.md', result_paths)
             self.assertEqual(concept_search_code, 0)
             self.assertNotIn('research/study.md', {row['path'] for row in concept_results['results']})
             self.assertEqual(before, after)
