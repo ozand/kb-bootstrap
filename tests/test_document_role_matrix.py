@@ -77,7 +77,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             self.assertTrue((brief.parent / 'raw' / 'img').is_dir())
             self.assertIn('status: in-progress', brief.read_text(encoding='utf-8'))
 
-            # A valid concept under the same directory is not a research workflow.
+            # Retrieval deliberately excludes research, regardless of document role.
             self.write(root, 'research/study.md', CONCEPT)
             generated_path = brief.relative_to(root).as_posix()
             report = root / 'wiki' / 'reports' / f'{brief.parent.name}.md'
@@ -85,6 +85,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
                 root, report.relative_to(root).as_posix(),
                 CONCEPT + f'[{brief.name}](../../{generated_path})\n',
             )
+            self.write(root, 'research/study.md', CONCEPT + 'workflow study canonical counterexample\n')
             before = {p.relative_to(root).as_posix(): p.read_bytes()
                       for p in root.rglob('*') if p.is_file()}
             profile, profile_ok = validate_canonical_profile(root)
@@ -94,7 +95,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             exported, export_report, export_ok = build_canonical_graph(root)
             bundle, bundle_report, bundle_ok = build_published_bundle(root)
             results, search_code = search_local('workflow study', root)
-            concept_results, concept_search_code = search_local('quartzmarker', root)
+            concept_results, concept_search_code = search_local('canonical counterexample', root)
             after = {p.relative_to(root).as_posix(): p.read_bytes()
                      for p in root.rglob('*') if p.is_file()}
 
@@ -113,7 +114,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             result_paths = {row['path'] for row in results['results']}
             self.assertNotIn(generated_path, result_paths)
             self.assertEqual(concept_search_code, 0)
-            self.assertIn('research/study.md', {row['path'] for row in concept_results['results']})
+            self.assertNotIn('research/study.md', {row['path'] for row in concept_results['results']})
             self.assertEqual(before, after)
 
     def test_link_grammar_and_output_boundaries(self):
