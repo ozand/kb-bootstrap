@@ -89,6 +89,12 @@ class SourceCaptureValidationTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             text = text.replace("fidelity: {class: exact, coverage: all-bytes, losses: []}",
                 "fidelity: {class: manual-summary, coverage: selected-topics, losses: [timing]}")
+            direct_exact = text.replace("fidelity: {class: manual-summary, coverage: selected-topics, losses: [timing]}",
+                "fidelity: {class: exact, coverage: all-bytes, losses: []}")
+            direct_with_lineage = direct_exact.replace("capture: {method: direct}",
+                "capture: {method: direct, converter: {identity: tool-1, version: '1'}}")
+            path.write_text(direct_with_lineage, encoding="utf-8")
+            self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
             text = text.replace("capture: {method: direct}", "capture: {method: manual-summary}")
             path.write_text(text, encoding="utf-8")
             self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
@@ -111,10 +117,20 @@ class SourceCaptureValidationTests(unittest.TestCase):
                 "capture: {method: converted, converter: {identity: tool-1, version: '1'}}")
             path.write_text(converted, encoding="utf-8")
             self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
-            blocked = text.replace("method: manual-summary", "method: blocked")
+            blocked = (
+                "schema: kb-bootstrap.source-capture\nversion: 1\nsources:\n"
+                "- source_id: blocked-1\n  origin: {kind: unavailable, reason: source-unavailable}\n"
+                "  original_revision: {opaque: unknown}\n  original_retention: unknown\n"
+                "  capture: {method: blocked, reason: access-not-provided}\n"
+                "  fidelity: {class: blocked, coverage: none, losses: [all-content-unavailable]}\n"
+                "  representations: []\n")
             path.write_text(blocked, encoding="utf-8")
-            self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
-            for bad in ("identity: true", "version: 'bad value'"):
+            self.assertTrue(validate_source_capture("record.yaml", root, "raw", [])[0])
+            blocked_lineage = blocked.replace("reason: access-not-provided}",
+                "reason: access-not-provided, converter: {identity: tool-1, version: '1'}}")
+            path.write_text(blocked_lineage, encoding="utf-8")
+            self.assertFalse(validate_source_capture("record.yaml", root, "raw", [])[0])
+            for bad in ("identity: true, version: '1'", "identity: tool-1, version: 'bad value'"):
                 malformed = text.replace("identity: tool-1, version: '1'", bad)
                 path.write_text(malformed, encoding="utf-8")
                 valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt"])
