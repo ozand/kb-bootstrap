@@ -23,4 +23,5 @@
 | ADR-019 | Accept pinned QMD index selectors and inert model defaults | Accepted |
 | ADR-020 | Derive portable QMD names with digests for lossy inputs | Accepted |
 | ADR-021 | Separate generated research progress from canonical lifecycle status | Accepted |
+| ADR-022 | Require explicit scoped operator authority for external actions | Accepted |
 | ADR-023 | Bound source-capture records to explicit byte representations | Accepted |
