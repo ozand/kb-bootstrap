@@ -10,12 +10,13 @@ Each fixture also contains a valid ordinary source concept.
 |---|---|---|---|---|---|
 | Ordinary `.MD` concept | pass | included | included | included | included |
 | Generic valid Concept stored under research/ (not a research workflow) | pass | included | included | included | excluded |
-| Research brief with `in-progress` | fail | included | blocked | blocked | excluded |
+| Legacy brief using `status: in-progress` (invalid control) | fail | included | blocked | blocked | excluded |
+| Newly generated brief (`status: draft`, `workflow_status: in-progress`) | pass | included | included | included | excluded |
 | Raw capture | excluded | excluded; eligible evidence target | excluded | excluded | excluded |
 | Lesson | excluded | excluded; invalid target | excluded | excluded | excluded |
 | Lowercase index/log | excluded | included | excluded | included | excluded |
 
-Research workflow status remains authored `in-progress`: it is not rewritten to an OKF lifecycle. Its profile rejection is an observed unresolved mismatch, not permission to exclude every research directory or change the schema. ADR-017's retrieval exclusion deliberately is not ADR-003 validator parity.
+For newly generated briefs, ADR-021 keeps workflow state in `workflow_status: in-progress` while canonical `status` remains `draft`; current profile/export/bundle therefore accept the brief, while ADR-017 retrieval still excludes research paths. The legacy `status: in-progress` negative control remains invalid. This does not justify excluding every research directory or changing unrelated schema. ADR-017's retrieval exclusion deliberately is not ADR-003 validator parity.
 
 ## Links from an ordinary source
 
@@ -37,6 +38,6 @@ Bundle membership checks do not establish graph integrity. ADR-005 explicitly de
 
 ## Scope and retention
 
-This finite local matrix does not cover every Markdown grammar, research template expansion, QMD registration, hostile concurrent writers or every symlink platform. Existing safety regressions remain authoritative. No QMD/model/network/consumer operation is invoked.
+Generated-template characterization now exercises the brief/report role path and the normal `check_research.py` validation branch against the source-tree CLI entry point with synthetic QMD declarations; no package install or external QMD query is performed. This finite matrix does not cover every Markdown grammar, hostile concurrent writers or every symlink platform. Existing safety regressions remain authoritative. No model/network/consumer operation is invoked.
 
 Repository-tracked evidence owner: ozand/kb-bootstrap; path: this report and its tests; retention/disposal: repository history and owner-controlled amendments; access: public repository; integrity: containing Git commit. Runtime test stdout is ephemeral, not an immutable audit record. Observed parent execution on Windows: focused pytest 2 passed; full pytest 421 passed, 8 skipped; documented unittest 355 tests, OK, 8 skipped. These summaries are versioned with this report, not immutable runtime logs. GitHub comments are mutable supplemental communication, not independent retention guarantees.

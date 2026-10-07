@@ -1,13 +1,17 @@
 """Characterize the generated market-research report across existing gates."""
+import contextlib
 import hashlib
 import io
 import json
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from kb_bootstrap.canonical_graph_export import build_canonical_graph
 from kb_bootstrap.canonical_profile import validate_canonical_profile
@@ -61,6 +65,14 @@ class GeneratedResearchReportTests(unittest.TestCase):
             concept = root / "wiki/concepts/product.md"
             concept.parent.mkdir(parents=True)
             concept.write_text(CONCEPT, encoding="utf-8")
+            project_collections = workspace / "qmd/collections"
+            project_collections.mkdir(parents=True)
+            (project_collections / "wiki.yaml").write_text(
+                "name: synthetic-wiki\npaths:\n  - ../../kb/wiki/\n", encoding="utf-8"
+            )
+            (project_collections / "raw.yaml").write_text(
+                "name: synthetic-raw\npaths:\n  - ../../kb/research/\n", encoding="utf-8"
+            )
             outside = root / "outside.md"
             outside.write_text(
                 "---\ntype: Concept\ntitle: Workflow control\ndescription: Positive retrieval control.\n"
@@ -69,24 +81,46 @@ class GeneratedResearchReportTests(unittest.TestCase):
             )
 
             before = {
-                path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in root.rglob("*") if path.is_file()
+                path.relative_to(workspace).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in workspace.rglob("*") if path.is_file()
             }
-            checker = subprocess.run(
-                [sys.executable, str(assets / "scripts/check_research.py"), str(study),
-                 "--kb", str(root), "--min-screenshots", "0", "--skip-validate"],
-                cwd=workspace, capture_output=True, text=True, check=False,
+            checker_script = assets / "scripts/check_research.py"
+            checker_globals = runpy.run_path(str(checker_script), run_name="synthetic_check_research")
+            checker_module = SimpleNamespace(**checker_globals)
+            validator_runs = []
+
+            def run_validator(args, **kwargs):
+                from kb_bootstrap.cli import main as cli_main
+                output = io.StringIO()
+                with patch.object(sys, "argv", ["kb-bootstrap", *args[1:]]), contextlib.redirect_stdout(output):
+                    return_code = cli_main()
+                validator_runs.append((args, return_code, output.getvalue()))
+                return SimpleNamespace(returncode=return_code, stdout=output.getvalue(), stderr="")
+
+            checker_output = io.StringIO()
+            with patch.object(checker_module.shutil, "which", return_value="kb-bootstrap"), patch.object(
+                checker_module.subprocess, "run", side_effect=run_validator
+            ), patch.object(sys, "argv", [
+                     "check_research.py", str(study), "--kb", str(root),
+                     "--min-screenshots", "0",
+                 ]), contextlib.redirect_stdout(checker_output):
+                checker_exit = checker_module.main()
+            checker = SimpleNamespace(
+                returncode=checker_exit, stdout=checker_output.getvalue(), stderr=""
             )
+            self.assertEqual(len(validator_runs), 1)
+            self.assertEqual(validator_runs[0][0][1:3], ["validate", "--dir"])
+            self.assertEqual(validator_runs[0][1], 0, validator_runs[0][2])
             profile, profile_ok = validate_canonical_profile(root)
             graph, _ = analyze_graph(root)
-            _, lint_ok = validate(root)
+            lint_report, lint_ok = validate(root)
             graph_data, graph_report, graph_ok = build_canonical_graph(root)
             bundle, bundle_report, bundle_ok = build_published_bundle(root)
             report_results, report_code = search_local("Synthetic characterization report", root)
             brief_results, brief_code = search_local("Synthetic study", root)
             after = {
-                path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in root.rglob("*") if path.is_file()
+                path.relative_to(workspace).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in workspace.rglob("*") if path.is_file()
             }
 
             brief_path = brief.relative_to(root).as_posix()
@@ -97,7 +131,8 @@ class GeneratedResearchReportTests(unittest.TestCase):
             self.assertIn("OK", checker.stdout)
             self.assertTrue(profile_ok, profile)
             self.assertIn("ERRORS: 0", profile)
-            self.assertTrue(lint_ok)
+            self.assertTrue(lint_ok, lint_report)
+            self.assertIn((report_path, brief_path), graph.edges)
             self.assertEqual({brief_path, report_path, concept_path, outside_path}, set(graph.nodes))
             self.assertTrue(graph_ok, graph_report)
             graph_value = json.loads(graph_data)
