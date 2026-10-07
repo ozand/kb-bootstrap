@@ -16,12 +16,28 @@ def adr_files():
 
 def index_rows():
     rows = {}
+    seen = set()
     for line in INDEX.read_text(encoding="utf-8").splitlines():
         match = INDEX_ROW_PATTERN.match(line)
         if match:
             number, title, status = match.groups()
+            assert number not in seen, f"duplicate ADR-{number} index row"
+            seen.add(number)
             rows[number] = (title, status)
     return rows
+
+
+def test_index_rows_reject_duplicate_adr_numbers():
+    from unittest.mock import patch
+
+    duplicate_index = "| ADR-020 | Example | Accepted |\n| ADR-020 | Example | Accepted |\n"
+    with patch.object(Path, "read_text", return_value=duplicate_index):
+        try:
+            index_rows()
+        except AssertionError as error:
+            assert "duplicate ADR-020 index row" in str(error)
+        else:
+            raise AssertionError("duplicate ADR index rows were silently overwritten")
 
 
 def test_adr_index_and_files_match_both_directions():
