@@ -33,13 +33,15 @@ REQUIRED_ASSETS = {
 }
 
 
-def _run(command, *, cwd, env=None, timeout=COMMAND_TIMEOUT):
+def _run(command, *, cwd, env=None, timeout=COMMAND_TIMEOUT, on_timeout=None):
     try:
         return subprocess.run(
             command, cwd=cwd, env=env, check=True, capture_output=True,
             text=True, timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
+        if on_timeout is not None:
+            on_timeout()
         raise AssertionError(f"Command timed out after {timeout}s: {command[0]}") from exc
     except subprocess.CalledProcessError as exc:
         raise AssertionError(
@@ -115,8 +117,10 @@ class InstalledDistributionTests(unittest.TestCase):
         except Exception as exc:
             raise RuntimeError("build module is discoverable but cannot be imported") from exc
         cls.expected_templates = _tracked_templates()
+        cls.preserve_temp = False
         cls.temp_context = tempfile.TemporaryDirectory()
         cls.temp_root = Path(cls.temp_context.name)
+        cls.temp_context._finalizer.detach()
         cls.source_copy = _build_input(cls.temp_root / "source")
         cls.artifacts = cls.temp_root / "artifacts"
         cls.artifacts.mkdir()
@@ -125,14 +129,24 @@ class InstalledDistributionTests(unittest.TestCase):
                 [sys.executable, "-m", "build", "--no-isolation", "--outdir", str(cls.artifacts)],
                 cwd=cls.source_copy,
                 timeout=BUILD_TIMEOUT,
+                on_timeout=lambda: setattr(cls, "preserve_temp", True),
             )
         except (AssertionError, OSError) as exc:
             raise RuntimeError(f"Distribution build failed with build tooling present: {exc}") from exc
 
     @classmethod
     def tearDownClass(cls):
-        if hasattr(cls, "temp_context"):
-            cls.temp_context.cleanup()
+        if hasattr(cls, "temp_root") and not getattr(cls, "preserve_temp", False):
+            shutil.rmtree(cls.temp_root, ignore_errors=True)
+
+    def test_timeout_preserves_owned_working_directory(self):
+        from unittest.mock import patch
+
+        timed_out = []
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("child", 1)):
+            with self.assertRaisesRegex(AssertionError, "timed out"):
+                _run(["child"], cwd=ROOT, timeout=1, on_timeout=lambda: timed_out.append(True))
+        self.assertEqual([True], timed_out)
 
     def test_build_tool_preflight_skips_only_when_module_is_absent(self):
         from unittest.mock import patch
@@ -166,7 +180,10 @@ class InstalledDistributionTests(unittest.TestCase):
     def _assert_installed_artifact_generates_assets(self, kind):
         artifact = next(self.artifacts.glob("*.whl" if kind == "wheel" else "*.tar.gz"))
         temp_root = Path(tempfile.mkdtemp(prefix=f"kb-bootstrap-{kind}-"))
-        self.addCleanup(shutil.rmtree, temp_root, ignore_errors=True)
+        preserve_temp = []
+        self.addCleanup(
+            lambda: None if preserve_temp else shutil.rmtree(temp_root, ignore_errors=True)
+        )
         environment = temp_root / "venv"
         venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
         scripts = environment / ("Scripts" if os.name == "nt" else "bin")
@@ -175,6 +192,7 @@ class InstalledDistributionTests(unittest.TestCase):
         _run(
             [str(python), "-m", "pip", "install", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)],
             cwd=temp_root,
+            on_timeout=lambda: preserve_temp.append(True),
         )
         outside = temp_root / "outside-source"
         outside.mkdir()
@@ -183,6 +201,7 @@ class InstalledDistributionTests(unittest.TestCase):
             [str(cli), "--target", str(target), "--with-project-lessons"],
             cwd=outside,
             env={**os.environ, "PYTHONPATH": ""},
+            on_timeout=lambda: preserve_temp.append(True),
         )
         self.assertIn("kb-capture", result.stdout)
         self.assertIn("market-research", result.stdout)
@@ -201,6 +220,7 @@ class InstalledDistributionTests(unittest.TestCase):
             [str(python), "-c", "import kb_bootstrap; print(kb_bootstrap.__file__)"],
             cwd=outside,
             env={**os.environ, "PYTHONPATH": ""},
+            on_timeout=lambda: preserve_temp.append(True),
         ).stdout.strip()
         try:
             Path(module_path).relative_to(environment)
