@@ -1,6 +1,7 @@
 """Characterize the generated market-research report across existing gates."""
 import contextlib
 import hashlib
+import os
 import io
 import json
 import runpy
@@ -88,14 +89,19 @@ class GeneratedResearchReportTests(unittest.TestCase):
             checker_globals = runpy.run_path(str(checker_script), run_name="synthetic_check_research")
             checker_module = SimpleNamespace(**checker_globals)
             validator_runs = []
+            source_root = str(package)
+            environment = os.environ.copy()
+            environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            actual_run = subprocess.run
 
             def run_validator(args, **kwargs):
-                from kb_bootstrap.cli import main as cli_main
-                output = io.StringIO()
-                with patch.object(sys, "argv", ["kb-bootstrap", *args[1:]]), contextlib.redirect_stdout(output):
-                    return_code = cli_main()
-                validator_runs.append((args, return_code, output.getvalue()))
-                return SimpleNamespace(returncode=return_code, stdout=output.getvalue(), stderr="")
+                result = actual_run(
+                    [sys.executable, "-m", "kb_bootstrap.cli", *args[1:]],
+                    cwd=workspace, env=environment, capture_output=True, text=True, check=False,
+                )
+                validator_runs.append((args, result.returncode, result.stdout, result.stderr))
+                return result
 
             checker_output = io.StringIO()
             with patch.object(checker_module.shutil, "which", return_value="kb-bootstrap"), patch.object(
@@ -110,7 +116,7 @@ class GeneratedResearchReportTests(unittest.TestCase):
             )
             self.assertEqual(len(validator_runs), 1)
             self.assertEqual(validator_runs[0][0][1:3], ["validate", "--dir"])
-            self.assertEqual(validator_runs[0][1], 0, validator_runs[0][2])
+            self.assertEqual(validator_runs[0][1], 0, validator_runs[0][2] + validator_runs[0][3])
             profile, profile_ok = validate_canonical_profile(root)
             graph, _ = analyze_graph(root)
             lint_report, lint_ok = validate(root)
