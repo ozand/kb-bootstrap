@@ -21,3 +21,4 @@
 | ADR-017 | Add bounded canonical local search and read commands | Accepted |
 | ADR-018 | Add an explicit bounded lexical QMD adapter | Accepted |
 | ADR-019 | Accept pinned QMD index selectors and inert model defaults | Accepted |
+| ADR-020 | Derive portable QMD names with digests for lossy inputs | Proposed |
