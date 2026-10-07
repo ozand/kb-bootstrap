@@ -13,9 +13,74 @@ from unittest.mock import patch
 
 from kb_bootstrap.cli import main
 from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files
+from kb_bootstrap.qmd_names import project_slug
 
 
 class ScaffoldRepeatTests(unittest.TestCase):
+    def test_project_slug_portable_name_matrix(self):
+        cases = {
+            "demo": "demo",
+            "sample_project-2": "sample_project-2",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(project_slug(source), expected)
+
+        lossy = ["A B", "A@B", "A", "équipe", "!!!", "", "a" * 60, "_foo"]
+        names = [project_slug(name) for name in lossy]
+        self.assertNotEqual(names[0], names[1])
+        self.assertNotEqual(names[0], project_slug("a-b"))
+        self.assertNotEqual(project_slug("_foo"), project_slug("foo"))
+        self.assertNotEqual(project_slug("foo-"), project_slug("foo"))
+        self.assertEqual(project_slug("!!!").split("-")[0], "p")
+        expected = hashlib.sha256("A B".encode("utf-8")).hexdigest()[:12]
+        self.assertEqual(project_slug("A B"), f"a-b-{expected}")
+        self.assertTrue(all(0 < len(name) <= 59 for name in names))
+        self.assertTrue(all(name.isascii() and name[0].isalnum() for name in names))
+        self.assertLessEqual(len(project_slug("z" * 1000)), 59)
+        self.assertEqual(project_slug("a" * 60), ("a" * 46) + "-" + hashlib.sha256(("a" * 60).encode("utf-8")).hexdigest()[:12])
+
+    def test_qmd_generated_names_are_bounded_for_lossy_names(self):
+        for basename in ("Пример проекта", "A B", "A@B", "!!!", "a" * 60):
+            with self.subTest(basename=basename):
+                payloads = qmd_payloads("single", project_slug(basename))
+                for relative in ("qmd/collections/wiki.yaml", "qmd/collections/raw.yaml"):
+                    line = next(line for line in payloads[relative].decode().splitlines() if line.startswith("name: "))
+                    generated = line.split(": ", 1)[1]
+                    self.assertLessEqual(len(generated), 64)
+                    self.assertTrue(generated.isascii())
+
+    def test_legacy_repeat_with_old_lossy_name_blocks_without_rewrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "A B"
+            root.mkdir()
+            legacy_payloads = qmd_payloads("single", "a-b")
+            for relative, payload in legacy_payloads.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+            before = self.snapshot(root)
+            self.assertEqual(self.run_cli("--target", str(root)), 1)
+            self.assertEqual(before, self.snapshot(root))
+
+    def test_fresh_generated_names_validate_and_repeats_are_noops(self):
+        for basename in ("Simple_Project", "Пример проекта", "équipe", "A B", "A@B", "!!!", "a" * 60):
+            with self.subTest(basename=basename), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / basename
+                self.assertIsNone(self.run_cli("--target", str(target)))
+                _, valid = __import__("kb_bootstrap.qmd_validator", fromlist=["validate_qmd_collections"]).validate_qmd_collections(target)
+                self.assertTrue(valid, basename)
+                before = self.snapshot(target)
+                self.assertEqual(self.run_cli("--target", str(target)), 0)
+                self.assertEqual(before, self.snapshot(target))
+
+    def test_names_use_exact_original_utf8_digest_and_prefix_cap(self):
+        source = "é" + "a" * 60
+        expected_digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
+        result = project_slug(source)
+        self.assertEqual(result, ("a" * 46) + "-" + expected_digest)
+        self.assertLessEqual(len(result), 59)
+
     def setUp(self):
         self.package = Path(__file__).parents[1] / "kb_bootstrap"
 

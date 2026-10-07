@@ -3,9 +3,30 @@ import unittest
 from pathlib import Path
 
 from kb_bootstrap.qmd_validator import validate_qmd_collections
+from kb_bootstrap.qmd_names import is_valid_generated_collection_name, project_slug
 
 
 class QmdValidatorTests(unittest.TestCase):
+    def test_generated_collection_name_contract(self):
+        for basename in ("demo", "Пример проекта", "équipe", "A B", "A@B", "!!!", "", "a" * 100):
+            base = project_slug(basename)
+            for suffix in ("-wiki", "-raw"):
+                name = base + suffix
+                self.assertTrue(is_valid_generated_collection_name(name), name)
+                self.assertLessEqual(len(name), 64)
+        # Existing owner-authored names keep the legacy validator grammar and length behavior.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            collections = root / "qmd/collections"
+            collections.mkdir(parents=True)
+            (root / "kb").mkdir()
+            for filename, custom_name in (("wiki.yaml", "Owner.Custom.Name"), ("raw.yaml", "a" * 70)):
+                (collections / filename).write_text(
+                    f"name: {custom_name}\npaths:\n  - ../../kb/\n", encoding="utf-8"
+                )
+            _, is_valid = validate_qmd_collections(root)
+            self.assertTrue(is_valid)
+
     def test_valid_dual_collections_pass(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
