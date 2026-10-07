@@ -1,9 +1,12 @@
 """Characterize the generated market-research report across existing gates."""
 import hashlib
+import io
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from kb_bootstrap.canonical_graph_export import build_canonical_graph
@@ -53,10 +56,7 @@ class GeneratedResearchReportTests(unittest.TestCase):
                 "../../research/<YYYY-MM-DD>_<slug>/brief.md",
                 "../../" + brief.relative_to(root).as_posix(),
             )
-            rendered += (
-                "\nSynthetic sources: [capture](../../" + raw.relative_to(root).as_posix()
-                + ")\n\n[concept](../../wiki/concepts/product.md)\n"
-            )
+            rendered += "\nSynthetic capture recorded.\n\n[concept](../concepts/product.md)\n"
             report.write_text(rendered, encoding="utf-8")
             concept = root / "wiki/concepts/product.md"
             concept.parent.mkdir(parents=True)
@@ -95,16 +95,17 @@ class GeneratedResearchReportTests(unittest.TestCase):
             outside_path = outside.relative_to(root).as_posix()
             self.assertEqual(checker.returncode, 0, checker.stdout + checker.stderr)
             self.assertIn("OK", checker.stdout)
-            self.assertTrue(profile_ok is False)
-            self.assertIn(f"{brief_path}: status must be draft, stable, or deprecated", profile)
+            self.assertTrue(profile_ok, profile)
+            self.assertIn("ERRORS: 0", profile)
             self.assertTrue(lint_ok)
             self.assertEqual({brief_path, report_path, concept_path, outside_path}, set(graph.nodes))
-            self.assertFalse(graph_ok)
-            self.assertEqual(graph_data, b"")
-            self.assertIn("status must be draft, stable, or deprecated", graph_report)
-            self.assertFalse(bundle_ok)
-            self.assertEqual(bundle, b"")
-            self.assertIn("status must be draft, stable, or deprecated", bundle_report)
+            self.assertTrue(graph_ok, graph_report)
+            graph_value = json.loads(graph_data)
+            self.assertIn({"source": report_path, "target": brief_path, "fragment": None}, graph_value["edges"])
+            self.assertTrue(bundle_ok, bundle_report)
+            with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+                self.assertIn(brief_path, archive.namelist())
+                self.assertIn(report_path, archive.namelist())
             self.assertEqual(report_code, 0)
             self.assertIn(report_path, {row["path"] for row in report_results["results"]})
             self.assertEqual(brief_code, 0)

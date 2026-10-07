@@ -6,6 +6,7 @@ import unittest
 import subprocess
 import sys
 import zipfile
+import shutil
 from pathlib import Path
 from kb_bootstrap.canonical_profile import validate_canonical_profile
 from kb_bootstrap.graph_linter import analyze_graph, validate
@@ -27,6 +28,16 @@ class DocumentRoleMatrixTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(before, {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob('*') if p.is_file()})
         return profile_ok, graph, lint_ok, exported, export_ok, bundle, bundle_ok, results, profile + export_report + bundle_report
+
+    def validate_canonical_profile_with_old_brief(self, root, brief):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / 'kb'
+            shutil.copytree(root, copy)
+            old_brief = copy / brief.relative_to(root)
+            text = old_brief.read_text(encoding='utf-8')
+            text = text.replace('status: draft\nworkflow_status: in-progress\n', 'status: in-progress\n')
+            old_brief.write_text(text, encoding='utf-8')
+            return validate_canonical_profile(copy)
 
     def write(self, root, name, content):
         path = root / name
@@ -75,7 +86,9 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             brief = Path(completed.stdout.strip()) / 'brief.md'
             self.assertTrue(brief.is_file())
             self.assertTrue((brief.parent / 'raw' / 'img').is_dir())
-            self.assertIn('status: in-progress', brief.read_text(encoding='utf-8'))
+            generated_text = brief.read_text(encoding='utf-8')
+            self.assertIn('status: draft', generated_text)
+            self.assertIn('workflow_status: in-progress', generated_text)
 
             # Retrieval deliberately excludes research, regardless of document role.
             self.write(root, 'research/study.md', CONCEPT)
@@ -90,6 +103,7 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             before = {p.relative_to(root).as_posix(): p.read_bytes()
                       for p in root.rglob('*') if p.is_file()}
             profile, profile_ok = validate_canonical_profile(root)
+            _, legacy_profile_ok = self.validate_canonical_profile_with_old_brief(root, brief)
             _, lint_validation_ok = validate(root)
             graph = analyze_graph(root)[0]
             lint_ok = lint_validation_ok
@@ -100,17 +114,17 @@ class DocumentRoleMatrixTests(unittest.TestCase):
             after = {p.relative_to(root).as_posix(): p.read_bytes()
                      for p in root.rglob('*') if p.is_file()}
 
-            self.assertFalse(profile_ok)
-            self.assertIn('status must be draft, stable, or deprecated', profile)
+            self.assertTrue(profile_ok, profile)
+            self.assertFalse(legacy_profile_ok)
             self.assertTrue(lint_ok)
             self.assertIn(generated_path, graph.nodes)
             self.assertIn(report.relative_to(root).as_posix(), graph.nodes)
-            self.assertFalse(export_ok)
-            self.assertEqual(exported, b'')
-            self.assertIn('status must be draft, stable, or deprecated', export_report)
-            self.assertFalse(bundle_ok)
-            self.assertEqual(bundle, b'')
-            self.assertIn('status must be draft, stable, or deprecated', bundle_report)
+            self.assertTrue(export_ok, export_report)
+            exported_nodes = {node['path'] for node in json.loads(exported)['nodes']}
+            self.assertIn(generated_path, exported_nodes)
+            self.assertTrue(bundle_ok, bundle_report)
+            with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+                self.assertIn(generated_path, archive.namelist())
             self.assertEqual(search_code, 0)
             result_paths = {row['path'] for row in results['results']}
             self.assertNotIn(generated_path, result_paths)
