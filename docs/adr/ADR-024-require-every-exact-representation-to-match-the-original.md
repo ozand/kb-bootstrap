@@ -1,6 +1,6 @@
 # ADR-024: Require every exact representation to match the original
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-07
 **Authors**: Pi coding agent
 **Supersedes**: ADR-023

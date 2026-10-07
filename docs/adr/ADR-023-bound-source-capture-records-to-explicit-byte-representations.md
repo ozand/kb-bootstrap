@@ -1,6 +1,6 @@
 # ADR-023: Bound source-capture records to explicit byte representations
 
-**Status**: Accepted
+**Status**: Superseded by ADR-024
 **Date**: 2026-10-07
 **Authors**: Pi coding agent
 **Supersedes**: None
