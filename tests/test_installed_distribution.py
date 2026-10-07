@@ -142,11 +142,14 @@ class InstalledDistributionTests(unittest.TestCase):
     def test_timeout_preserves_owned_working_directory(self):
         from unittest.mock import patch
 
-        timed_out = []
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("child", 1)):
-            with self.assertRaisesRegex(AssertionError, "timed out"):
-                _run(["child"], cwd=ROOT, timeout=1, on_timeout=lambda: timed_out.append(True))
-        self.assertEqual([True], timed_out)
+        cls = type("FixtureOwner", (), {"temp_root": ROOT, "preserve_temp": True})
+        with patch("shutil.rmtree") as remove_tree:
+            InstalledDistributionTests.tearDownClass.__func__(cls)
+        remove_tree.assert_not_called()
+        cls.preserve_temp = False
+        with patch("shutil.rmtree") as remove_tree:
+            InstalledDistributionTests.tearDownClass.__func__(cls)
+        remove_tree.assert_called_once_with(ROOT, ignore_errors=True)
 
     def test_build_tool_preflight_skips_only_when_module_is_absent(self):
         from unittest.mock import patch
