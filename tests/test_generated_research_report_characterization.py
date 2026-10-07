@@ -61,6 +61,12 @@ class GeneratedResearchReportTests(unittest.TestCase):
             concept = root / "wiki/concepts/product.md"
             concept.parent.mkdir(parents=True)
             concept.write_text(CONCEPT, encoding="utf-8")
+            outside = root / "outside.md"
+            outside.write_text(
+                "---\ntype: Concept\ntitle: Workflow control\ndescription: Positive retrieval control.\n"
+                "tags: [synthetic]\nstatus: stable\n---\nSynthetic study retrieval control.\n",
+                encoding="utf-8",
+            )
 
             before = {
                 path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -77,7 +83,7 @@ class GeneratedResearchReportTests(unittest.TestCase):
             graph_data, graph_report, graph_ok = build_canonical_graph(root)
             bundle, bundle_report, bundle_ok = build_published_bundle(root)
             report_results, report_code = search_local("Synthetic characterization report", root)
-            brief_results, brief_code = search_local("brief-template", root)
+            brief_results, brief_code = search_local("Synthetic study", root)
             after = {
                 path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in root.rglob("*") if path.is_file()
@@ -86,12 +92,13 @@ class GeneratedResearchReportTests(unittest.TestCase):
             brief_path = brief.relative_to(root).as_posix()
             report_path = report.relative_to(root).as_posix()
             concept_path = concept.relative_to(root).as_posix()
+            outside_path = outside.relative_to(root).as_posix()
             self.assertEqual(checker.returncode, 0, checker.stdout + checker.stderr)
             self.assertIn("OK", checker.stdout)
             self.assertTrue(profile_ok is False)
             self.assertIn(f"{brief_path}: status must be draft, stable, or deprecated", profile)
             self.assertTrue(lint_ok)
-            self.assertEqual({brief_path, report_path, concept_path}, set(graph.nodes))
+            self.assertEqual({brief_path, report_path, concept_path, outside_path}, set(graph.nodes))
             self.assertFalse(graph_ok)
             self.assertEqual(graph_data, b"")
             self.assertIn("status must be draft, stable, or deprecated", graph_report)
@@ -101,7 +108,10 @@ class GeneratedResearchReportTests(unittest.TestCase):
             self.assertEqual(report_code, 0)
             self.assertIn(report_path, {row["path"] for row in report_results["results"]})
             self.assertEqual(brief_code, 0)
-            self.assertNotIn(brief_path, {row["path"] for row in brief_results["results"]})
+            self.assertIn("Synthetic study", brief.read_text(encoding="utf-8"))
+            brief_hits = {row["path"] for row in brief_results["results"]}
+            self.assertNotIn(brief_path, brief_hits)
+            self.assertIn(outside_path, brief_hits)
             self.assertEqual(before, after)
 
 
