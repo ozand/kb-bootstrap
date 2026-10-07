@@ -3,7 +3,8 @@ type: ResearchBrief
 title: {title_json}
 started: {date}
 issue: {issue}
-status: in-progress
+status: draft
+workflow_status: in-progress
 ---
 
 # {title}
