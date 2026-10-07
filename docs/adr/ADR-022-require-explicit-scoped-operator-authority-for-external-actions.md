@@ -24,7 +24,7 @@ A future operation must not treat presence/readiness of a tool, permission to re
 
 1. Keep technical state separate from authority: capability configuration/availability, a readiness probe (`NOT RUN` when unperformed), operation policy (`ALLOW`, `BLOCKED`, or `UNAVAILABLE`), and observed host-egress isolation are separate facts. A policy denial does not relabel a configured tool disabled or broken.
 2. Treat these permissions as independent and non-transitive: read a selected source; write a local artifact to an exact target; review/approve it; acquire an asset; execute an external action; and transmit/publish to an exact destination. In particular, local export may be independently authorized when outbound publication is denied. A writer, reviewer, candidate, or publisher has no other role merely by implication.
-3. An external-action authorization must originate from a trusted operator interaction and be bound at minimum to the actor, operation, data/revision scope, exact destination, purpose, and validity/revocation state. **Until a separately accepted interface establishes the operator identity and authenticates that interaction, no presented grant is treated as valid: the action remains `BLOCKED`/`UNAVAILABLE`.** A config value, environment variable, document, adapter, prior receipt, or unauthenticated prompt cannot self-assert operator authority. Enforcement rechecks the grant immediately before crossing the boundary. The mechanism for identity authentication, representation, delegation, expiry and revocation remains a separately accepted owner decision and must reconcile with W01 before implementation; this proposal chooses no public format.
+3. An external-action authorization must be an explicit, current decision by the operator through the already authorized interaction that initiated or is supervising that action, and be bound at minimum to the actor as represented in that interaction, operation, data/revision scope, exact destination, and purpose. Enforcement rechecks the decision immediately before crossing the boundary. A config value, environment variable, document, adapter, prior receipt, model output, or untrusted prompt text cannot self-assert operator approval. This ADR does not claim cryptographic identity proof or prescribe a new identity platform. How unattended/delegated workflows authenticate the actor, represent grants, expire or revoke them, and reconcile with W01 remains a separate owner decision; until such a mechanism is accepted, an automated workflow without a live authorized operator decision cannot perform the external action.
 4. Configuration, source text, paths, manifests, indexes, environment values, prior receipts, model outputs, classifier labels/non-detections, confidence scores, and tool availability never create or widen authority. Missing, conflicting, expired, or unverifiable authority blocks the external action with a sanitized result and no fallback route.
 5. This requirement applies to future external actions; it does not insert policy checks into Accepted ADR-015's bounded core-only validation, change legacy `validate`, make optional local adapters mandatory, or grant authority to any remote adapter in #108.
 
@@ -34,7 +34,7 @@ This proposal is not owner approval, implemented enforcement, a universal capabi
 
 ### Success criteria if accepted
 
-For each external action, absence of a current exact operator authorization—or absence of a separately accepted identity/authentication mechanism—yields `BLOCKED`/`UNAVAILABLE`, zero outbound calls and remote writes; an authorized local artifact can still be written only under its separate local-write authority; capability readiness, probe state, policy result and host-isolation evidence remain distinguishable; and no document/model/metadata-derived value is accepted as authority.
+For each external action, missing approval or a mismatch in actor/context, operation, data/revision scope, exact destination, or purpose yields `BLOCKED`/`UNAVAILABLE`, zero outbound calls and remote writes; expired or revoked approval does likewise. A current matching operator decision permits only the named operation and target. An authorized local artifact can still be written under its separate local-write authority; capability readiness, probe state, policy result and host-isolation evidence remain distinguishable; and no document/model/metadata-derived value is accepted as authority.
 
 ## Consequences
 
@@ -64,11 +64,13 @@ These are proposed synthetic tests, not tests already implemented or evidence of
 
 | Claim | Test | Currently |
 |---|---|---|
-| Missing/expired external-action authority causes zero calls/writes and no fallback | `tests/test_execution_authority.py::test_denied_external_action_has_no_side_effects` | not yet written |
+| Missing external-action authority causes zero calls/writes and no fallback | `tests/test_execution_authority.py::test_denied_external_action_has_no_side_effects` | not yet written |
+| Matching current operator decision permits one outbound operation only to its named target | `tests/test_execution_authority.py::test_authorized_target_is_used_exactly` | not yet written |
+| Wrong target, actor/context, operation, revision, or purpose is denied without calls/writes | `tests/test_execution_authority.py::test_mismatched_or_revoked_authority_is_denied` | not yet written |
 | Local artifact permission is independent of denied publication | `tests/test_execution_authority.py::test_local_write_can_be_allowed_when_publication_is_denied` | not yet written |
 | Configuration, readiness probe, policy result and host-egress evidence remain distinct | `tests/test_execution_authority.py::test_readiness_probe_and_policy_states_are_not_conflated` | not yet written |
 | Source instructions, metadata and classifier results cannot grant external authority | `tests/test_execution_authority.py::test_untrusted_content_cannot_grant_action_authority` | not yet written |
-| Unauthenticated/config-only grant cannot be accepted before a separately accepted trusted identity boundary exists | `tests/test_execution_authority.py::test_untrusted_grant_source_is_blocked` | not yet written |
+| Config/document/model content cannot self-assert a live operator decision; unattended automation without an accepted delegation mechanism is denied | `tests/test_execution_authority.py::test_untrusted_grant_source_is_blocked` | not yet written |
 | Core-only and legacy validation contracts do not gain new checks | `tests/test_core_authority_compatibility.py::test_validate_core_and_legacy_validate_unchanged` | not yet written |
 
 ## Rollback
