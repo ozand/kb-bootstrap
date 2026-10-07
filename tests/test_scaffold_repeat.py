@@ -38,7 +38,7 @@ class ScaffoldRepeatTests(unittest.TestCase):
         self.assertTrue(all(0 < len(name) <= 59 for name in names))
         self.assertTrue(all(name.isascii() and name[0].isalnum() for name in names))
         self.assertLessEqual(len(project_slug("z" * 1000)), 59)
-        self.assertEqual(project_slug("a" * 60), project_slug("a" * 60))
+        self.assertEqual(project_slug("a" * 60), ("a" * 46) + "-" + hashlib.sha256(("a" * 60).encode("utf-8")).hexdigest()[:12])
 
     def test_qmd_generated_names_are_bounded_for_lossy_names(self):
         for basename in ("Пример проекта", "A B", "A@B", "!!!", "a" * 60):
@@ -52,13 +52,16 @@ class ScaffoldRepeatTests(unittest.TestCase):
 
     def test_legacy_repeat_with_old_lossy_name_blocks_without_rewrite(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / "consumer"
-            self.assertIsNone(self.run_cli("--target", str(root)))
-            wiki = root / "qmd/collections/wiki.yaml"
-            wiki.write_text(wiki.read_text(encoding="utf-8").replace("consumer-wiki", "a-b-wiki"), encoding="utf-8")
-            old_state = self.snapshot(root)
+            root = Path(tmp) / "A B"
+            root.mkdir()
+            legacy_payloads = qmd_payloads("single", "a-b")
+            for relative, payload in legacy_payloads.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+            before = self.snapshot(root)
             self.assertEqual(self.run_cli("--target", str(root)), 1)
-            self.assertEqual(old_state, self.snapshot(root))
+            self.assertEqual(before, self.snapshot(root))
 
     def test_fresh_generated_names_validate_and_repeats_are_noops(self):
         for basename in ("Simple_Project", "Пример проекта", "équipe", "A B", "A@B", "!!!", "a" * 60):
@@ -70,6 +73,13 @@ class ScaffoldRepeatTests(unittest.TestCase):
                 before = self.snapshot(target)
                 self.assertEqual(self.run_cli("--target", str(target)), 0)
                 self.assertEqual(before, self.snapshot(target))
+
+    def test_names_use_exact_original_utf8_digest_and_prefix_cap(self):
+        source = "é" + "a" * 60
+        expected_digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
+        result = project_slug(source)
+        self.assertEqual(result, ("a" * 46) + "-" + expected_digest)
+        self.assertLessEqual(len(result), 59)
 
     def setUp(self):
         self.package = Path(__file__).parents[1] / "kb_bootstrap"
