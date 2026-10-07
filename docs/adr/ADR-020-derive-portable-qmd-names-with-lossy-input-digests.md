@@ -14,7 +14,7 @@ This proposal intentionally does not preserve every legacy ASCII result: upperca
 
 ### Problem statement
 
-Initialization should emit QMD identifiers accepted by local validation and ADR-018 bounds. Lossy Unicode normalization should not collapse distinct non-ASCII basenames into the same generated identifier; preserve the current ASCII naming behavior for compatibility, including its known collision cases. Existing initialized collections must never be silently renamed.
+Initialization should emit QMD identifiers accepted by local validation and ADR-018 bounds. Lossy normalization should distinguish different source basenames in the ordinary case; preserve prior output only for already-lowercase simple ASCII names. Existing initialized collections must never be silently renamed.
 
 ## Decision
 
@@ -33,7 +33,7 @@ No runtime implementation is authorized by this Proposed ADR. It does not rename
 
 ### Success criteria
 
-Cyrillic/accented, uppercase, punctuation-only, empty-normalized and overlength basenames deterministically produce validator-valid bounded names; already-simple lowercase ASCII names remain byte-compatible. `A B` and `A@B` do not collapse to the same generated name under this rule, subject to the explicitly accepted 48-bit digest collision risk. Repeat preflight never rewrites existing names.
+Cyrillic/accented, uppercase, punctuation-only, empty-normalized and overlength basenames deterministically produce validator-valid bounded names; already-simple lowercase ASCII names remain byte-compatible. `A B` and `A@B` do not collapse to the same generated name under this rule, subject to the proposed residual 48-bit digest collision risk pending owner approval. Repeat preflight never rewrites existing names.
 
 ## Consequences
 
