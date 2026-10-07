@@ -1,6 +1,6 @@
 # ADR-021: Separate generated research progress from canonical lifecycle status
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-07
 **Authors**: Pi coding agent
 **Supersedes**: None
