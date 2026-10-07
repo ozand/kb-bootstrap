@@ -118,10 +118,11 @@ def _origin(value: Any) -> bool:
         try:
             parts = urlsplit(reference)
             host = parts.hostname
+            port = parts.port
             return (set(value) == {"kind", "reference"} and parts.scheme.lower() in {"http", "https"}
                     and bool(host) and not any(char.isspace() for char in host)
                     and parts.username is None and parts.password is None
-                    and (parts.port is None or 1 <= parts.port <= 65535)
+                    and (port is None or 1 <= port <= 65535)
                     and not parts.query and not parts.fragment)
         except ValueError:
             return False
@@ -358,8 +359,8 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
             return _bad("origin-unavailable reason requires an unavailable origin")
         if cls == "manual-summary" and method != "manual-summary":
             return _bad("manual-summary fidelity requires manual-summary method")
-        if method in {"direct", "manual-summary", "blocked"} and "converter" in capture:
-            return _bad("converter metadata is only valid for converted captures")
+        if method in {"direct", "blocked"} and "converter" in capture:
+            return _bad("converter metadata is only valid for converted or manual-summary captures")
         if method == "manual-summary" and cls != "manual-summary":
             return _bad("manual-summary method requires manual-summary fidelity")
         if method == "blocked" and (set(capture) - {"method", "reason"} or cls != "blocked"):
@@ -368,12 +369,14 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
             return _bad("capture reason is only valid for blocked records")
         if method != "converted" and method not in {"direct", "manual-summary", "blocked"}:
             return _bad("capture method is unsupported")
-        if method == "converted":
-            converter = capture.get("converter")
+        if method in {"converted", "manual-summary"} and "converter" in capture:
+            converter = capture["converter"]
             if (not isinstance(converter, dict) or set(converter) - {"identity", "version", "parameters"}
                     or not isinstance(converter.get("identity"), str) or not TOKEN.fullmatch(converter["identity"])
                     or not isinstance(converter.get("version"), str) or not TOKEN.fullmatch(converter["version"])):
-                return _bad("converted capture requires converter identity and version")
+                return _bad("converter lineage requires identity and version")
+        if method == "converted" and "converter" not in capture:
+            return _bad("converted capture requires converter identity and version")
         rep_ids: Set[str] = set()
         rep_digests: list[str] = []
         rep_paths: Set[str] = set()

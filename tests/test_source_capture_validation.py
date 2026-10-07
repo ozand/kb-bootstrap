@@ -81,6 +81,46 @@ class SourceCaptureValidationTests(unittest.TestCase):
                     self.assertFalse(valid)
                     self.assertTrue(errors)
 
+    def test_manual_summary_optional_tool_lineage_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "record.yaml"
+            text = path.read_text(encoding="utf-8")
+            text = text.replace("fidelity: {class: exact, coverage: all-bytes, losses: []}",
+                "fidelity: {class: manual-summary, coverage: selected-topics, losses: [timing]}")
+            text = text.replace("capture: {method: direct}", "capture: {method: manual-summary}")
+            path.write_text(text, encoding="utf-8")
+            self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            direct = text.replace("capture: {method: manual-summary}", "capture: {method: direct}")
+            direct = direct.replace("class: manual-summary", "class: partial")
+            direct = direct.replace("losses: [timing]", "losses: []")
+            path.write_text(direct, encoding="utf-8")
+            self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            text = text.replace("capture: {method: manual-summary}",
+                "capture: {method: manual-summary, converter: {identity: tool-1, version: '1'}}")
+            path.write_text(text, encoding="utf-8")
+            self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            converted = text.replace("method: manual-summary", "method: converted")
+            converted = converted.replace("class: manual-summary", "class: partial")
+            converted = converted.replace("losses: [timing]", "losses: [timing, wording]")
+            converted = converted.replace("method: converted, converter: {identity: tool-1, version: '1'}", "method: converted")
+            path.write_text(converted, encoding="utf-8")
+            self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            converted = converted.replace("capture: {method: converted}",
+                "capture: {method: converted, converter: {identity: tool-1, version: '1'}}")
+            path.write_text(converted, encoding="utf-8")
+            self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            blocked = text.replace("method: manual-summary", "method: blocked")
+            path.write_text(blocked, encoding="utf-8")
+            self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+            for bad in ("identity: true", "version: 'bad value'"):
+                malformed = text.replace("identity: tool-1, version: '1'", bad)
+                path.write_text(malformed, encoding="utf-8")
+                valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt"])
+                self.assertFalse(valid)
+                self.assertTrue(errors)
+
     def test_bounded_path_iterable_stops_at_limit_plus_one(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
