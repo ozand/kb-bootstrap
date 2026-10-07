@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 from typing import Dict, List, Tuple
 
 from .project_lesson_enablement import ARTIFACTS, inspect_project_lessons
+from .qmd_names import is_valid_generated_collection_name, project_slug
 
 
 QMD_PATHS = ("qmd.json", "qmd/collections/wiki.yaml", "qmd/collections/raw.yaml")
@@ -23,9 +24,6 @@ TARGET_MARKERS = (
 _REPARSE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
-def _slug(name):
-    value = "".join(c.lower() if c.isalnum() or c in "._-" else "-" for c in name)
-    return value.strip("-._") or "project"
 
 
 def _text_payload(text: str) -> bytes:
@@ -42,9 +40,13 @@ def qmd_payloads(layout, project_name):
         "    \"db_path\": \".qmd/vector.db\"\n  },\n"
         "  \"models\": {\n    \"embedding\": \"text-embedding-3-small\"\n  }\n}"
     )
-    wiki = (f"name: {project_name}-wiki\npaths:\n  - ../../kb/\nexclude:\n"
+    wiki_name = f"{project_name}-wiki"
+    raw_name = f"{project_name}-raw"
+    if not is_valid_generated_collection_name(wiki_name) or not is_valid_generated_collection_name(raw_name):
+        raise ValueError("generated collection name is not portable")
+    wiki = (f"name: {wiki_name}\npaths:\n  - ../../kb/\nexclude:\n"
             "  - \"raw/**\"\n  - \"research/**\"\n  - \"**/.DS_Store\"\n")
-    raw = (f"name: {project_name}-raw\npaths:\n  - ../../kb/raw/\n"
+    raw = (f"name: {raw_name}\npaths:\n  - ../../kb/raw/\n"
            "  - ../../kb/research/\nexclude:\n  - \"**/.DS_Store\"\n")
     return {"qmd.json": _text_payload(config), QMD_PATHS[1]: _text_payload(wiki), QMD_PATHS[2]: _text_payload(raw)}
 
@@ -243,7 +245,7 @@ def preflight(target: Path, package_root: Path, layout: str, lessons_requested: 
     except OSError:
         return "blocked", _receipt(["target unavailable"], "BLOCKED")
     try:
-        expected = qmd_payloads(layout, _slug(raw_target.name))
+        expected = qmd_payloads(layout, project_slug(raw_target.name))
         expected.update(_inventory_files(package_root))
     except (OSError, ValueError):
         return "blocked", _receipt(["trusted package inventory unavailable"], "BLOCKED")
