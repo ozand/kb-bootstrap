@@ -11,6 +11,7 @@ from .canonical_provenance import validate_canonical_provenance
 from .canonical_graph_export import write_canonical_graph
 from .published_bundle_export import write_published_bundle
 from .qmd_validator import validate_qmd_collections
+from .qmd_names import project_slug
 from .qmd_search import search_qmd
 from .local_retrieval import search_local, read_local
 from .qmd_adapter import search_qmd_bounded
@@ -34,14 +35,6 @@ from . import __version__
 def create_dirs(base_path: Path, dirs: list):
     for d in dirs:
         (base_path / d).mkdir(parents=True, exist_ok=True)
-
-
-def project_slug(target: Path) -> str:
-    slug = "".join(
-        character.lower() if character.isalnum() or character in "._-" else "-"
-        for character in target.name
-    ).strip("-._")
-    return slug or "project"
 
 
 def append_gitignore_rules(target: Path) -> None:
@@ -522,7 +515,7 @@ def main():
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
 
-        project_name = project_slug(target)
+        project_name = project_slug(target.name)
 
         if args.type == "umbrella":
             create_dirs(
