@@ -54,7 +54,7 @@ def _tracked_templates():
         cwd=ROOT,
     ).stdout
     return {
-        line.removeprefix("kb_bootstrap/").replace("\\", "/")
+        (line[len("kb_bootstrap/") :] if line.startswith("kb_bootstrap/") else line).replace("\\", "/")
         for line in listing.splitlines()
         if line
     }
@@ -104,14 +104,16 @@ class InstalledDistributionTests(unittest.TestCase):
     def setUpClass(cls):
         if shutil.which("git") is None:
             raise unittest.SkipTest("git is required to enumerate tracked template inputs")
-        build_check = subprocess.run(
-            [sys.executable, "-c", "import build"], cwd=ROOT,
-            capture_output=True, text=True, timeout=10,
-        )
-        if build_check.returncode != 0:
+        import importlib.util
+
+        if importlib.util.find_spec("build") is None:
             raise unittest.SkipTest(
                 "optional test tool 'build' is unavailable; install the project build tooling to run distribution tests"
             )
+        try:
+            importlib.import_module("build")
+        except Exception as exc:
+            raise RuntimeError("build module is discoverable but cannot be imported") from exc
         cls.expected_templates = _tracked_templates()
         cls.temp_context = tempfile.TemporaryDirectory()
         cls.temp_root = Path(cls.temp_context.name)
@@ -131,6 +133,18 @@ class InstalledDistributionTests(unittest.TestCase):
     def tearDownClass(cls):
         if hasattr(cls, "temp_context"):
             cls.temp_context.cleanup()
+
+    def test_build_tool_preflight_skips_only_when_module_is_absent(self):
+        from unittest.mock import patch
+
+        with patch("importlib.util.find_spec", return_value=None):
+            with self.assertRaises(unittest.SkipTest):
+                InstalledDistributionTests.setUpClass()
+        with patch("importlib.util.find_spec", return_value=object()), patch(
+            "importlib.import_module", side_effect=ImportError("broken build install")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "discoverable but cannot be imported"):
+                InstalledDistributionTests.setUpClass()
 
     def test_wheel_and_sdist_include_tracked_templates_without_build_artifacts(self):
         wheel = next(self.artifacts.glob("*.whl"))
