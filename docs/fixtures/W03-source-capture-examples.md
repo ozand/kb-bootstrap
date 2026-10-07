@@ -10,7 +10,9 @@ Each non-empty fenced payload below denotes exactly its UTF-8 content between th
 fence lines, including the single LF after the visible text. Digests were computed
 over those literal bytes, not over the Markdown fences or labels.
 
-`shared.txt` (also used by two distinct origins):
+`shared.txt` (the literal six-byte payload `alpha` plus LF; it is also used by two
+distinct origins and once duplicated at `letter-a/shared-copy.txt`; those three
+paths have identical SHA-256):
 
 ```text
 alpha

@@ -8,7 +8,7 @@
 
 ## Context
 
-Post-acceptance review of ADR-023 identified two ambiguities before validator implementation: source-level `exact` permits multiple representations but does not define the digest comparison quantifier; the zero-byte fixture uses `application/octet-stream` while v1 is scoped to supplied Markdown/text. See review comments on PR #172 and owner decision request in Issue #124. No validator is implemented.
+Post-acceptance review of ADR-023 identified two ambiguities before validator implementation: source-level `exact` permits multiple representations but does not define the digest comparison quantifier; the zero-byte fixture uses `application/octet-stream` while v1 is scoped to supplied Markdown/text. The owner-accepted ADR-023 superseded the earlier Proposed W03/PR #142 design, but these two points require a follow-on decision. See review comments on PR #172 and owner decision request in Issue #124. No validator is implemented.
 
 ### Problem statement
 
