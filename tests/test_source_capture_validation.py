@@ -87,6 +87,20 @@ class SourceCaptureValidationTests(unittest.TestCase):
                     self.assertFalse(valid)
                     self.assertTrue(errors)
 
+    def test_malformed_permission_labels_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "record.yaml"
+            text = path.read_text(encoding="utf-8").replace(
+                "  original_retention: retained",
+                "  permissions: {access: true, retention: owner, redistribution: unknown}\n"
+                "  original_retention: retained")
+            path.write_text(text, encoding="utf-8")
+            valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt"])
+            self.assertFalse(valid)
+            self.assertIn("permission labels", errors[0])
+
     def test_blocked_record_and_malformed_path_are_checked_without_fetch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -188,8 +188,9 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
                             manifest_path: str | Path | None = None) -> Tuple[bool, Tuple[str, ...]]:
     """Validate supplied metadata and exactly the caller-selected raw members.
 
-    This private-core validator never discovers members or dereferences origins.
-    It returns category-only errors and never mutates source files.
+    Metadata and optional manifest paths are project-relative. ``corpus_root``
+    is a project-relative ADR-010 corpus directory; each selected/raw member path
+    is relative to that corpus. No tree discovery or origin dereference occurs.
     """
     if not isinstance(metadata_path, (str, Path)) or not isinstance(project_root, (str, Path)) or not isinstance(corpus_root, (str, Path)):
         return _bad("metadata, project, and corpus paths are invalid")
@@ -230,7 +231,7 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
         return _bad("source count is invalid or exceeds limit")
     try:
         requested = list(selected_paths)
-    except TypeError:
+    except (TypeError, ValueError):
         return _bad("selected paths are invalid")
     if any(not isinstance(path, str) or not _safe_relative(path) for path in requested):
         return _bad("selected path is unsafe")
@@ -302,11 +303,13 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
         original_digest = _digest_record(original, original=True)
         if (not isinstance(original, dict)
                 or set(original) - {"algorithm", "digest", "media_type", "language", "observed_at", "opaque"}
-                or (original_digest is None and not isinstance(original.get("opaque"), str))
+                or (original_digest is None and (not isinstance(original.get("opaque"), str) or not original["opaque"]))
                 or (original_digest is not None and "opaque" in original)):
             return _bad("original revision is invalid")
         if "observed_at" in original and not _timestamp(original["observed_at"]):
             return _bad("original observation time is invalid")
+        if "opaque" in original and not (original["opaque"] == "unknown" or (isinstance(original["opaque"], str) and OPAQUE.fullmatch(original["opaque"]))):
+            return _bad("opaque original revision is invalid")
         if "media_type" in original and (not isinstance(original["media_type"], str) or not original["media_type"]):
             return _bad("original media type is invalid")
         retention = source.get("original_retention")
