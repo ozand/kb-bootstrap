@@ -12,7 +12,7 @@ Owner acceptance: #133 comment 6038730839 (2026-10-07).
 
 Synthetic reproduction on current `main` shows `project_slug()` preserves Unicode alphanumerics, while `qmd_validator.py` accepts ASCII-only collection names. Initializing basenames `Пример проекта` and `équipe` succeeds but produces collections rejected by the repository validator. Distinct basenames `A B` and `A@B` both normalize to `a-b`; punctuation-only `!!!` maps to `project`. These are source/validator observations from fresh synthetic targets, not QMD runtime behavior. The repeat guard independently generates expected QMD payloads; ADR-016 requires a conflicting repeat to block without repair or normalization. ADR-018 bounds adapter index/collection names to ASCII letters/digits/underscore/hyphen, 1–64 characters.
 
-This proposal intentionally does not preserve every legacy ASCII result: uppercase, punctuation-containing and otherwise lossy basenames will receive digests on a fresh initialization. Only already-lowercase ASCII basenames that need no normalization retain their previous generated base exactly. Existing initialized directories are not rewritten by this decision.
+This decision intentionally does not preserve every legacy ASCII result: uppercase, punctuation-containing and otherwise lossy basenames receive digests on a fresh initialization. Only already-lowercase ASCII basenames that need no normalization retain their previous generated base exactly. Existing initialized directories are not rewritten by this decision.
 
 ### Problem statement
 
@@ -20,7 +20,7 @@ Initialization should emit QMD identifiers accepted by local validation and ADR-
 
 ## Decision
 
-This proposal chooses deterministic ASCII-compatible generated identifiers, with a digest when normalization is lossy or exceeds the portable prefix bound.
+This decision chooses deterministic ASCII-compatible generated identifiers, with a digest when normalization is lossy or exceeds the portable prefix bound.
 
 ### What this IS
 
@@ -35,7 +35,7 @@ This accepted decision authorizes only fresh generator outputs and matching gene
 
 ### Success criteria
 
-Cyrillic/accented, uppercase, punctuation-only, empty-normalized and overlength basenames deterministically produce validator-valid bounded names; already-simple lowercase ASCII names remain byte-compatible. `A B` and `A@B` do not collapse to the same generated name under this rule, subject to the proposed residual 48-bit digest collision risk pending owner approval. Repeat preflight never rewrites existing names.
+Cyrillic/accented, uppercase, punctuation-only, empty-normalized and overlength basenames deterministically produce validator-valid bounded names; already-simple lowercase ASCII names remain byte-compatible. `A B` and `A@B` do not collapse to the same generated name under this rule, subject to the recorded residual 48-bit digest collision risk; owner acceptance does not make that collision probability zero. Repeat preflight never rewrites existing names.
 
 ## Consequences
 
