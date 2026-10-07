@@ -1,6 +1,6 @@
 # W03 synthetic source and capture examples
 
-**Status:** Illustrative data-only fixtures for the Proposed W03-A design. All
+**Status:** Illustrative data-only fixtures for ADR-023 and proposed ADR-024. All
 origins, bytes, identifiers, timestamps, permission labels, and converter names
 below are synthetic. Nothing is fetched or authorized.
 
@@ -10,7 +10,9 @@ Each non-empty fenced payload below denotes exactly its UTF-8 content between th
 fence lines, including the single LF after the visible text. Digests were computed
 over those literal bytes, not over the Markdown fences or labels.
 
-`shared.txt` (also used by two distinct origins):
+`shared.txt` (the literal six-byte payload `alpha` plus LF; it is also used by two
+distinct origins and once duplicated at `letter-a/shared-copy.txt`; those three
+paths have identical SHA-256):
 
 ```text
 alpha
@@ -55,7 +57,7 @@ ALPHA
 - bytes: `6`
 - SHA-256: `1921b918b15842c7fdb115078e610263fac85f159c1d8e0ecec3d89a0faa4005`
 
-`empty.bin` contains zero bytes (there is deliberately no payload fence whose
+`empty.txt` is an empty UTF-8 text representation containing zero bytes (there is deliberately no payload fence whose
 Markdown newline could be mistaken for content):
 
 - bytes: `0`
@@ -89,6 +91,11 @@ sources:
     raw_path: letter-a/shared.txt
     retention: retained
     coordinates: {local: {unit: unicode-code-point, range: [0, 5]}, original: {unit: line, range: [1, 2]}}
+  - representation_id: direct-v1-copy
+    revision: {algorithm: sha256, digest: b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060}
+    media_type: text/plain
+    raw_path: letter-a/shared-copy.txt
+    retention: retained
   permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: unknown}
 - source_id: synthetic:letter-b
   origin: {kind: bundle-relative, reference: supplied/letter-b.txt}
@@ -140,16 +147,16 @@ sources:
   representations: []
   permissions: {access: unknown, retention: none, redistribution: unknown}
 - source_id: synthetic:empty-control
-  origin: {kind: bundle-relative, reference: supplied/empty.bin}
-  original_revision: {algorithm: sha256, digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, media_type: application/octet-stream}
+  origin: {kind: bundle-relative, reference: supplied/empty.txt}
+  original_revision: {algorithm: sha256, digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, media_type: text/plain}
   original_retention: retained
   capture: {method: direct}
   fidelity: {class: unknown, coverage: unknown, losses: []}
   representations:
   - representation_id: empty-direct-v1
     revision: {algorithm: sha256, digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
-    media_type: application/octet-stream
-    raw_path: empty/empty.bin
+    media_type: text/plain
+    raw_path: empty/empty.txt
     retention: retained
     coordinates: {local: {unit: byte, range: [0, 0]}, original: unknown}
   permissions: {access: owner-approved-local, retention: retained-by-owner, redistribution: unknown}
@@ -191,6 +198,8 @@ relabels the baseline, changes permissions, or implies deletion/refetch.
 7. The envelope and every source use the proposal's single nested shape; missing
    `representations`, `capture`, or `fidelity` is invalid.
 8. `representations: []` is used only for the blocked record; unknown fidelity has
-   one retained representation. Exact rows have a known matching original digest;
-   partial/manual-summary rows declare at least one loss; line coordinates start
-   at one while byte/code-point coordinates start at zero.
+   one retained representation. The `letter-a` exact record has two representations,
+   both matching its known original digest; partial/manual-summary rows declare at
+   least one loss; line coordinates start at one while byte/code-point coordinates
+   start at zero.
+9. The zero-byte control is UTF-8 text (`text/plain`), not arbitrary binary.
