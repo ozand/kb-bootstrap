@@ -160,7 +160,7 @@ representation identity/revision. Original coordinates remain separate and
 unknown where unavailable. `letter-b` and the zero-byte control intentionally
 omit `captured_at`; no time is implied. The blocked `[]` means known-no-output,
 whereas the zero-byte control has one retained representation and `[0, 0)` range.
-Its `class: unknown` does not infer exact fidelity from matching digests.
+Its `class: unknown` records an attempted capture with one retained representation; it requires explicit representation presence and does not infer exact fidelity from matching digests.
 
 ### Changed original versus changed conversion
 
@@ -190,3 +190,7 @@ relabels the baseline, changes permissions, or implies deletion/refetch.
    coordinates, and permission labels remain independent of every revision.
 7. The envelope and every source use the proposal's single nested shape; missing
    `representations`, `capture`, or `fidelity` is invalid.
+8. `representations: []` is used only for the blocked record; unknown fidelity has
+   one retained representation. Exact rows have a known matching original digest;
+   partial/manual-summary rows declare at least one loss; line coordinates start
+   at one while byte/code-point coordinates start at zero.
