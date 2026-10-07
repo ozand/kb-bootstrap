@@ -61,6 +61,74 @@ class SourceCaptureValidationTests(unittest.TestCase):
             self.assertFalse(valid)
             self.assertIn("every exact representation", errors[0])
 
+    def test_reviewer_malformed_origin_reason_urls_and_original_revision_block(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "record.yaml"
+            original = path.read_text(encoding="utf-8")
+            bad_records = (
+                original.replace("reference: SRC-1", "reference: http://host:abc/x"),
+                original.replace("reference: SRC-1", "reference: http://a b/x"),
+                original.replace("reference: SRC-1", "reference: https://exa mple.com/"),
+                original.replace("method: direct", "method: blocked, reason: []"),
+                original.replace("algorithm: sha256, digest:", "algorithm: invalid, digest:"),
+            )
+            for malformed in bad_records:
+                with self.subTest(record=malformed[:80]):
+                    path.write_text(malformed, encoding="utf-8")
+                    valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt"])
+                    self.assertFalse(valid)
+                    self.assertTrue(errors)
+
+    def test_bounded_path_iterable_stops_at_limit_plus_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            observed = []
+            def paths():
+                for index in range(100_010):
+                    observed.append(index)
+                    yield f"missing-{index}.txt"
+            valid, errors = validate_source_capture("record.yaml", root, "raw", paths())
+            self.assertFalse(valid)
+            self.assertIn("count exceeds limit", errors[0])
+            self.assertEqual(len(observed), 100_001)
+
+    def test_nonretained_coordinate_shape_is_still_validated_without_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "record.yaml"
+            text = path.read_text(encoding="utf-8").replace(
+                "retention: retained", "retention: reference-only").replace(
+                "raw_path: note.txt", "raw_path: missing.txt").replace(
+                "    revision: {algorithm:", "    coordinates: {local: {unit: byte, range: [true, 2]}}\n    revision: {algorithm:")
+            path.write_text(text, encoding="utf-8")
+            valid, errors = validate_source_capture("record.yaml", root, "raw", [])
+            self.assertFalse(valid)
+            self.assertIn("coordinate", errors[0])
+
+    def test_deep_manifest_is_rejected_without_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            (root / "manifest.json").write_text("[" * 2000 + "0" + "]" * 2000, encoding="utf-8")
+            valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt"], "manifest.json")
+            self.assertFalse(valid)
+            self.assertTrue(errors)
+
+    def test_no_tree_enumeration_occurs(self):
+        from unittest.mock import patch
+        import os
+        import kb_bootstrap.source_capture_validation as validator
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            with patch.object(os, "scandir", side_effect=AssertionError("tree enumeration")), \
+                 patch.object(os, "listdir", side_effect=AssertionError("tree enumeration")):
+                self.assertTrue(validate_source_capture("record.yaml", root, "raw", ["note.txt"])[0])
+
     def test_malformed_scalar_fields_do_not_raise(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

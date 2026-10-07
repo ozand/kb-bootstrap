@@ -117,8 +117,11 @@ def _origin(value: Any) -> bool:
         from urllib.parse import urlsplit
         try:
             parts = urlsplit(reference)
+            host = parts.hostname
             return (set(value) == {"kind", "reference"} and parts.scheme.lower() in {"http", "https"}
-                    and bool(parts.hostname) and parts.username is None and parts.password is None
+                    and bool(host) and not any(char.isspace() for char in host)
+                    and parts.username is None and parts.password is None
+                    and (parts.port is None or 1 <= parts.port <= 65535)
                     and not parts.query and not parts.fragment)
         except ValueError:
             return False
@@ -230,11 +233,15 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
     if not isinstance(sources, list) or len(sources) > MAX_SOURCES:
         return _bad("source count is invalid or exceeds limit")
     try:
-        requested = list(selected_paths)
+        requested = []
+        for path in selected_paths:
+            if len(requested) >= MAX_SOURCES * MAX_REPRESENTATIONS:
+                return _bad("selected path count exceeds limit")
+            if not isinstance(path, str) or not _safe_relative(path):
+                return _bad("selected path is unsafe")
+            requested.append(path)
     except (TypeError, ValueError):
         return _bad("selected paths are invalid")
-    if any(not isinstance(path, str) or not _safe_relative(path) for path in requested):
-        return _bad("selected path is unsafe")
     if len(requested) > MAX_SOURCES * MAX_REPRESENTATIONS:
         return _bad("selected path count exceeds limit")
     if len({path.casefold() for path in requested}) != len(requested):
@@ -265,7 +272,7 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
             return _bad("manifest " + error)
         try:
             manifest = json.loads(raw_manifest.decode("utf-8"), object_pairs_hook=_json_pairs)
-        except (UnicodeError, ValueError, json.JSONDecodeError):
+        except (UnicodeError, ValueError, json.JSONDecodeError, RecursionError):
             return _bad("manifest is invalid")
         if not _manifest_matches(manifest, selected, corpus_path.as_posix()):
             return _bad("manifest does not match selected paths and digests")
@@ -304,7 +311,7 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
         if (not isinstance(original, dict)
                 or set(original) - {"algorithm", "digest", "media_type", "language", "observed_at", "opaque"}
                 or (original_digest is None and (not isinstance(original.get("opaque"), str) or not original["opaque"]))
-                or (original_digest is not None and "opaque" in original)):
+                or ("opaque" in original and set(original) - {"opaque", "media_type", "language", "observed_at"})):
             return _bad("original revision is invalid")
         if "observed_at" in original and not _timestamp(original["observed_at"]):
             return _bad("original observation time is invalid")
@@ -331,7 +338,9 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
         if len(reps) > MAX_REPRESENTATIONS:
             return _bad("representation count exceeds limit")
         if cls == "blocked":
-            if (method != "blocked" or reps or capture.get("reason") not in {"origin-unavailable", "access-not-provided", "conversion-failed", "unsupported-input"}
+            reason = capture.get("reason")
+            if (method != "blocked" or reps or not isinstance(reason, str)
+                    or reason not in {"origin-unavailable", "access-not-provided", "conversion-failed", "unsupported-input"}
                     or set(capture) - {"method", "reason"}):
                 return _bad("blocked capture is inconsistent")
         elif method == "blocked" or not reps:
@@ -406,6 +415,8 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
                 coords = rep["coordinates"]
                 if not isinstance(coords, dict) or set(coords) - {"local", "original"}:
                     return _bad("coordinates are invalid")
+                if "local" in coords and not _coordinate(coords["local"], selected.get(path)):
+                    return _bad("local coordinate is invalid")
                 if "original" in coords and not _coordinate(coords["original"], None):
                     return _bad("original coordinate is invalid")
         if cls == "exact" and any(
