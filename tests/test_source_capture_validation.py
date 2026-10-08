@@ -328,7 +328,6 @@ class CompleteW03EnvelopeTests(unittest.TestCase):
         return record
 
     def test_complete_w03_envelope_validates_bytes_manifest_and_immutability(self):
-        from kb_bootstrap.raw_manifest import _scan
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             record = self.load_complete_record(root)
@@ -346,7 +345,17 @@ class CompleteW03EnvelopeTests(unittest.TestCase):
             self.assertNotEqual(record["sources"][0]["source_id"], record["sources"][1]["source_id"])
             files = [root / "records" / "complete.yaml", *[raw / item for item in paths]]
             before = {item.relative_to(root).as_posix(): item.read_bytes() for item in files}
-            (root / "manifest.json").write_text(json.dumps({"schema": "kb-bootstrap.raw-manifest", "version": 1, "corpus": "raw", "algorithm": "sha256", "files": [{"path": k, "sha256": v} for k, v in _scan(raw).items()]}), encoding="utf-8")
+            manifest_files = [
+                {"path": item, "sha256": hashlib.sha256((raw / item).read_bytes()).hexdigest()}
+                for item in sorted(self.PAYLOADS)
+            ]
+            (root / "manifest.json").write_text(json.dumps({
+                "schema": "kb-bootstrap.raw-manifest",
+                "version": 1,
+                "corpus": "raw",
+                "algorithm": "sha256",
+                "files": manifest_files,
+            }), encoding="utf-8")
             expected = (True, ())
             self.assertEqual(validate_source_capture("records/complete.yaml", root, "raw", paths, "manifest.json"), expected)
             self.assertEqual(validate_source_capture("records/complete.yaml", root, "raw", paths, "manifest.json"), expected)
