@@ -414,25 +414,23 @@ class CompleteW03EnvelopeTests(unittest.TestCase):
             self.assertEqual(old_raw.read_bytes(), old_bytes)
             self.assertEqual(old_path.read_bytes(), old_metadata_bytes)
 
-            bad = deepcopy(new_record)
-            bad["sources"][0]["representations"][0]["revision"]["digest"] = hashlib.sha256(b"stale bytes\n").hexdigest()
-            bad_path = root / "records" / "bad.yaml"
-            bad_path.write_text(yaml.safe_dump(bad, sort_keys=False), encoding="utf-8")
-            invalid, errors = validate_source_capture("records/bad.yaml", root, "raw", ["note-7/partial-v2.txt"])
+            (root / "raw" / "note-7/partial-v2.txt").write_bytes(old_bytes)
+            invalid, errors = validate_source_capture("records/new.yaml", root, "raw", ["note-7/partial-v2.txt"])
             self.assertFalse(invalid)
             self.assertIn("digest", errors[0])
             self.assertEqual(original_digest, source["original_revision"].get("digest"))
 
     def test_study_references_reuse_capture_identity_without_claiming_corroboration(self):
-        record = self.load_complete_record(Path(tempfile.mkdtemp()))
-        source = record["sources"][0]
-        capture_identity = (source["source_id"], source["representations"][0]["representation_id"],
-                            source["representations"][0]["revision"]["digest"])
-        studies = [
-            {"study_id": "study-a", "source_ref": capture_identity},
-            {"study_id": "study-b", "source_ref": capture_identity},
-        ]
-        self.assertEqual(studies[0]["source_ref"], studies[1]["source_ref"])
-        self.assertEqual(studies[0]["source_ref"][0], source["source_id"])
-        self.assertNotIn("corroboration_count", studies[0])
-        self.assertNotIn("corroboration_count", studies[1])
+        with tempfile.TemporaryDirectory() as directory:
+            record = self.load_complete_record(Path(directory))
+            source = record["sources"][0]
+            capture_identity = (source["source_id"], source["representations"][0]["representation_id"],
+                                source["representations"][0]["revision"]["digest"])
+            studies = [
+                {"study_id": "study-a", "source_ref": capture_identity},
+                {"study_id": "study-b", "source_ref": capture_identity},
+            ]
+            self.assertEqual(studies[0]["source_ref"], studies[1]["source_ref"])
+            self.assertEqual(studies[0]["source_ref"][0], source["source_id"])
+            self.assertNotIn("corroboration_count", studies[0])
+            self.assertNotIn("corroboration_count", studies[1])
