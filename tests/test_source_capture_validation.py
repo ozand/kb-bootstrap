@@ -373,3 +373,64 @@ class CompleteW03EnvelopeTests(unittest.TestCase):
             valid, errors = validate_source_capture("records/complete.yaml", root, "raw", list(self.PAYLOADS))
             self.assertFalse(valid)
             self.assertIn("every exact representation", errors[0])
+
+    def test_capture_revision_update_keeps_original_and_prior_capture_unchanged(self):
+        from copy import deepcopy
+        import yaml
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete = self.load_complete_record(root)
+            source = deepcopy(complete["sources"][2])
+            old_bytes = self.PAYLOADS["note-7/partial.txt"]
+            old_digest = hashlib.sha256(old_bytes).hexdigest()
+            old_record = {"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [source]}
+            old_path = root / "records" / "old.yaml"
+            old_yaml = yaml.safe_dump(old_record, sort_keys=False)
+            old_path.write_text(old_yaml, encoding="utf-8")
+            old_metadata_bytes = old_path.read_bytes()
+            old_raw = root / "raw" / "note-7/partial.txt"
+            old_raw.write_bytes(old_bytes)
+            self.assertTrue(validate_source_capture("records/old.yaml", root, "raw", ["note-7/partial.txt"])[0])
+
+            updated = deepcopy(source)
+            new_bytes = b"SECOND PARAGRAPH\n"
+            new_digest = hashlib.sha256(new_bytes).hexdigest()
+            updated["representations"][0]["raw_path"] = "note-7/partial-v2.txt"
+            updated["representations"][0]["revision"]["digest"] = new_digest
+            updated["capture"]["captured_at"] = "2026-03-04T05:06:07Z"
+            updated["capture"]["converter"]["version"] = "2"
+            updated["fidelity"]["losses"] = ["paragraphs-1-and-3-omitted", "case-normalized"]
+            new_record = {"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [updated]}
+            new_path = root / "records" / "new.yaml"
+            new_path.write_text(yaml.safe_dump(new_record, sort_keys=False), encoding="utf-8")
+            (root / "raw" / "note-7/partial-v2.txt").write_bytes(new_bytes)
+
+            original_digest = source["original_revision"].get("digest")
+            self.assertEqual(updated["source_id"], source["source_id"])
+            self.assertEqual(updated["original_revision"], source["original_revision"])
+            self.assertNotEqual(updated["representations"][0]["revision"]["digest"], old_digest)
+            self.assertTrue(validate_source_capture("records/old.yaml", root, "raw", ["note-7/partial.txt"])[0])
+            self.assertTrue(validate_source_capture("records/new.yaml", root, "raw", ["note-7/partial-v2.txt"])[0])
+            self.assertEqual(old_raw.read_bytes(), old_bytes)
+            self.assertEqual(old_path.read_bytes(), old_metadata_bytes)
+
+            (root / "raw" / "note-7/partial-v2.txt").write_bytes(old_bytes)
+            invalid, errors = validate_source_capture("records/new.yaml", root, "raw", ["note-7/partial-v2.txt"])
+            self.assertFalse(invalid)
+            self.assertIn("digest", errors[0])
+            self.assertEqual(original_digest, source["original_revision"].get("digest"))
+
+    def test_study_references_reuse_capture_identity_without_claiming_corroboration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            record = self.load_complete_record(Path(directory))
+            source = record["sources"][0]
+            capture_identity = (source["source_id"], source["representations"][0]["representation_id"],
+                                source["representations"][0]["revision"]["digest"])
+            studies = [
+                {"study_id": "study-a", "source_ref": capture_identity},
+                {"study_id": "study-b", "source_ref": capture_identity},
+            ]
+            self.assertEqual(studies[0]["source_ref"], studies[1]["source_ref"])
+            self.assertEqual(studies[0]["source_ref"][0], source["source_id"])
+            self.assertNotIn("corroboration_count", studies[0])
+            self.assertNotIn("corroboration_count", studies[1])
