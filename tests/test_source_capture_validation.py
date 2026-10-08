@@ -59,7 +59,7 @@ class SourceCaptureValidationTests(unittest.TestCase):
             path.write_text(text, encoding="utf-8")
             valid, errors = validate_source_capture("record.yaml", root, "raw", ["note.txt", "copy.txt"])
             self.assertFalse(valid)
-            self.assertIn("every exact representation", errors[0])
+            self.assertIn("every exact representation must match original digest", errors[0])
 
     def test_reviewer_malformed_origin_reason_urls_and_original_revision_block(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -298,3 +298,69 @@ class SourceCaptureValidationTests(unittest.TestCase):
             manifest["files"][0]["sha256"] = "0" * 64
             (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             self.assertFalse(validate_source_capture("record.yaml", root, "raw", ["note.txt"], "manifest.json")[0])
+
+
+class CompleteW03EnvelopeTests(unittest.TestCase):
+    PAYLOADS = {
+        "letter-a/shared.txt": b"alpha\n",
+        "letter-a/shared-copy.txt": b"alpha\n",
+        "letter-b/shared.txt": b"alpha\n",
+        "note-7/partial.txt": b"second paragraph\n",
+        "briefing/summary.md": b"Operator summary.\n",
+        "empty/empty.txt": b"",
+    }
+
+    def load_complete_record(self, root):
+        import re
+        import yaml
+        examples = Path(__file__).parents[1] / "docs" / "fixtures" / "W03-source-capture-examples.md"
+        text = examples.read_text(encoding="utf-8")
+        match = re.search(r"### Complete proposed instance\s+```yaml\n(.*?)\n```", text, re.S)
+        self.assertIsNotNone(match, "complete W03 envelope fixture is present")
+        record = yaml.safe_load(match.group(1))
+        (root / "records").mkdir()
+        (root / "raw").mkdir()
+        (root / "records" / "complete.yaml").write_text(match.group(1) + "\n", encoding="utf-8")
+        for relative, payload in self.PAYLOADS.items():
+            target = root / "raw" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(payload)
+        return record
+
+    def test_complete_w03_envelope_validates_bytes_manifest_and_immutability(self):
+        from kb_bootstrap.raw_manifest import _scan
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = self.load_complete_record(root)
+            raw = root / "raw"
+            paths = [rep["raw_path"] for source in record["sources"]
+                     for rep in source["representations"] if rep["retention"] == "retained"]
+            self.assertEqual((len(record["sources"]), sum(len(x["representations"]) for x in record["sources"])), (6, 6))
+            self.assertEqual(len(paths), 6)
+            for source in record["sources"]:
+                for rep in source["representations"]:
+                    data = (raw / rep["raw_path"]).read_bytes()
+                    self.assertEqual(hashlib.sha256(data).hexdigest(), rep["revision"]["digest"])
+            self.assertEqual((raw / "letter-a/shared.txt").read_bytes(), (raw / "letter-a/shared-copy.txt").read_bytes())
+            self.assertEqual((raw / "letter-a/shared.txt").read_bytes(), (raw / "letter-b/shared.txt").read_bytes())
+            self.assertNotEqual(record["sources"][0]["source_id"], record["sources"][1]["source_id"])
+            files = [root / "records" / "complete.yaml", *[raw / item for item in paths]]
+            before = {item.relative_to(root).as_posix(): item.read_bytes() for item in files}
+            (root / "manifest.json").write_text(json.dumps({"schema": "kb-bootstrap.raw-manifest", "version": 1, "corpus": "raw", "algorithm": "sha256", "files": [{"path": k, "sha256": v} for k, v in _scan(raw).items()]}), encoding="utf-8")
+            expected = (True, ())
+            self.assertEqual(validate_source_capture("records/complete.yaml", root, "raw", paths, "manifest.json"), expected)
+            self.assertEqual(validate_source_capture("records/complete.yaml", root, "raw", paths, "manifest.json"), expected)
+            self.assertEqual(before, {item.relative_to(root).as_posix(): item.read_bytes() for item in files})
+
+    def test_complete_envelope_rejects_mixed_exact_representation(self):
+        import yaml
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = self.load_complete_record(root)
+            changed_bytes = b"not alpha\n"
+            record["sources"][0]["representations"][1]["revision"]["digest"] = hashlib.sha256(changed_bytes).hexdigest()
+            (root / "raw" / record["sources"][0]["representations"][1]["raw_path"]).write_bytes(changed_bytes)
+            (root / "records" / "complete.yaml").write_text(yaml.safe_dump(record, sort_keys=False), encoding="utf-8")
+            valid, errors = validate_source_capture("records/complete.yaml", root, "raw", list(self.PAYLOADS))
+            self.assertFalse(valid)
+            self.assertIn("every exact representation", errors[0])
