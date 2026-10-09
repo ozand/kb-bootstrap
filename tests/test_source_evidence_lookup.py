@@ -142,6 +142,18 @@ class SourceEvidenceLookupTests(unittest.TestCase):
         self.assertEqual(missing_member["status"], "BLOCKED")
         self.assertEqual(self._lookup("source-unavailable", ["a.txt", "a-copy.txt", "partial.txt", "summary.md"])["origin_reason"], "source-unavailable")
 
+    def test_malformed_bounded_yaml_blocks_without_unpacking_error(self):
+        from kb_bootstrap.source_capture_validation import validate_source_capture
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "raw").mkdir()
+            metadata = root / "record.yaml"
+            metadata.write_text("schema: kb-bootstrap.source-capture\\nversion: 1\\nsources: &a []\\ncopy: *a\\n", encoding="utf-8")
+            public_result = validate_source_capture("record.yaml", root, "raw", [])
+            self.assertFalse(public_result[0])
+            lookup_result = lookup_source_evidence(root, "record.yaml", "raw", "source-a", [])
+            self.assertEqual(lookup_result["status"], "BLOCKED")
+
     def test_no_tree_discovery_or_mutation(self):
         before = {path.relative_to(self.root).as_posix(): path.read_bytes() for path in [self.metadata, *[self.raw / name for name in self.payloads]]}
         with patch("os.scandir", side_effect=AssertionError("tree discovery")), patch("os.listdir", side_effect=AssertionError("tree discovery")):

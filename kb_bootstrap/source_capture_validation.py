@@ -233,7 +233,7 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
         return False, ("metadata is not valid UTF-8",), None
     event_error = _events(text)
     if event_error:
-        return _bad(event_error)
+        return False, (event_error,), None
     try:
         record = yaml.load(text, Loader=_UniqueLoader)
     except (yaml.YAMLError, ValueError):
