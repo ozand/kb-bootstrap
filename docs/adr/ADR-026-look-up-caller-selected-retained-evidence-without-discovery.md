@@ -1,10 +1,12 @@
 # ADR-026: Look up caller-selected retained evidence without discovery
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-09
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #124; ADR-010, ADR-022, ADR-024, ADR-025
+
+Owner acceptance: Issue #124, comment 6074593249 (2026-10-09), scoped to reviewed implementation contract at `7591abdb6f593a1e53ab4ffad9241b0944c4f9bd`; no implementation is authorized by this status change.
 
 ## Context
 

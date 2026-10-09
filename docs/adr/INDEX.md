@@ -27,4 +27,4 @@
 | ADR-023 | Bound source-capture records to explicit byte representations | Superseded by ADR-024 |
 | ADR-024 | Require every exact representation to match the original | Accepted |
 | ADR-025 | Publish a source capture as one exclusive archive | Proposed |
-| ADR-026 | Look up caller-selected retained evidence without discovery | Proposed |
+| ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
