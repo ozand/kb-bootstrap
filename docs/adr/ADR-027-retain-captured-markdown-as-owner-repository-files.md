@@ -1,10 +1,12 @@
 # ADR-027: Retain captured Markdown as owner-repository files
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-10
 **Authors**: Pi coding agent
-**Supersedes**: ADR-025 (only if this ADR is accepted)
+**Supersedes**: ADR-025
 **Related**: Issue #124; Issue #125; ADR-010, ADR-022, ADR-024, ADR-025, ADR-026
+
+Owner acceptance: Issue #124, comment 6093586248 (2026-10-10), for reviewed contract at `34735b5ac697f99d009fac3772991aab37c23db8`.
 
 ## Context
 
@@ -16,7 +18,7 @@ A capture retained for repository use must remain an ordinary readable Markdown 
 
 ## Decision
 
-If accepted, repository capture retention prepares an explicit selected set of existing repository capture files and then uses the ordinary reviewable Git workflow to make exactly that set tracked in the owning repository. It adds no new copier or metadata format.
+Repository capture retention prepares an explicit selected set of existing repository capture files and then uses the ordinary reviewable Git workflow to make exactly that set tracked in the owning repository. It adds no new copier or metadata format.
 
 ### What this IS
 
@@ -28,7 +30,7 @@ If accepted, repository capture retention prepares an explicit selected set of e
 
 ### What this IS NOT
 
-This is not a ZIP/archive output or reader, generic importer, external acquisition or conversion engine, global source registry, automatic `git add`/commit/push, automatic publication to a consumer repository, source renumbering, overwrite/repair, copier, or transaction across multiple files. It does not claim an untracked working-tree file is repository-retained. It does not alter ADR-010 manifest v1, ADR-024 source-capture metadata, or ADR-025's accepted historical text. If accepted, ADR-025 becomes superseded; its archive implementation is not authorized by this decision.
+This is not a ZIP/archive output or reader, generic importer, external acquisition or conversion engine, global source registry, automatic `git add`/commit/push, automatic publication to a consumer repository, source renumbering, overwrite/repair, copier, or transaction across multiple files. It does not claim an untracked working-tree file is repository-retained. It does not alter ADR-010 manifest v1, ADR-024 source-capture metadata, or ADR-025's accepted historical text. ADR-025 is superseded by this decision. Its archive implementation is not authorized.
 
 ### Success criteria
 
@@ -68,7 +70,7 @@ ADR-010 remains a read-only exact-byte inventory. ADR-024 remains the source/cap
 
 ## Rollback
 
-Before acceptance, withdraw this proposal and retain ADR-025 unchanged. If accepted, ADR-025 is marked `Superseded by ADR-027` without changing its normative body. Any implementation must preserve already-created capture files on rollback; no consumer files, commits, or remote branches are automatically deleted or rewritten.
+ADR-025 is marked `Superseded by ADR-027` without changing its normative body. Any implementation must preserve already-created capture files on rollback; no consumer files, commits, or remote branches are automatically deleted or rewritten.
 
 ## References
 
