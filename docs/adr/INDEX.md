@@ -28,3 +28,4 @@
 | ADR-024 | Require every exact representation to match the original | Accepted |
 | ADR-025 | Publish a source capture as one exclusive archive | Accepted |
 | ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
+| ADR-027 | Retain captured Markdown as owner-repository files | Proposed |
