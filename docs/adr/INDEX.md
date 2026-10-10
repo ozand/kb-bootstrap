@@ -26,5 +26,6 @@
 | ADR-022 | Require explicit scoped operator authority for external actions | Accepted |
 | ADR-023 | Bound source-capture records to explicit byte representations | Superseded by ADR-024 |
 | ADR-024 | Require every exact representation to match the original | Accepted |
-| ADR-025 | Publish a source capture as one exclusive archive | Accepted |
+| ADR-025 | Publish a source capture as one exclusive archive | Superseded by ADR-027 |
 | ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
+| ADR-027 | Retain captured Markdown as owner-repository files | Accepted |

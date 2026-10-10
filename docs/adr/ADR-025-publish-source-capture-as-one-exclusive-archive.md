@@ -1,6 +1,6 @@
 # ADR-025: Publish a source capture as one exclusive archive
 
-**Status**: Accepted
+**Status**: Superseded by ADR-027
 **Date**: 2026-10-09
 **Authors**: Pi coding agent
 **Supersedes**: None
