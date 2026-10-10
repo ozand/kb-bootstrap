@@ -16,34 +16,33 @@ A capture retained for repository use must remain an ordinary readable Markdown 
 
 ## Decision
 
-If accepted, capture publication retains explicitly selected captured Markdown and its required selected attachments as ordinary files under an explicit owner-repository study/raw path. The operation's successful local result is a complete set of new files in the selected working tree plus a sanitized file list suitable for review; Git staging, commit and remote push remain separate, explicit repository workflow actions.
+If accepted, repository capture retention prepares an explicit selected set of existing repository capture files and then uses the ordinary reviewable Git workflow to make exactly that set tracked in the owning repository. It adds no new copier or metadata format.
 
 ### What this IS
 
-1. The caller explicitly selects the owning repository root, existing study directory, accepted capture envelope, and complete set of Markdown/attachment members to retain. The operation does not infer a consumer repository from remotes, discover other studies, fetch origins, or choose an external destination.
-2. Preserve captured Markdown bytes as supplied UTF-8; do not summarize or rewrite them. Keep the accepted ADR-024 envelope/provenance in a deterministic, bounded sidecar for the selected capture set, and preserve the existing `kb/research/<study>/raw/NNN-<slug>.md` relative-reference convention where the selected owner study uses it. Attachments are included only when explicitly selected and referenced by the capture. No format claims that Markdown equals an unavailable external original or proves lossless extraction.
-3. Derive each new output path from an explicit safe study-relative target and selected basename/capture identity. Reject unsafe, duplicate, case-fold-colliding, or already-existing file paths; never overwrite, replace, renumber, or repair prior captures. Preserve every pre-existing target. The caller's selection is the complete publication set; no directory scan is used to silently add files.
-4. Write only new, exclusively created files. Report each successfully created relative path and any blocked/partial outcome honestly. If a later member fails, preserve all pre-existing files and all newly created files from that attempt, report the exact bounded partial set, and require a new explicit reviewed operation to continue. Do not delete prior or partial capture files as automatic rollback and do not claim multi-file atomicity.
-5. A successful local capture operation does not itself stage, commit, push, create a PR, or publish to a consumer repository. A separately authorized normal Git workflow may add exactly the reported selected capture/provenance files to a reviewable commit; unrelated workspace files are not implicitly included. Remote publication remains separately targeted and authorized under ADR-022 and repository contribution policy.
-6. Reuse ADR-024 whole-envelope validation and ADR-010 path constraints for selected data without changing either contract. Preserve ADR-026's distinction between a retained representation and a verified retained original. Owner-authored permission/retention labels are descriptive only and do not authorize publication.
+1. The caller explicitly selects the owning repository root, an existing study directory, and the complete set of already captured `RawCapture` Markdown files to retain. Preserve the established repository form `kb/research/<study>/raw/NNN-<slug>.md` where used. The operation does not infer a consumer repository from remotes, discover other studies, fetch origins, or choose an external destination.
+2. Prepare a bounded sorted list of selected repository-relative paths and exact blob digests from the working tree. Preserve selected Markdown bytes, existing frontmatter and relative references exactly; do not summarize or rewrite. No new sidecar schema is defined. If an accepted ADR-024 envelope is explicitly selected or required for validation, select that existing file explicitly and preserve/validate its original bytes; `RawCapture` frontmatter is not itself treated as an ADR-024 envelope. Do not create an ADR-024 sidecar or metadata reserialization. No format claims that Markdown is a byte-identical unavailable external original or proves lossless extraction.
+3. Existing selected files are preserved byte-for-byte. This ADR defines no copier or output-path allocator. Creating a new capture or attachment is outside this decision and must use an existing separately authorized capture path or a separately accepted no-overwrite rule. Do not scan studies to expand the selected set.
+4. Remote push/PR remains a distinct explicit, exactly targeted operation under ADR-022 and repository contribution policy. The helper does not stage, commit, or push; no consumer repository is inferred or modified.
+5. ADR-024 validation may be applied to an explicitly selected existing envelope when required, but this decision does not rewrite its metadata, create a sidecar, widen its UTF-8-only contract, or copy unsupported media. ADR-026 continues to distinguish retained representation evidence from a verified retained original. Permission/retention labels do not authorize repository delivery.
 
 ### What this IS NOT
 
-This is not a ZIP/archive output or reader, generic importer, external acquisition or conversion engine, global source registry, automatic `git add`/commit/push, automatic publication to a consumer repository, source renumbering, overwrite/repair, or a transaction across multiple files. It does not assert Git tracking or remote publication merely because a working-tree file exists. It does not alter ADR-010 manifest v1, ADR-024 source-capture metadata, or the accepted ADR-025 historical text. If accepted, ADR-025 becomes superseded; its archive implementation is not authorized by this decision.
+This is not a ZIP/archive output or reader, generic importer, external acquisition or conversion engine, global source registry, automatic `git add`/commit/push, automatic publication to a consumer repository, source renumbering, overwrite/repair, copier, or transaction across multiple files. It does not claim an untracked working-tree file is repository-retained. It does not alter ADR-010 manifest v1, ADR-024 source-capture metadata, or ADR-025's accepted historical text. If accepted, ADR-025 becomes superseded; its archive implementation is not authorized by this decision.
 
 ### Success criteria
 
-A future implementation copies only the caller-selected captured Markdown and required selected attachments to the explicit owner-repository paths as ordinary readable files, preserves exact Markdown bytes and relative references, rejects all target/path collisions without overwriting, truthfully reports per-file partial outcomes, and performs no hidden discovery, network fetch, commit, push or consumer write. A separately authorized normal repository workflow can verify and commit exactly that selected set without staging unrelated files.
+A future workflow prepares an explicit set of existing owner-repository `RawCapture` Markdown/provenance paths, verifies their current blob identities, stages exactly those paths, verifies the staged path/blob set contains no unrelated path, and commits them so the selected captured Markdown is tracked. It leaves source bytes and metadata unchanged and performs no discovery, origin fetch, new file copy, consumer write, or implicit push.
 
 ## Consequences
 
 ### What gets easier
 
-People and tools can read captured Markdown directly in the owning repository and follow existing relative evidence links without extracting an archive.
+People and tools can read captured Markdown directly as tracked files in the owning repository and follow existing relative evidence links; no archive extraction or new copy step is required.
 
 ### What gets harder
 
-Each capture and required attachment is a separate filesystem operation, so a partial run can leave a reported partial set. Repository changes are reviewable/upstream or owner-repository changes, but commit and remote publication still require a distinct explicit workflow. Existing captures are immutable inputs; a changed capture needs a new path/revision rather than replacement.
+The selected-file manifest and Git staging/commit boundary must be checked carefully to prevent unrelated files entering the commit. Existing captures are immutable; a changed capture needs a new path/revision rather than replacement. Remote publication remains a separate authorization boundary.
 
 ### What does not change
 
@@ -61,11 +60,11 @@ ADR-010 remains a read-only exact-byte inventory. ADR-024 remains the source/cap
 
 | Claim | Test | Currently |
 |---|---|---|
-| Selected Markdown bytes, metadata sidecar, attachment bytes, and relative references are preserved at explicit repository paths | `tests/test_capture_repository_publication.py::test_selected_markdown_and_attachments_are_retained_verbatim` | Not yet written |
-| Existing, unsafe, duplicate, or case-fold-colliding destinations block without overwrite or renumbering | `tests/test_capture_repository_publication.py::test_existing_and_colliding_capture_paths_are_preserved` | Not yet written |
-| Multi-file failure reports partial creation and preserves both prior and created files without claiming transactionality | `tests/test_capture_repository_publication.py::test_partial_capture_publication_is_honest_and_non_destructive` | Not yet written |
-| Only explicitly selected capture files enter the reported set; no discovery or origin fetch occurs | `tests/test_capture_repository_publication.py::test_no_discovery_or_origin_access` | Not yet written |
-| Local operation does not stage/commit/push or include unrelated repository changes | `tests/test_capture_repository_publication.py::test_capture_write_has_no_git_side_effects` | Not yet written |
+| Explicit RawCapture paths and blob identities are prepared without rewriting files | `tests/test_capture_repository_delivery.py::test_selected_capture_blob_manifest_is_exact` | Not yet written |
+| Git delivery stages/commits only selected paths with expected blobs | `tests/test_capture_repository_delivery.py::test_git_commit_contains_only_selected_capture_blobs` | Not yet written |
+| Unrelated files and pre-existing captures remain excluded and unchanged | `tests/test_capture_repository_delivery.py::test_unselected_and_existing_files_are_preserved` | Not yet written |
+| Selected ADR-024 metadata, when present, remains byte-identical | `tests/test_capture_repository_delivery.py::test_selected_provenance_bytes_are_unchanged` | Not yet written |
+| No discovery, origin fetch, implicit copy, remote push, or consumer targeting occurs | `tests/test_capture_repository_delivery.py::test_delivery_selection_has_no_external_side_effects` | Not yet written |
 
 ## Rollback
 
