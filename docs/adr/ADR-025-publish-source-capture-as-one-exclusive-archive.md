@@ -1,10 +1,12 @@
 # ADR-025: Publish a source capture as one exclusive archive
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-09
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #124; ADR-005, ADR-009, ADR-010, ADR-022, ADR-024
+
+Owner acceptance: Issue #124, comment 6091429872 (2026-10-10), for this exact archive contract; implementation authorization is separately bounded by the same comment.
 
 ## Context
 
