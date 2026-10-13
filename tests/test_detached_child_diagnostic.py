@@ -84,10 +84,15 @@ class DetachedChildEvidenceTests(unittest.TestCase):
         """A delayed marker is not promoted to process-exit evidence."""
         owned = Path(tempfile.mkdtemp(prefix="kb-descendant-unknown-"))
         marker = owned / "finished"
-        child_code = (
-            "import pathlib,time; time.sleep(1.5); "
-            "pathlib.Path('finished').write_text('done',encoding='ascii')"
-        )
+        release = owned / "release-child"
+        child_code = "\n".join((
+            "import pathlib,time",
+            "pathlib.Path('finished').write_text('done',encoding='ascii')",
+            "release=pathlib.Path('release-child')",
+            "deadline=time.monotonic()+10",
+            "while not release.exists() and time.monotonic()<deadline:",
+            "    time.sleep(.01)",
+        ))
         parent_code = (
             "import pathlib,subprocess,sys,time; "
             "p=subprocess.Popen([sys.executable,'-c',%r],cwd='.', "
@@ -124,5 +129,9 @@ class DetachedChildEvidenceTests(unittest.TestCase):
             self.assertEqual(exit_evidence, "UNKNOWN")
             self.assertTrue(owned.is_dir(), "unknown-exit fixture must be preserved")
             self.assertEqual(marker.read_text(encoding="ascii"), "done")
+            # Release only this owned synthetic child, then confirm its exact
+            # process handle is signaled before TemporaryDirectory cleanup.
+            release.write_text("release", encoding="ascii")
+            self.assertEqual(kernel32.WaitForSingleObject(handle, 5000), 0)
         finally:
             kernel32.CloseHandle(handle)
