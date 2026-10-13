@@ -1,9 +1,9 @@
 # Tool-independent core and explicit capability evidence
 
-**Status**: Proposed
+**Status**: Proposed; behavior matrix updated for ADR-028 review
 **ADR number**: Unassigned
 **Date**: 2026-09-28
-**Related**: GitHub issues #121 and #122; ADR-003, ADR-006, ADR-009, ADR-014
+**Related**: GitHub issues #121 and #122; ADR-003, ADR-006, ADR-009, ADR-014, ADR-015, ADR-022, ADR-028
 
 ## Context and scope
 
@@ -14,22 +14,24 @@ does not supersede an Accepted ADR, accept W09, define a persisted format, or au
 runtime implementation.
 
 Current behavior is coupled in several observable places. `kb_bootstrap/cli.py` makes
-QMD declaration validation part of `validate`, initializes `qmd.json` and two QMD
-collections for both layouts, and installs QMD- and Surf-oriented skills. The QMD
+QMD declaration validation part of legacy `validate`, initializes `qmd.json` and two
+QMD collections for both layouts, and installs QMD- and Surf-oriented skills. The QMD
 validator checks declarations and paths, not the QMD executable or index. Repository
 doctor separately invokes Git and `gh` and fails closed when publication identity
-cannot be established. `docs/VALIDATION_COMPOSITION.md` already separates universal
-conformance, consumer policy, and retrieval/index freshness. ADR-009 keeps publication
-as an explicit local export and excludes network distribution; ADR-014 makes local
-inference optional and forbids implicit model acquisition.
+cannot be established. `docs/VALIDATION_COMPOSITION.md` separates universal
+conformance, consumer policy, and retrieval/index freshness. Accepted ADR-015 adds
+`validate-core` with local profile/provenance/graph checks, preserving legacy
+`validate` and initialization. Accepted ADR-022 keeps action authority separate from
+capability readiness. The current behavior is verified at main
+`87e1a8c77aa595c325688a3f320ba63dea6cb785`; no new runtime behavior is authorized here.
 
 ### Observed and proposed behavior
 
-| Concern | Current, source-grounded behavior | Proposed behavior |
+| Concern | Current behavior at baseline `87e1a8c77aa595c325688a3f320ba63dea6cb785` | Proposed distinction / compatibility |
 |---|---|---|
-| Canonical files | `validate` runs profile, provenance, graph, then QMD declarations (`cli.py:259-277`). | A core validation entry point runs only local canonical structure, metadata, provenance, and graph checks. |
-| QMD | Both layouts generate declarations; missing declarations fail `validate` (`cli.py:480-523`, `qmd_validator.py`). Runtime registration/update remains separate per `VALIDATION_COMPOSITION.md`. | `search` is a stable operation and QMD can be one explicitly selected adapter. Declaration validity, selection, probe evidence, and operation authorization remain distinct. |
-| Search | `search` directly uses QMD (`cli.py:137-149,311-315`). | Search reports its selected adapter and separate configuration, readiness-evidence, and authorization results. Core file reading remains available without search. |
+| Canonical files | `validate-core` runs local profile, provenance, graph checks (ADR-015); legacy `validate` also checks QMD declarations. | Preserve both commands; report only invoked checks, no inferred policy/readiness. |
+| QMD | Both layouts generate declarations; missing declarations fail legacy `validate`. Declarations do not establish runtime registration/freshness (`VALIDATION_COMPOSITION.md`). | Keep declaration, selection, attempted check, freshness, and authority distinct; no implicit register/update/fallback. |
+| Search | Legacy `search` uses QMD; ADR-017 adds bounded file-only search; ADR-018/019 constrain optional QMD. | No search behavior change; readiness and authorization are separate evidence. |
 | Collection/research | The packaged market-research skill requires Surf and describes QMD as optional. | `collect` is outside core; Surf can be one adapter, but no collector, browser, network, service, or model is selected implicitly. |
 | Entity inference | `inspect-gliner` and checkpoint verification are explicit local commands (`cli.py:123-133,300-307`). | `entity-inference` is optional and GLiNER can be one adapter; no download, cloud fallback, or hidden inference occurs in core. |
 | GitHub publication | `doctor` checks Git root, origin, `gh` default, and default branch (`repository_doctor.py`). | `remote-publication` is an operation and GitHub can be one adapter. Its existing doctor remains required for the GitHub path. |
@@ -37,6 +39,9 @@ inference optional and forbids implicit model acquisition.
 | Layout | `single` and `umbrella` choose generated directory shapes (`cli.py:479-516`). | They are storage/layout choices only, never domain, sensitivity, tenancy, deployment, or capability presets. |
 
 ## Proposed decision
+
+This broad W01 proposal remains unaccepted. Its specific selection/observation matrix
+is proposed in ADR-028; neither document changes runtime.
 
 Define the **required core** as deterministic operations over explicitly bounded local
 files: canonical read/edit guidance, canonical profile and provenance checks, graph
@@ -217,13 +222,11 @@ to the required deterministic core. Its outbound-publication and path rules requ
 local-artifact and trusted-root distinctions above. W01 does not modify W09 or require
 its unfinished follow-up.
 
-For the first additive core-only validation slice, review the separate
-[Proposed ADR-015](../adr/ADR-015-add-core-only-validation-without-changing-legacy-validate.md).
-That slice needs only the local-check boundary and compatible CLI contract; it does
-not depend on this wider proposal's capability vocabulary, adapter namespace,
-authorization aggregation or persisted schema. Those remain separate decisions
-requiring approval before their own implementation. Consumer policy remains consumer-owned and versioned;
-no universal policy engine is introduced.
+ADR-015 is accepted and implemented; it authorizes only the additive `validate-core`
+contract. It deliberately does not accept this proposal's wider capability vocabulary,
+adapter namespace, authorization aggregation, or persisted schema. ADR-028 is the
+bounded Proposed decision for selection/observation and gate distinctions; consumer
+policy remains consumer-owned and versioned. No universal policy engine is introduced.
 
 ## Alternatives (not accepted defaults)
 
