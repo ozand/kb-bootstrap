@@ -420,6 +420,102 @@ class CompleteW03EnvelopeTests(unittest.TestCase):
             self.assertIn("digest", errors[0])
             self.assertEqual(original_digest, source["original_revision"].get("digest"))
 
+    def test_original_revision_change_with_direct_capture_is_independent(self):
+        from copy import deepcopy
+        import yaml
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = self.load_complete_record(root)
+            source = deepcopy(record["sources"][0])
+            old_raw = root / "raw" / source["representations"][0]["raw_path"]
+            old_bytes = old_raw.read_bytes()
+            old_digest = source["original_revision"]["digest"]
+            old_metadata = root / "records" / "original-r1.yaml"
+            old_metadata.write_text(yaml.safe_dump({"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [source]}, sort_keys=False), encoding="utf-8")
+            old_metadata_bytes = old_metadata.read_bytes()
+            self.assertTrue(validate_source_capture("records/original-r1.yaml", root, "raw", ["letter-a/shared.txt", "letter-a/shared-copy.txt"])[0])
+
+            changed = deepcopy(source)
+            new_bytes = b"alpha revised\n"
+            new_digest = hashlib.sha256(new_bytes).hexdigest()
+            changed["original_revision"]["digest"] = new_digest
+            changed["representations"] = [{
+                "representation_id": "direct-r2",
+                "revision": {"algorithm": "sha256", "digest": new_digest},
+                "media_type": "text/plain", "language": "en",
+                "raw_path": "letter-a/original-v2.txt", "retention": "retained",
+                "coordinates": {"local": {"unit": "line", "range": [1, 2]}, "original": "unknown"},
+            }]
+            new_metadata = root / "records" / "original-r2.yaml"
+            new_metadata.write_text(yaml.safe_dump({"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [changed]}, sort_keys=False), encoding="utf-8")
+            (root / "raw" / "letter-a/original-v2.txt").write_bytes(new_bytes)
+            selected = ["letter-a/original-v2.txt"]
+            self.assertTrue(validate_source_capture("records/original-r2.yaml", root, "raw", selected)[0])
+            self.assertEqual(changed["source_id"], source["source_id"])
+            self.assertNotEqual(changed["original_revision"]["digest"], source["original_revision"]["digest"])
+            self.assertEqual(changed["representations"][0]["revision"]["digest"], changed["original_revision"]["digest"])
+            self.assertEqual(old_raw.read_bytes(), old_bytes)
+            self.assertEqual(old_metadata.read_bytes(), old_metadata_bytes)
+            valid, errors = validate_source_capture("records/original-r2.yaml", root, "raw", selected)
+            self.assertTrue(valid, errors)
+            (root / "raw" / "letter-a/original-v2.txt").write_bytes(old_bytes)
+            invalid, errors = validate_source_capture("records/original-r2.yaml", root, "raw", selected)
+            self.assertFalse(invalid)
+            self.assertIn("digest", errors[0])
+            self.assertEqual(old_raw.read_bytes(), old_bytes)
+            self.assertEqual(old_metadata.read_bytes(), old_metadata_bytes)
+
+    def test_conversion_revision_change_keeps_known_original_independent(self):
+        from copy import deepcopy
+        import yaml
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = self.load_complete_record(root)
+            source = deepcopy(record["sources"][0])
+            baseline_bytes = self.PAYLOADS["letter-a/shared.txt"]
+            baseline_digest = hashlib.sha256(baseline_bytes).hexdigest()
+            old_metadata = root / "records" / "conversion-v1.yaml"
+            old_metadata.write_text(yaml.safe_dump({"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [source]}, sort_keys=False), encoding="utf-8")
+            old_metadata_bytes = old_metadata.read_bytes()
+            old_raw = root / "raw" / "letter-a/shared.txt"
+            old_raw_bytes = old_raw.read_bytes()
+            self.assertTrue(validate_source_capture("records/conversion-v1.yaml", root, "raw", ["letter-a/shared.txt", "letter-a/shared-copy.txt"])[0])
+
+            changed = deepcopy(source)
+            changed["original_retention"] = "reference-only"
+            converted_bytes = b"ALPHA\n"
+            converted_digest = hashlib.sha256(converted_bytes).hexdigest()
+            changed["capture"] = {"method": "converted", "captured_at": "2026-02-03T04:05:06Z", "converter": {"identity": "synthetic-normalizer", "version": "2", "parameters": {"case": "upper"}}}
+            changed["fidelity"] = {"class": "partial", "coverage": "all-characters", "losses": ["case-normalized"]}
+            changed["representations"] = [{
+                "representation_id": "conversion-v2",
+                "revision": {"algorithm": "sha256", "digest": converted_digest},
+                "media_type": "text/plain", "language": "en",
+                "raw_path": "letter-a/conversion-v2.txt", "retention": "retained",
+                "coordinates": {"local": {"unit": "line", "range": [1, 2]}, "original": "unknown"},
+            }]
+            new_metadata = root / "records" / "conversion-v2.yaml"
+            new_metadata.write_text(yaml.safe_dump({"schema": "kb-bootstrap.source-capture", "version": 1, "sources": [changed]}, sort_keys=False), encoding="utf-8")
+            converted_path = root / "raw" / "letter-a/conversion-v2.txt"
+            converted_path.write_bytes(converted_bytes)
+            selected = ["letter-a/conversion-v2.txt"]
+            valid, errors = validate_source_capture("records/conversion-v2.yaml", root, "raw", selected)
+            self.assertTrue(valid, errors)
+            self.assertEqual(changed["original_revision"]["digest"], baseline_digest)
+            self.assertEqual(changed["representations"][0]["revision"]["digest"], converted_digest)
+            self.assertNotEqual(converted_digest, baseline_digest)
+            self.assertEqual(changed["capture"]["converter"], {"identity": "synthetic-normalizer", "version": "2", "parameters": {"case": "upper"}})
+            self.assertEqual(changed["fidelity"]["losses"], ["case-normalized"])
+            self.assertEqual(old_metadata.read_bytes(), old_metadata_bytes)
+            self.assertEqual(old_raw.read_bytes(), old_raw_bytes)
+            converted_path.write_bytes(b"stale conversion\\n")
+            invalid, errors = validate_source_capture("records/conversion-v2.yaml", root, "raw", selected)
+            self.assertFalse(invalid)
+            self.assertIn("digest", errors[0])
+            self.assertTrue(validate_source_capture("records/conversion-v1.yaml", root, "raw", ["letter-a/shared.txt", "letter-a/shared-copy.txt"])[0])
+            self.assertEqual(old_metadata.read_bytes(), old_metadata_bytes)
+            self.assertEqual(old_raw.read_bytes(), old_raw_bytes)
+
     def test_study_references_reuse_capture_identity_without_claiming_corroboration(self):
         with tempfile.TemporaryDirectory() as directory:
             record = self.load_complete_record(Path(directory))
