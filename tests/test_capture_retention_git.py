@@ -1,0 +1,66 @@
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+
+class CaptureRetentionGitTests(unittest.TestCase):
+    def git(self, root, *args):
+        return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True).stdout.decode().strip()
+
+    def test_commit_contains_selected_capture_and_provenance_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.git(root, "init", "-q")
+            self.git(root, "config", "user.name", "Synthetic Test")
+            self.git(root, "config", "user.email", "synthetic@example.invalid")
+            raw = root / "kb/research/study/raw/001-page.md"
+            brief = root / "kb/research/study/brief.md"
+            prior = root / "kb/research/study/raw/000-prior.md"
+            unrelated = root / "notes.md"
+            for p in (raw, brief, prior, unrelated):
+                p.parent.mkdir(parents=True, exist_ok=True)
+            raw_bytes = b"---\ntype: RawCapture\n---\nSynthetic captured page.\n"
+            brief_bytes = b"---\ntype: Brief\n---\nSynthetic provenance.\n"
+            prior_bytes = b"---\ntype: RawCapture\n---\nPrior capture.\n"
+            raw.write_bytes(raw_bytes)
+            brief.write_bytes(brief_bytes)
+            prior.write_bytes(prior_bytes)
+            unrelated.write_bytes(b"original\n")
+            paths = [p.relative_to(root).as_posix() for p in (raw, brief, prior)]
+            self.git(root, "add", "--", paths[2], unrelated.name)
+            self.git(root, "commit", "-qm", "seed")
+            prior_blob = self.git(root, "rev-parse", f"HEAD:{paths[2]}")
+
+            # A pre-staged unrelated file is detectable and must be removed deliberately.
+            extra = root / "unrelated-new.md"
+            extra.write_bytes(b"not selected\n")
+            self.git(root, "add", "--", extra.name)
+            self.assertEqual(self.git(root, "diff", "--cached", "--name-only"), extra.name)
+            self.git(root, "rm", "-q", "--cached", "--", extra.name)
+            self.git(root, "reset", "-q", "HEAD")
+
+            unrelated.write_bytes(b"working-tree edit, not selected\n")
+            selected = [paths[0], paths[1]]
+            self.git(root, "add", "--", *selected)
+            staged = self.git(root, "diff", "--cached", "--name-only").splitlines()
+            self.assertEqual(staged, sorted(selected))
+            raw_records = self.git(root, "diff", "--cached", "--raw").splitlines()
+            staged_blobs = {rel: self.git(root, "rev-parse", f":{rel}") for rel in selected}
+            self.assertEqual(set(staged_blobs), set(selected))
+            self.assertEqual(staged_blobs[paths[0]], self.git(root, "hash-object", str(raw)))
+            self.assertEqual(staged_blobs[paths[1]], self.git(root, "hash-object", str(brief)))
+            for rel, content in ((paths[0], raw_bytes), (paths[1], brief_bytes)):
+                blob = self.git(root, "rev-parse", f":{rel}")
+                self.assertEqual(subprocess.run(["git", "cat-file", "blob", blob], cwd=root, check=True, capture_output=True).stdout, content)
+            self.git(root, "commit", "-qm", "retain selected capture")
+            committed = self.git(root, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").splitlines()
+            self.assertEqual(committed, sorted(selected))
+            for rel, content in ((paths[0], raw_bytes), (paths[1], brief_bytes)):
+                self.assertEqual(subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=root, check=True, capture_output=True).stdout, content)
+            self.assertEqual(self.git(root, "rev-parse", f"HEAD:{paths[2]}"), prior_blob)
+            self.assertEqual(self.git(root, "status", "--short").splitlines(), ["M notes.md", "?? unrelated-new.md"])
+
+
+if __name__ == "__main__":
+    unittest.main()
