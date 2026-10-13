@@ -19,6 +19,12 @@ class DetachedChildEvidenceTests(unittest.TestCase):
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
         kernel32.OpenProcess.restype = ctypes.c_void_p
+        kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        kernel32.WaitForSingleObject.restype = ctypes.c_uint32
+        kernel32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+        kernel32.GetExitCodeProcess.restype = ctypes.c_int
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             try:
@@ -35,50 +41,72 @@ class DetachedChildEvidenceTests(unittest.TestCase):
 
     def test_reader_join_marker_and_handle_exit_are_separate(self):
         """Descendant holds pipes; run_bounded joins readers while handle observes exit."""
-        with tempfile.TemporaryDirectory(prefix="kb-descendant-evidence-") as tmp:
-            root = Path(tmp)
-            pid_file = root / "child.pid"
-            marker = root / "finished"
-            child_code = (
-                "import pathlib,time; time.sleep(1.5); "
-                "pathlib.Path('finished').write_text('done', encoding='ascii')"
-            )
-            parent_code = (
-                "import pathlib,subprocess,sys,time; "
-                "p=subprocess.Popen([sys.executable,'-c',%r],cwd='.', "
-                "stdout=sys.stdout,stderr=sys.stderr); "
-                "pathlib.Path('child.pid').write_text(str(p.pid),encoding='ascii'); "
-                "time.sleep(5)"
-            ) % child_code
-            observed = []
-            watcher = threading.Thread(
-                target=self._open_process_handle_when_pid_appears,
-                args=(pid_file, observed), daemon=True,
-            )
-            watcher.start()
-            started = time.monotonic()
-            _, reason = run_bounded(
-                [sys.executable, "-c", parent_code], root, os.environ.copy(), timeout=0.5
-            )
-            elapsed = time.monotonic() - started
-            watcher.join(timeout=1)
+        root = Path(tempfile.mkdtemp(prefix="kb-descendant-evidence-"))
+        pid_file = root / "child.pid"
+        marker = root / "finished"
+        child_code = (
+            "import pathlib,time; time.sleep(1.5); "
+            "pathlib.Path('finished').write_text('done', encoding='ascii')"
+        )
+        parent_code = (
+            "import pathlib,subprocess,sys,time; "
+            "p=subprocess.Popen([sys.executable,'-c',%r],cwd='.', "
+            "stdout=sys.stdout,stderr=sys.stderr); "
+            "pathlib.Path('child.pid').write_text(str(p.pid),encoding='ascii'); "
+            "time.sleep(5)"
+        ) % child_code
+        observed = []
+        watcher = threading.Thread(
+            target=self._open_process_handle_when_pid_appears,
+            args=(pid_file, observed), daemon=True,
+        )
+        watcher.start()
+        started = time.monotonic()
+        _, reason = run_bounded(
+            [sys.executable, "-c", parent_code], root, os.environ.copy(), timeout=0.5
+        )
+        elapsed = time.monotonic() - started
+        watcher.join(timeout=1)
 
+        handle = None
+        wait_result = None
+        exit_query_ok = False
+        exit_code = ctypes.c_uint32(0xFFFFFFFF)
+        if observed and observed[0]:
+            kernel32, handle = observed[0]
+        try:
             self.assertEqual(reason, "timeout")
             self.assertTrue(pid_file.is_file(), "launch acknowledgement was not recorded")
             self.assertLess(elapsed, 2.5, "reader join exceeded its bounded allowance")
-            self.assertTrue(observed and observed[0], "child process handle was not acquired")
-            kernel32, handle = observed[0]
-            try:
-                self.assertEqual(kernel32.WaitForSingleObject(handle, 5000), 0)
-                exit_code = ctypes.c_uint32()
-                self.assertTrue(kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)))
-                self.assertEqual(exit_code.value, 0)
-            finally:
-                kernel32.CloseHandle(handle)
+            self.assertIsNotNone(handle, "child process handle was not acquired")
+            wait_result = kernel32.WaitForSingleObject(handle, 5000)
+            self.assertEqual(wait_result, 0)
+            exit_query_ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+            self.assertTrue(exit_query_ok)
+            self.assertEqual(exit_code.value, 0)
             self.assertTrue(marker.is_file(), "marker is separate corroborating evidence")
             self.assertEqual(marker.read_text(encoding="ascii"), "done")
-            # TemporaryDirectory cleanup is safe here: the retained process handle
-            # confirmed that this exact child had exited before the fixture is removed.
+        finally:
+            if handle is not None:
+                kernel32.CloseHandle(handle)
+        # Explicit cleanup happens only after confirmed wait + exit status.
+        self._remove_confirmed_fixture(root, wait_result, exit_query_ok, exit_code.value)
+
+    @staticmethod
+    def _remove_confirmed_fixture(path, wait_result, exit_query_ok, exit_code):
+        import shutil
+
+        if wait_result != 0 or not exit_query_ok or exit_code != 0:
+            return False
+        shutil.rmtree(path)
+        return True
+
+    def test_wait_failure_preserves_owned_fixture(self):
+        """A failed handle wait is UNKNOWN and must not trigger fixture cleanup."""
+        owned = Path(tempfile.mkdtemp(prefix="kb-descendant-wait-failure-"))
+        removed = self._remove_confirmed_fixture(owned, 258, True, 0)
+        self.assertFalse(removed)
+        self.assertTrue(owned.is_dir(), "failed wait must preserve the owned fixture")
 
     def test_marker_without_process_handle_keeps_exit_unknown_and_fixture(self):
         """A delayed marker is not promoted to process-exit evidence."""
