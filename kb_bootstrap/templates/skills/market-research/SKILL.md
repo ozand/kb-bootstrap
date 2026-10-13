@@ -77,7 +77,7 @@ Copy this checklist into your notes and tick it off:
       blob matches the selected working-tree bytes. Confirm prior capture paths and bytes remain
       unchanged. If the index contains unrelated staged content or selected bytes changed, stop
       and resolve explicitly before committing. This verifies repository-tracked retention; it
-      does not authorize an implicit push, consumer-repository publication, or capture rewriting;
+      does not authorize an implicit push, consumer-repository publication, or capture rewriting,
       or any claim that the capture is the byte-identical external origin.
 - [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
       raw pages and screenshots, top conclusions, and the exact retention commit.
