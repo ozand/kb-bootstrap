@@ -67,8 +67,20 @@ Copy this checklist into your notes and tick it off:
       `kb-bootstrap validate --dir kb --project-root .` (0 errors) and `qmd update` if configured.
       Every `WARN` is unfinished work; if it cannot be fixed, say why in the report's Limitations.
       Re-read the brief's done-criteria and confirm each one.
-- [ ] 8. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
-      raw pages and screenshots, top conclusions.
+- [ ] 8. Retain the selected captures in the owning repository. Before claiming delivery,
+      select the exact existing `raw/*.md` capture paths and any existing provenance files
+      required by the study; verify their repository-relative paths and current bytes. Do not
+      discover or include unrelated files. Stage only that explicit path list (never `git add .`
+      or `git add -A`); inspect both the staged path set and staged blob IDs, and ensure there
+      are no pre-staged unrelated changes. Commit the selected set through the ordinary review
+      workflow, then verify the commit contains exactly those paths and that each committed
+      blob matches the selected working-tree bytes. Confirm prior capture paths and bytes remain
+      unchanged. If the index contains unrelated staged content or selected bytes changed, stop
+      and resolve explicitly before committing. This verifies repository-tracked retention; it
+      does not authorize an implicit push, consumer-repository publication, or capture rewriting,
+      or any claim that the capture is the byte-identical external origin.
+- [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
+      raw pages and screenshots, top conclusions, and the exact retention commit.
 
 Commit and push after every 3–4 products so a crash or context reset loses nothing.
 
