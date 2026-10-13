@@ -8,6 +8,15 @@ class CaptureRetentionGitTests(unittest.TestCase):
     def git(self, root, *args):
         return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True).stdout.decode().strip()
 
+    def stage_selected_or_abort(self, root, selected):
+        staged = set(self.git(root, "diff", "--cached", "--name-only").splitlines())
+        if staged and staged != set(selected):
+            raise RuntimeError("pre-staged paths differ from the explicit selection")
+        self.git(root, "add", "--", *selected)
+        actual = set(self.git(root, "diff", "--cached", "--name-only").splitlines())
+        if actual != set(selected):
+            raise RuntimeError("staged paths differ from the explicit selection")
+
     def test_commit_contains_selected_capture_and_provenance_only(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -32,14 +41,17 @@ class CaptureRetentionGitTests(unittest.TestCase):
             self.git(root, "commit", "-qm", "seed")
             prior_blob = self.git(root, "rev-parse", f"HEAD:{paths[2]}")
 
-            # A pre-staged unrelated file is detectable and must be removed deliberately.
+            # Foreign staged content makes the ordinary workflow abort without touching it.
             extra = root / "unrelated-new.md"
             extra.write_bytes(b"not selected\n")
             self.git(root, "add", "--", extra.name)
             self.assertEqual(self.git(root, "diff", "--cached", "--name-only"), extra.name)
+            head_before = self.git(root, "rev-parse", "HEAD")
             staged_before = self.git(root, "ls-files", "--stage").splitlines()
             bytes_before = (raw.read_bytes(), brief.read_bytes(), prior.read_bytes(), unrelated.read_bytes(), extra.read_bytes())
-            self.assertNotEqual(set(self.git(root, "diff", "--cached", "--name-only").splitlines()), {paths[0], paths[1]})
+            with self.assertRaisesRegex(RuntimeError, "pre-staged paths differ"):
+                self.stage_selected_or_abort(root, [paths[0], paths[1]])
+            self.assertEqual(self.git(root, "rev-parse", "HEAD"), head_before)
             self.assertEqual(self.git(root, "ls-files", "--stage").splitlines(), staged_before)
             self.assertEqual((raw.read_bytes(), brief.read_bytes(), prior.read_bytes(), unrelated.read_bytes(), extra.read_bytes()), bytes_before)
 
@@ -55,9 +67,9 @@ class CaptureRetentionGitTests(unittest.TestCase):
             unrelated = root / "notes.md"
             for p in (raw, brief, prior, unrelated):
                 p.parent.mkdir(parents=True, exist_ok=True)
-            raw_bytes = b"---\\ntype: RawCapture\\n---\\nSynthetic captured page.\\n"
-            brief_bytes = b"---\\ntype: Brief\\n---\\nSynthetic provenance.\\n"
-            prior_bytes = b"---\\ntype: RawCapture\\n---\\nPrior capture.\\n"
+            raw_bytes = b"---\ntype: RawCapture\n---\nSynthetic captured page.\n"
+            brief_bytes = b"---\ntype: Brief\n---\nSynthetic provenance.\n"
+            prior_bytes = b"---\ntype: RawCapture\n---\nPrior capture.\n"
             unrelated_before = b"original\\n"
             raw.write_bytes(raw_bytes)
             brief.write_bytes(brief_bytes)
@@ -69,10 +81,10 @@ class CaptureRetentionGitTests(unittest.TestCase):
             prior_blob = self.git(root, "rev-parse", f"HEAD:{paths[2]}")
             self.assertEqual(prior.read_bytes(), prior_bytes)
 
-            unrelated_after = b"working-tree edit, not selected\\n"
+            unrelated_after = b"working-tree edit, not selected\n"
             unrelated.write_bytes(unrelated_after)
             selected = [paths[0], paths[1]]
-            self.git(root, "add", "--", *selected)
+            self.stage_selected_or_abort(root, selected)
             staged = self.git(root, "diff", "--cached", "--name-only").splitlines()
             self.assertEqual(staged, sorted(selected))
             staged_blobs = {rel: self.git(root, "rev-parse", f":{rel}") for rel in selected}
