@@ -29,6 +29,4 @@
 | ADR-025 | Publish a source capture as one exclusive archive | Superseded by ADR-027 |
 | ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
 | ADR-027 | Retain captured Markdown as owner-repository files | Accepted |
-| ADR-028 | Separate optional capability state from validation and authority | Proposed |
-| ADR-029 | Reserve new capture paths without overwriting existing captures | Proposed |
 | ADR-030 | Reuse source identity only through an explicit capture envelope | Proposed |
