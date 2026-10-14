@@ -65,10 +65,25 @@ class MarketResearchScaffoldTests(unittest.TestCase):
                 self.assertTrue((root / folder).is_dir(), folder)
             raw = (root / "qmd/collections/raw.yaml").read_text(encoding="utf-8")
             wiki = (root / "qmd/collections/wiki.yaml").read_text(encoding="utf-8")
+            self.assertIn("../../kb/raw/", raw)
             self.assertIn("../../kb/research/", raw)
+            self.assertIn('"raw/**"', wiki)
             self.assertIn('"research/**"', wiki)
             _, valid = validate_qmd_collections(root)
             self.assertTrue(valid)
+
+            readme = Path("README.md").read_text(encoding="utf-8")
+            self.assertIn("QMD raw indexing is a search configuration, not Git tracking or publication approval", readme)
+            self.assertIn("local-only `sources/` area", readme)
+            self.assertIn("license, privacy, secrets", readme)
+            skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("QMD raw indexing and Git publication are independent", skill_text)
+            self.assertIn("no fixed commit/push", skill_text)
+            self.assertIn("its name does not itself exclude files from Git", skill_text)
+            self.assertNotIn("Commit and push after every 3–4 products", skill_text)
+            operator_text = Path("kb_bootstrap/templates/skills/qmd-operator/SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("QMD indexing does not authorize", operator_text)
+            self.assertIn("both `kb/raw/` and `kb/research/`", operator_text)
 
 
 class MarketResearchScriptTests(unittest.TestCase):
