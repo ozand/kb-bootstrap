@@ -20,17 +20,17 @@ The binding is a new relation record, not a capture or retained-source file. ADR
 
 ### Binding contents
 
-Each binding names one project-relative knowledge Markdown path and observed document revision, plus one or more explicit source/representation references already present in the supplied validated envelope. It copies no source body and mints no source or representation identity. A fragment/coordinate is optional and must be tied to the referenced representation revision; no relocation is inferred.
+Each binding names one project-relative knowledge Markdown path and observed document revision, plus one or more explicit source/representation references already present in the supplied validated envelope. It copies no source body and mints no source or representation identity. A fragment/coordinate is optional and must be tied to the referenced representation revision; no relocation is inferred. Claim-level bindings are deferred; this increment binds documents only.
 
-Optional scope/context fields are consumer-authored assertions, not inferred truth. OKF `sources`/footnotes remain compatible and need not be rewritten; this separate relation is not a replacement for ADR-006 provenance. No retention class or reviewer-identity schema is introduced by this increment.
+Each binding may include bounded consumer-authored applicability/scope/context qualifiers, a retention class and owner/policy reference, and review actor/attribution. These fields are descriptive only: they do not enforce retention/access, authenticate an actor, record a verifier event, or grant approval. Actor attribution follows ADR-006's sanitized, <=256-character string limit. OKF `sources`/footnotes remain compatible and need not be rewritten; this relation is not a replacement for ADR-006 provenance.
 
 ### Resolution and report
 
 The caller supplies every path explicitly: the binding document, selected knowledge document, and the complete source/capture envelope and retained representation paths required by its existing validator. Reuse ADR-024 validation and ADR-026's caller-directed evidence lookup rather than adding a second envelope parser or lookup result contract. Validate all referenced inputs before reporting. Do not enumerate directories, dereference origins, fetch, index, cache, write, or use a system clock.
 
-Classify each binding as `unchanged`, `changed`, `missing`, `inaccessible`, `unsupported`, or `malformed`, with a bounded reason and project-relative identity. These are proposed design labels, not a committed API vocabulary. Missing or inaccessible evidence is not deletion; malformed input is not silently skipped. Changed evidence creates a review item, not an automatic claim rewrite or lifecycle transition. Unchanged bindings remain unchanged. Added contradictory evidence may create a separate review item but cannot automatically resolve or merge claims.
+Classify each binding as `unchanged`, `changed`, `missing`, `inaccessible`, `unsupported`, or `malformed`, with a bounded reason and project-relative identity. These labels directly use #128's requested outcome distinctions; a missing/inaccessible reference is not deletion and malformed input is not silently skipped. Changed evidence creates a review item, not an automatic knowledge rewrite or lifecycle transition. Unchanged bindings remain unchanged. Added contradictory evidence may create a separate review item but cannot automatically resolve or merge claims.
 
-The implementation must use fixed finite limits for binding metadata, number of document/evidence references, selected file sizes, aggregate bytes and serialized output. Exact values, blocked/partial response shape, and ordering are owner-review questions for this proposal; no implementation may guess them. Incomplete inspection must never be reported as a complete empty worklist.
+Proposed fixed ceilings are: 8 MiB per binding document; at most 1000 document bindings; at most 100 evidence references per binding; at most 64 MiB for each selected knowledge/evidence file; at most 256 MiB combined selected knowledge and evidence bytes per invocation; at most 1000 report items; and at most 8 MiB serialized report bytes. The 8 MiB metadata, 64 MiB per-file and 256 MiB aggregate values reuse ADR-024's existing bounds; 1000 bindings/references and report limits are finite operational caps proposed here to prevent multiplication of that budget. These values are decision proposals, not current implementation guarantees. The resolver blocks with a sanitized outcome if any ceiling is exceeded; it does not emit a truncated report claiming complete inspection. Sort records by project-relative knowledge path, then source ID, representation ID and revision. No implementation may silently alter these bounds.
 
 A digest proves byte identity only. It does not prove entailment, authority, independence, completeness, current external reality, source truth or semantic equivalence. Duplicate/reprinted sources do not become independent support; generated knowledge must preserve its upstream lineage and cannot self-confirm. A frozen capture cannot detect later website changes; recapture is a separate explicit input/action. Confirmation, revision and retraction remain human-governed lifecycle decisions with no fabricated verifier event.
 
@@ -71,10 +71,12 @@ This preserves current contracts but leaves no explicit binding relation for inc
 | Claim if accepted and implemented | Test | Currently |
 |---|---|---|
 | Only caller-selected inputs are read; no discovery, origin access or writes occur | `tests/test_evidence_binding.py::test_explicit_inputs_only_no_side_effects` | not yet written |
-| Unchanged/changed/missing/inaccessible/unsupported/malformed outcomes remain distinct | `tests/test_evidence_binding.py::test_revision_outcome_matrix` | not yet written |
+| The six #128 outcomes remain distinct and are ordered deterministically | `tests/test_evidence_binding.py::test_revision_outcome_matrix` | not yet written |
+| Proposed file/count/aggregate/report ceilings block without incomplete-success claims | `tests/test_evidence_binding.py::test_fixed_resource_ceilings` | not yet written |
 | Changed bytes create bounded review items; unchanged items remain unchanged | `tests/test_evidence_binding.py::test_changed_evidence_worklist_is_bounded` | not yet written |
 | Optional fragment coordinates are tied to a representation revision; relocation is not guessed | `tests/test_evidence_binding.py::test_fragment_revision_and_ambiguity` | not yet written |
 | Duplicate/reprinted evidence and generated lineage are not presented as independent corroboration | `tests/test_evidence_binding.py::test_duplicate_and_generated_lineage` | not yet written |
+| Scope, retention and review attribution remain descriptive, not permission or verifier events | `tests/test_evidence_binding.py::test_descriptive_context_grants_no_authority` | not yet written |
 | Digests do not imply semantic truth/freshness or trigger lifecycle mutation | `tests/test_evidence_binding.py::test_hash_is_identity_only` | not yet written |
 
 ## Rollback
