@@ -25,7 +25,32 @@ kb/wiki/                           conclusions shared by all studies (OKF frontm
   index.md
 ```
 
-`SKILL_DIR` below is the folder of this file (e.g. `.agents/skills/market-research`).
+`SKILL_DIR` below is the folder of this file (e.g. `.agents/skills/market-research`). A consumer may choose a `sources/` directory for local-only private or bulky inputs, but this is not part of the generated layout and its name does not itself exclude files from Git; verify local ignore/tracking policy.
+
+## Capture storage and publication review
+
+QMD raw indexing and Git publication are independent. The generated `<project>-raw`
+collection includes both `kb/raw/` and `kb/research/`; the wiki collection excludes
+both. This only describes what can be searched. It does not authorize Git tracking,
+committing, pushing, or publication.
+
+`kb/research/` is for captures individually reviewed and eligible for the intended
+repository/destination. Before tracking any capture, review that source for license,
+privacy, secrets, and destination eligibility. A Markdown file, index entry, capture
+helper output, or directory name is not approval. Keep private, bulky, binary, books,
+repository clones, and other local source inputs outside tracked/public research areas.
+A consumer may choose `sources/` for local-only inputs, but the directory name does not
+exclude files from Git: verify the repository's ignore/tracking policy and keep such
+content untracked. Do not publish these inputs through this research workflow. The
+scaffold's selective ignore rules for large `kb/raw/` files do not imply that other
+files are publishable.
+
+If a capture is ineligible or its review is incomplete, leave it untracked/local and
+record the limitation without copying its contents into public reports. For eligible
+already-captured Markdown, first complete the source-specific publication review, then
+follow ADR-027's explicit selection and exact staged-file review; resolve unrelated
+staged changes before committing. This checks repository retention, not permission for
+an implicit push or publication to another repository.
 
 ## Repository governance gate
 
@@ -80,9 +105,12 @@ Copy this checklist into your notes and tick it off:
       does not authorize an implicit push, consumer-repository publication, or capture rewriting,
       or any claim that the capture is the byte-identical external origin.
 - [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
-      raw pages and screenshots, top conclusions, and the exact retention commit.
+      raw pages and screenshots, top conclusions, and—if committed—the exact retention commit.
 
-Commit and push after every 3–4 products so a crash or context reset loses nothing.
+Local checkpoints may be used to protect work in progress, but no fixed commit/push
+cadence is required. Before a commit, review the exact staged paths and blobs. Pushing
+is a separate explicitly authorized action under the owning repository's workflow;
+this skill does not authorize it or publication to a consumer repository.
 
 Several agents on one market map, or one study split by product area? Read
 [references/parallel-studies.md](references/parallel-studies.md) before dispatching.
