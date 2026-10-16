@@ -11,7 +11,8 @@ import_local_capture = importlib.util.module_from_spec(SPEC)
 write_bytecode = sys.dont_write_bytecode
 try:
     sys.dont_write_bytecode = True
-    SPEC.loader.exec_module(import_local_capture)
+    code = SPEC.loader.get_code(SPEC.name)
+    exec(code, import_local_capture.__dict__)
 finally:
     sys.dont_write_bytecode = write_bytecode
 ImportErrorResult = import_local_capture.ImportErrorResult
