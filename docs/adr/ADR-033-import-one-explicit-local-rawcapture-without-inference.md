@@ -1,10 +1,12 @@
 # ADR-033: Import one explicit local RawCapture without inference
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-16
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #125; ADR-024, ADR-026, ADR-027, ADR-029, ADR-030
+
+Owner acceptance: Issue #125, comment 6214765020, for reviewed contract at `ac74ecf0c47b34a6eb43f86f27cc2e1ee038cd98`.
 
 ## Context
 
