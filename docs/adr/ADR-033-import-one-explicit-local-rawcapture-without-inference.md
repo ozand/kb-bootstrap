@@ -60,8 +60,8 @@ new identity or capture metadata and makes no acquisition or publication claim.
    and `fidelity`; `type` must be the literal `RawCapture`. These seven required
    values plus optional `description`, `tags`, and `status` use the existing
    documented forms: required values are one-line scalar strings; optional
-   `description`/`status` are one-line strings and `tags` is a one-line
-   comma-separated list of plain lowercase tokens. Reject duplicate/unknown
+   `description`/`status` are one-line strings and `tags` is a one-line YAML
+   inline list of plain lowercase tokens, matching `formats.md`. Reject duplicate/unknown
    keys, blank required values, tabs, YAML collections, aliases, multiline
    scalars, malformed quoting, invalid UTF-8, and extra document separators.
    `fidelity` is exactly `full`, `partial`, or `blocked`; `captured_at` must be
