@@ -208,12 +208,14 @@ This generates:
 - Local `kb/raw/` directory retained by `kb/raw/.gitkeep` in fresh Git checkouts.
 - Root `qmd.json` with `collections_dir` set to `./qmd/collections`.
 - `qmd/collections/<project>-wiki` configuration in `wiki.yaml`, indexing canonical Markdown under `kb/` while excluding `kb/raw/`.
-- `qmd/collections/<project>-raw` configuration in `raw.yaml`, indexing source captures under `kb/raw/`.
+- `qmd/collections/<project>-raw` configuration in `raw.yaml`, indexing source captures under `kb/raw/` and research-study captures under `kb/research/`.
 - Anchored `.gitignore` rules for generated top-level artifacts and large raw files without hiding `kb/models/` or sanitized raw Markdown.
 - Read-only/search skills (`qmd-operator`, `kb-wiki-builder`, `kb-lookup`) placed in `.agents/skills/`; `kb-capture` is omitted until `--with-project-lessons` creates its local contract.
 - The `market-research` skill in `.agents/skills/market-research/` and its layout: `kb/research/<YYYY-MM-DD>_<slug>/` (brief + immutable `raw/` page captures with screenshots) and `kb/wiki/{entities,concepts,reports}/` for conclusions. See [Research studies](#research-studies-market-research-skill).
 
 Collection names are derived from the target directory name. Use `<project>-wiki` for canonical answers by default and query `<project>-raw` explicitly when inspecting source evidence.
+
+QMD raw indexing is a search configuration, not Git tracking or publication approval. `kb/research/` is intended for tracked public research evidence only after each source is individually reviewed for license, privacy, secrets, and repository eligibility. Keep private, bulky, binary, book, repository-clone, and other non-public source inputs outside tracked research; a consumer may use a local-only `sources/` area, but its name does not itself ignore files, so verify the repository's ignore/tracking policy and keep such inputs untracked. Existing ignore rules for selected bulky `kb/raw/` extensions do not make other files approved for publication.
 
 Use the read-only search wrapper when mode labeling and validated collection selection are required:
 
@@ -247,6 +249,8 @@ The wrapper runs `qmd search` against exactly one matching collection. Raw resul
 ### Research studies (market-research skill)
 
 `market-research` runs competitive, technology and UX studies from public web sources: every analysed page is captured as Markdown (+ product screenshots) under `kb/research/<date>_<slug>/raw/`, conclusions become entities, concepts and a report under `kb/wiki/`. The skill covers feature and technology matrices, UX/UI patterns, positioning from public reviews, JTBD and customer journey maps, and multi-agent market maps with a consolidation step. It requires the [surf](https://github.com/nicobailon/surf-cli) browser CLI connected to Chrome/Chromium and Python 3.9+.
+
+The raw QMD collection indexes both `kb/raw/` and `kb/research/`; the wiki collection excludes both. These paths describe search scope only and do not authorize Git tracking, committing, pushing, or publication. Track a research capture only after an individual review confirms it is eligible for the intended repository and destination, including license, privacy, and secret checks. Keep private, bulky, binary, books, repository clones, and other local source inputs in a local-only `sources/` area; do not track or publish them through this research workflow. A Markdown format, QMD index entry, capture helper output, or existing filename is not approval to publish.
 
 Agents started outside the project do not discover project skills by name; when dispatching a study to another agent, pass the absolute path to `.agents/skills/market-research/SKILL.md`. To make it available in every session on a machine, link the installed copy into the user skill folders, e.g. `ln -s "$(python -c 'import kb_bootstrap,os;print(os.path.dirname(kb_bootstrap.__file__))')/templates/skills/market-research" ~/.agents/skills/market-research`.
 

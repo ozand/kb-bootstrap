@@ -48,8 +48,16 @@ qmd collection list
 ### 3. Search and Query
 Generated projects use two collections:
 
-- `<project>-wiki` for canonical OKF knowledge; use this by default.
-- `<project>-raw` for source captures; query it explicitly during research.
+- `<project>-wiki` for canonical OKF knowledge; use this by default. It excludes `kb/raw/` and `kb/research/`.
+- `<project>-raw` for source captures under both `kb/raw/` and `kb/research/`; query it explicitly during research.
+
+These collection paths describe search/index scope only. QMD indexing does not authorize
+Git tracking, committing, pushing, or publication. Each source must separately pass the
+owning repository's license, privacy, secret, and destination review before it is tracked.
+Keep private, bulky, binary, books, repository clones, and other local-only source inputs
+outside these collections and untracked. A consumer may choose `sources/` as a local
+location, but its name does not itself exclude files from Git; verify local ignore and
+tracking policy.
 
 ```bash
 qmd search "<keywords>" -c <project>-wiki

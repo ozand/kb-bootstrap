@@ -1,10 +1,12 @@
 # ADR-030: Reuse source identity only through an explicit capture envelope
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-13
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #125; Issues #124, #122; ADR-024, ADR-026, ADR-027
+
+Owner acceptance: Issue #125, comment 6207512792, for reviewed contract at `bfbaf2703f2005945b5c89deccca838920b760d9`.
 
 ## Context
 
