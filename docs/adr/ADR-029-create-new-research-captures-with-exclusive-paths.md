@@ -1,10 +1,12 @@
 # ADR-029: Create new research captures with exclusive paths
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-13
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #125; ADR-010, ADR-022, ADR-024, ADR-027
+
+Owner acceptance: Issue #125, comment 6207512792, for reviewed contract at `dee7fbc045aa5acd0801199ad0a71b6a4e732bfd`.
 
 ## Context
 
