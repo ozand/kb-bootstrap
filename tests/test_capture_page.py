@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,10 +9,20 @@ from unittest.mock import patch
 SCRIPT = Path("kb_bootstrap/templates/skills/market-research/scripts/capture_page.py").resolve()
 SPEC = importlib.util.spec_from_file_location("capture_page", SCRIPT)
 capture_page = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(capture_page)
+_write_bytecode = sys.dont_write_bytecode
+try:
+    sys.dont_write_bytecode = True
+    SPEC.loader.exec_module(capture_page)
+finally:
+    sys.dont_write_bytecode = _write_bytecode
 
 
 class CapturePageExclusiveTests(unittest.TestCase):
+    def test_test_loader_does_not_write_bytecode_into_packaged_skill(self):
+        self.assertFalse(any(SCRIPT.parent.rglob("*.pyc")))
+        self.assertIn("def main", SCRIPT.read_text(encoding="utf-8"))
+        self.assertEqual(sys.dont_write_bytecode, _write_bytecode)
+
     def study(self, root):
         (root / "raw/img").mkdir(parents=True)
         (root / "brief.md").write_text("# brief\n", encoding="utf-8")
