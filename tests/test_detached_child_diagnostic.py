@@ -101,12 +101,21 @@ class DetachedChildEvidenceTests(unittest.TestCase):
         shutil.rmtree(path)
         return True
 
-    def test_wait_failure_preserves_owned_fixture(self):
-        """A failed handle wait is UNKNOWN and must not trigger fixture cleanup."""
-        owned = Path(tempfile.mkdtemp(prefix="kb-descendant-wait-failure-"))
-        removed = self._remove_confirmed_fixture(owned, 258, True, 0)
-        self.assertFalse(removed)
-        self.assertTrue(owned.is_dir(), "failed wait must preserve the owned fixture")
+    def test_unconfirmed_exit_evidence_preserves_owned_fixture(self):
+        """Wait or exit-query failure/nonzero code must not trigger fixture cleanup."""
+        cases = (
+            ("wait-failure", 258, True, 0),
+            ("exit-query-failure", 0, False, 0),
+            ("nonzero-exit", 0, True, 7),
+        )
+        for label, wait_result, exit_query_ok, exit_code in cases:
+            with self.subTest(evidence=label):
+                owned = Path(tempfile.mkdtemp(prefix=f"kb-descendant-{label}-"))
+                removed = self._remove_confirmed_fixture(
+                    owned, wait_result, exit_query_ok, exit_code
+                )
+                self.assertFalse(removed)
+                self.assertTrue(owned.is_dir(), f"{label} must preserve the owned fixture")
 
     def test_marker_without_process_handle_keeps_exit_unknown_and_fixture(self):
         """A delayed marker is not promoted to process-exit evidence."""
