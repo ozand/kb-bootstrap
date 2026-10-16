@@ -45,29 +45,50 @@ new identity or capture metadata and makes no acquisition or publication claim.
 ### What this IS
 
 1. The caller explicitly supplies an input root and one relative input path, an
-   existing study root, and one absent relative destination path beneath that
-   study's existing `raw/` directory. Reject absolute/drive/UNC paths,
-   parent traversal, symlinked files/ancestors, non-regular files, paths
-   resolving outside the respective selected roots, and unsafe/colliding
-   destinations before reading content or writing output. Do not enumerate
-   directories or choose a filename/sequence number.
-2. Accept only one UTF-8 Markdown file up to 64 MiB whose existing frontmatter
-   declares `type: RawCapture` and satisfies the packaged bounded frontmatter
-   shape. Preserve all source bytes exactly; do not append a timestamp, URL,
-   source ID, digest, converter record, or other field. This validates syntax
-   and size only; it does not prove source truth, permission to retain, or that
-   `captured_at` is current.
+   existing study root, and one absent destination directly beneath that study's
+   existing `raw/` directory. The destination basename must match
+   `NNN-<slug>.md`, where `NNN` is exactly three ASCII digits and `<slug>` is a
+   non-empty lowercase ASCII sequence of letters/digits separated only by
+   single hyphens. The caller chooses the name; the operation never scans to
+   allocate or choose another number. Reject absolute/drive/UNC paths, parent
+   traversal, symlinked files/ancestors, non-regular files, paths resolving
+   outside the respective selected roots, and unsafe/colliding destinations
+   before reading content or writing output.
+2. Accept one UTF-8 Markdown file up to 64 MiB. Its first line must be `---`;
+   frontmatter ends at the first subsequent line exactly `---`. Require exactly
+   one each of `type`, `title`, `url`, `captured_at`, `captured_by`, `entity`,
+   and `fidelity`; `type` must be the literal `RawCapture`. These seven required
+   values plus optional `description`, `tags`, and `status` use the existing
+   documented forms: required values are one-line scalar strings; optional
+   `description`/`status` are one-line strings and `tags` is a one-line
+   comma-separated list of plain lowercase tokens. Reject duplicate/unknown
+   keys, blank required values, tabs, YAML collections, aliases, multiline
+   scalars, malformed quoting, invalid UTF-8, and extra document separators.
+   `fidelity` is exactly `full`, `partial`, or `blocked`; `captured_at` must be
+   an offset-aware ISO timestamp string. `url` is a non-empty string copied
+   verbatim; it is never dereferenced or interpreted as identity. `captured_by`
+   and `entity` are descriptive strings only. These syntax gates do not prove
+   source truth, permission, or timestamp accuracy. Preserve source bytes
+   exactly; do not append, repair, or reserialize frontmatter.
 3. Create the destination exclusively, using the per-file no-overwrite and
    containment boundary accepted in ADR-029. If it already exists, a raced
    writer wins unchanged and the import blocks; do not retry or renumber. The
    operation never deletes an existing or newly created capture as rollback.
-4. Preflight local relative asset references using the existing bounded
-   research-reference rules. The operation accepts no attachment/input set and
-   copies no images or binaries. A local relative reference that would not
-   resolve safely to an already-present destination under the selected study
-   returns `UNSUPPORTED`/blocked before copying. It does not rewrite links,
-   fetch external URLs, or treat a remote image URL as a screenshot. External
-   references remain uninterpreted source text.
+4. Do not claim general Markdown parsing. Accept only one-line inline
+   `[label](target)` and `![alt](target)` constructs whose non-empty target has
+   no whitespace, parentheses, or control characters. Block before copy if the
+   file contains reference definitions/usages (`[label][id]`, `[id]: target`),
+   HTML tags, or an image/link-like construct outside this subset; the check is
+   deliberately conservative and must not rely on `check_research.py`'s
+   permissive `local_links` as a containment proof. A target with an explicit
+   URI scheme or fragment-only link is left uninterpreted and never fetched.
+   Every other target is a local relative path: resolve it from the destination's
+   parent, reject absolute/drive/UNC paths, `..`, symlinks, and any canonical
+   resolution outside the selected study, then require the already-existing
+   target to be a regular file. The importer accepts no attachment/input set,
+   copies no images/binaries, and rewrites no links. This conservative
+   source-relative to destination-relative check returns `UNSUPPORTED`/blocked
+   if moving the file would make a reference unsafe or missing.
 5. A successful copy is a local study file only. Git staging/commit under
    ADR-027, remote publication under ADR-022, and any consumer target remain
    separate operations and authority. No QMD update, canonical promotion, or
@@ -86,15 +107,17 @@ ADR-024 bridge, envelope generator, sidecar, report generator, canonical wiki
 writer, QMD/index operation, automatic Git action, network fallback, consumer
 migration, or proof that the supplied bytes are a faithful external original.
 It does not alter the existing Surf capture path. Importing arbitrary Markdown
-without the existing RawCapture provenance form and importing referenced local
-assets are outside this first bounded operation.
+without the listed `RawCapture` frontmatter, reference-style Markdown,
+HTML-embedded asset syntax, or attachments is outside this first bounded
+operation.
 
 ### Success criteria
 
 A future implementation must demonstrate with synthetic local files that one
-explicit valid RawCapture can be copied byte-identically to one explicit absent
-study destination without Surf, QMD, or network; unsafe/out-of-root paths,
-malformed/oversized input, missing local asset targets, and existing/raced output
+explicit valid RawCapture with accepted required/optional fields and a direct
+`NNN-<slug>.md` destination can be copied byte-identically without Surf, QMD,
+or network; unsafe/out-of-root paths, malformed/oversized frontmatter,
+unsupported or escaping/missing local references, and existing/raced output
 block without changing prior bytes; and the result carries no inferred identity,
 new timestamp, or authorization claim. A valid supplied ADR-024 envelope can
 still be reused separately through ADR-030; the importer itself neither creates
@@ -149,11 +172,12 @@ network policy, QMD behavior, or canonical lifecycle is changed by this proposal
 
 | Claim if implemented | Test | Currently |
 |---|---|---|
-| One explicit valid RawCapture is copied byte-identically to one absent study destination | `tests/test_local_rawcapture_import.py::test_single_import_preserves_exact_bytes` | not yet written |
+| Valid required RawCapture fields and optional documented description/tags/status forms are accepted; missing, duplicate, unknown, malformed, multiline, or unsupported YAML syntax is rejected without rewriting bytes | `tests/test_local_rawcapture_import.py::test_frontmatter_subset_is_deterministic` | not yet written |
+| Only direct `raw/NNN-<lowercase-slug>.md` absent destination names are accepted | `tests/test_local_rawcapture_import.py::test_destination_matches_capture_name_contract` | not yet written |
 | Input/destination traversal, symlink, non-regular and outside-root paths block before content read/write | `tests/test_local_rawcapture_import.py::test_unsafe_paths_block_without_mutation` | not yet written |
-| Missing/wrong RawCapture frontmatter and >64 MiB input block without output | `tests/test_local_rawcapture_import.py::test_invalid_or_oversized_capture_blocks` | not yet written |
+| >64 MiB input blocks without output | `tests/test_local_rawcapture_import.py::test_oversized_capture_blocks` | not yet written |
 | Existing/raced destination bytes are preserved; no retry/renumber occurs | `tests/test_local_rawcapture_import.py::test_existing_and_raced_targets_are_not_overwritten` | not yet written |
-| Missing/escaping local asset reference returns unsupported without copying/rewrite; external reference is not fetched | `tests/test_local_rawcapture_import.py::test_assets_are_not_discovered_copied_or_fetched` | not yet written |
+| Supported inline local links are contained/existing; reference-style/HTML/ambiguous forms and missing/escaping targets block; external URLs are not fetched | `tests/test_local_rawcapture_import.py::test_asset_reference_subset_fails_closed` | not yet written |
 | Import does not mint identity, timestamps, or an envelope; explicit ADR-024 reuse remains a separate ADR-030 call | `tests/test_local_rawcapture_import.py::test_import_adds_no_provenance_or_identity` | not yet written |
 | No QMD, Git staging/commit/push, or canonical output occurs | `tests/test_local_rawcapture_import.py::test_import_has_no_external_or_canonical_side_effects` | not yet written |
 
