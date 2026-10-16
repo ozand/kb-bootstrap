@@ -65,6 +65,14 @@ If kb-bootstrap is not installed, verify `git remote -v` and `gh repo view` by h
 
 ## Workflow
 
+A local-only study may stop after its files are reviewed in the owning working tree; no
+commit or push cadence is required. If selected captures are to be retained as tracked
+repository content, use the separate explicit Git-retention step below. This is not a local
+capture importer: collection still uses the existing Surf workflow unless the user supplies
+already saved material through another explicitly authorized process. Do not imply that
+local review proves source eligibility, completeness, screenshot provenance, or cross-study
+identity.
+
 Copy this checklist into your notes and tick it off:
 
 - [ ] 0. Look up what is known: `qmd search "<topic>" -c <project>-wiki` (collection names
@@ -104,8 +112,10 @@ Copy this checklist into your notes and tick it off:
       and resolve explicitly before committing. This verifies repository-tracked retention; it
       does not authorize an implicit push, consumer-repository publication, or capture rewriting,
       or any claim that the capture is the byte-identical external origin.
-- [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
-      raw pages and screenshots, top conclusions, and—if committed—the exact retention commit.
+- [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)` only when repository delivery is
+      requested and authorized. For local-only work, record the reviewed study location and
+      limitations without creating a PR. Final message: report path, number of raw pages and
+      screenshots, top conclusions, and—if committed—the exact retention commit.
 
 Local checkpoints may be used to protect work in progress, but no fixed commit/push
 cadence is required. Before a commit, review the exact staged paths and blobs. Pushing
