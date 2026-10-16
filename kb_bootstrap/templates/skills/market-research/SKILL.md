@@ -112,8 +112,10 @@ Copy this checklist into your notes and tick it off:
       and resolve explicitly before committing. This verifies repository-tracked retention; it
       does not authorize an implicit push, consumer-repository publication, or capture rewriting,
       or any claim that the capture is the byte-identical external origin.
-- [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)`; final message: report path, number of
-      raw pages and screenshots, top conclusions, and—if committed—the exact retention commit.
+- [ ] 9. Deliver one PR `docs(kb): <topic> (#<issue>)` only when repository delivery is
+      requested and authorized. For local-only work, record the reviewed study location and
+      limitations without creating a PR. Final message: report path, number of raw pages and
+      screenshots, top conclusions, and—if committed—the exact retention commit.
 
 Local checkpoints may be used to protect work in progress, but no fixed commit/push
 cadence is required. Before a commit, review the exact staged paths and blobs. Pushing
