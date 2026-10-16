@@ -19,9 +19,11 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -80,11 +82,45 @@ def next_number(raw_dir: Path) -> int:
     return max(nums, default=0) + 1
 
 
+def _exclusive_write(path: Path, data: bytes, study_dir: Path) -> None:
+    """Create one contained output without replacing an existing path."""
+    root = study_dir.absolute()
+    target = path.absolute()
+    try:
+        if os.path.commonpath((str(root), str(target))) != str(root):
+            raise ValueError("output path escapes study")
+    except ValueError as exc:
+        raise ValueError("output path escapes study") from exc
+    try:
+        relative_root = root.relative_to(Path(root.anchor))
+        current = Path(root.anchor)
+        for part in relative_root.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("study path is unsafe")
+        relative = target.relative_to(root)
+        for part in relative.parts[:-1]:
+            current = current / part
+            if current.is_symlink() or not current.is_dir():
+                raise ValueError("output parent is unavailable or unsafe")
+        if target.is_symlink():
+            raise ValueError("output path is unsafe")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(str(target), flags, 0o666)
+    except FileExistsError:
+        raise
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(data)
+
+
 MAX_IMAGE_BYTES = 5_000_000
 MAGIC = ((b"\x89PNG", ".png"), (b"GIF8", ".gif"), (b"\xff\xd8", ".jpg"), (b"RIFF", ".webp"))
 
 
-def save_image(src: str, base: Path, window_id: str) -> Path | None:
+def save_image(src: str, base: Path, window_id: str,
+               study_dir: Path | None = None, created: list[Path] | None = None) -> Path | None:
     """Download an image (browser screenshot as fallback). Returns the saved path."""
     try:
         req = urllib.request.Request(src, headers={"User-Agent": UA})
@@ -93,17 +129,46 @@ def save_image(src: str, base: Path, window_id: str) -> Path | None:
         ext = next((e for magic, e in MAGIC if data.startswith(magic)), None)
         if ext and 2000 < len(data) <= MAX_IMAGE_BYTES:
             dest = base.with_suffix(ext)
-            dest.write_bytes(data)
+            if study_dir is None:
+                dest.write_bytes(data)
+            else:
+                _exclusive_write(dest, data, study_dir)
+                if created is not None:
+                    created.append(dest)
             return dest
+    except FileExistsError:
+        raise
     except (OSError, ValueError):
         pass
     dest = base.with_suffix(".png")  # too big, unknown type or blocked: screenshot it
     try:
-        surf("--window-id", window_id, "go", src)
-        time.sleep(2)
-        surf("--window-id", window_id, "screenshot", "--output", str(dest))
-        return dest if dest.exists() else None
-    except RuntimeError:
+        staged = None
+        try:
+            surf("--window-id", window_id, "go", src)
+            time.sleep(2)
+            if study_dir is None:
+                surf("--window-id", window_id, "screenshot", "--output", str(dest))
+                return dest if dest.is_file() and not dest.is_symlink() else None
+            fd, staged_name = tempfile.mkstemp(prefix=".capture-image-", suffix=".png", dir=str(dest.parent))
+            os.close(fd)
+            staged = Path(staged_name)
+            surf("--window-id", window_id, "screenshot", "--output", str(staged))
+            if not staged.is_file() or staged.is_symlink():
+                return None
+            _exclusive_write(dest, staged.read_bytes(), study_dir)
+            if created is not None:
+                created.append(dest)
+            return dest
+        finally:
+            if staged is not None and staged.is_file() and not staged.is_symlink():
+                staged.unlink()
+    except FileExistsError:
+        raise
+    except ValueError:
+        if study_dir is not None:
+            raise
+        return None
+    except (RuntimeError, OSError):
         return None
 
 
@@ -120,9 +185,13 @@ def main() -> int:
     a = ap.parse_args()
 
     raw_dir = a.research_dir / "raw"
-    if not (a.research_dir / "brief.md").exists():
-        sys.exit(f"{a.research_dir} is not a research folder (no brief.md); run new_research.py first")
-    (raw_dir / "img").mkdir(parents=True, exist_ok=True)
+    if not (a.research_dir / "brief.md").is_file() or (a.research_dir / "brief.md").is_symlink():
+        sys.exit(f"{a.research_dir} is not a research folder (no safe brief.md); run new_research.py first")
+    if raw_dir.is_symlink() or not raw_dir.is_dir():
+        sys.exit("capture output is blocked: raw directory is unavailable or unsafe")
+    image_dir = raw_dir / "img"
+    if image_dir.is_symlink() or not image_dir.is_dir():
+        sys.exit("capture output is blocked: image directory is unavailable or unsafe")
 
     window_id = open_page(a.url, a.window_id)
     page = extract(window_id)
@@ -144,9 +213,19 @@ def main() -> int:
         page["images"] = []
 
     saved = []
+    created_images: list[Path] = []
     wanted = [i for i in page["images"] if i["width"] >= a.min_width][: max(a.images, 0)]
     for k, img in enumerate(wanted, 1):
-        dest = save_image(img["src"], raw_dir / "img" / f"{num:03d}-{k}", window_id)
+        try:
+            dest = save_image(img["src"], raw_dir / "img" / f"{num:03d}-{k}", window_id,
+                              a.research_dir, created_images)
+        except (FileExistsError, OSError, ValueError):
+            created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
+            if created_paths:
+                print("PARTIAL: image output blocked; created files preserved: " + ", ".join(created_paths))
+            else:
+                print("BLOCKED: image output already exists or output path is unsafe")
+            return 3
         if dest:
             md = md.replace(f"]({img['src']})", f"](img/{dest.name})")
             saved.append(dest.name)
@@ -166,7 +245,15 @@ def main() -> int:
         "---",
     ])
     out = raw_dir / f"{stem}.md"
-    out.write_text(f"{front}\n\n# {title}\n\n{md}\n", encoding="utf-8")
+    try:
+        _exclusive_write(out, f"{front}\n\n# {title}\n\n{md}\n".encode("utf-8"), a.research_dir)
+    except (FileExistsError, OSError, ValueError):
+        created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
+        if created_paths:
+            print("PARTIAL: markdown output blocked; created files preserved: " + ", ".join(created_paths))
+        else:
+            print("BLOCKED: markdown output already exists or output path is unsafe")
+        return 3
 
     print(f"saved {out}  chars={len(md)} fidelity={fidelity} images_saved={len(saved)}")
     rest = [i for i in page["images"] if i not in wanted and i["width"] >= a.min_width]
