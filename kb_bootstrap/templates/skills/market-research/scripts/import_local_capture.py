@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 MAX_BYTES = 64 * 1024 * 1024
@@ -146,7 +147,7 @@ def _validate_links(body: str, destination_md: Path, study: Path):
         _fail("UNSUPPORTED", "unsupported link-like Markdown syntax")
     for match in matches:
         target = match.group(2)
-        if not target or any(ch.isspace() or ord(ch) < 32 or ch in "()" for ch in target):
+        if not target or any(ch.isspace() or unicodedata.category(ch) == "Cc" or ch in "()" for ch in target):
             _fail("UNSUPPORTED", "inline link target syntax is unsupported")
         if target.startswith("#"):
             continue

@@ -184,6 +184,19 @@ class LocalRawCaptureImportTests(unittest.TestCase):
         self.assertEqual(caught.exception.status, "BLOCKED")
         self.assertFalse((self.study / "raw/010-local.md").exists())
 
+    def test_control_characters_in_link_targets_block_without_mutation(self):
+        for codepoint in (0x7F, 0x80, 0x9F):
+            with self.subTest(codepoint=codepoint):
+                control = chr(codepoint)
+                self.source.write_bytes(self.raw.replace(b"Local text.", f"[x](file{control}name)".encode("utf-8")))
+                before = self.source.read_bytes()
+                destination = self.study / f"raw/{codepoint:03d}-local.md"
+                with self.assertRaises(ImportErrorResult) as caught:
+                    import_capture(self.study, self.input_root, "001-demo.md", destination.name)
+                self.assertEqual(caught.exception.status, "UNSUPPORTED")
+                self.assertEqual(self.source.read_bytes(), before)
+                self.assertFalse(destination.exists())
+
     def test_unsupported_markdown_links_and_external_urls_are_not_fetched(self):
         for body in (b"[ref][id]\n\n[id]: target.md\n", b"<img src=\"x\">", b"[x](../escape.md)"):
             self.source.write_bytes(self.raw.replace(b"Local text.", body))
