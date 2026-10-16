@@ -1,20 +1,15 @@
 import importlib.util
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path("kb_bootstrap/templates/skills/market-research/scripts/import_local_capture.py").resolve()
 SPEC = importlib.util.spec_from_file_location("import_local_capture", SCRIPT)
 import_local_capture = importlib.util.module_from_spec(SPEC)
-write_bytecode = sys.dont_write_bytecode
-try:
-    sys.dont_write_bytecode = True
-    code = SPEC.loader.get_code(SPEC.name)
-    exec(code, import_local_capture.__dict__)
-finally:
-    sys.dont_write_bytecode = write_bytecode
+with patch("sys.dont_write_bytecode", True):
+    SPEC.loader.exec_module(import_local_capture)
 ImportErrorResult = import_local_capture.ImportErrorResult
 import_capture = import_local_capture.import_capture
 
