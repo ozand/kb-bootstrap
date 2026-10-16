@@ -49,21 +49,26 @@ new identity or capture metadata and makes no acquisition or publication claim.
    existing `raw/` directory. The destination basename must match
    `NNN-<slug>.md`, where `NNN` is exactly three ASCII digits and `<slug>` is a
    non-empty lowercase ASCII sequence of letters/digits separated only by
-   single hyphens. The caller chooses the name; the operation never scans to
-   allocate or choose another number. Reject absolute/drive/UNC paths, parent
-   traversal, symlinked files/ancestors, non-regular files, paths resolving
+   single hyphens, matching `check_research.py`. The caller chooses the name;
+   the operation never scans to allocate or choose another number. Reject
+   absolute/drive/UNC paths, parent traversal, symlinked files/ancestors,
+   non-regular files, paths resolving
    outside the respective selected roots, and unsafe/colliding destinations
    before reading content or writing output.
 2. Accept one UTF-8 Markdown file up to 64 MiB. Its first line must be `---`;
    frontmatter ends at the first subsequent line exactly `---`. Require exactly
    one each of `type`, `title`, `url`, `captured_at`, `captured_by`, `entity`,
-   and `fidelity`; `type` must be the literal `RawCapture`. These seven required
-   values plus optional `description`, `tags`, and `status` use the existing
-   documented forms: required values are one-line scalar strings; optional
-   `description`/`status` are one-line strings and `tags` is a one-line YAML
-   inline list of plain lowercase tokens, matching `formats.md`. Reject duplicate/unknown
-   keys, blank required values, tabs, YAML collections, aliases, multiline
-   scalars, malformed quoting, invalid UTF-8, and extra document separators.
+   and `fidelity`; `type` must be the literal `RawCapture`. These are the fields
+   emitted by the current capture writer. `title`, `url`, `captured_at`,
+   `captured_by`, and `fidelity` must be non-empty one-line scalar strings;
+   `entity` is a one-line scalar and may be empty, as the documented no-entity
+   form permits. The only optional key is `tags`, using a one-line YAML inline
+   list of plain lowercase tokens as in `formats.md`. The listed scalar forms
+   accept only the documented plain or double-quoted single-line spelling. This
+   is the only accepted collection form: reject collections for other keys, nested or
+   block collections, aliases, duplicate/unknown keys, blank required values,
+   tabs, multiline scalars, malformed quoting, invalid UTF-8, and extra document
+   separators.
    `fidelity` is exactly `full`, `partial`, or `blocked`; `captured_at` must be
    an offset-aware ISO timestamp string. `url` is a non-empty string copied
    verbatim; it is never dereferenced or interpreted as identity. `captured_by`
@@ -80,10 +85,12 @@ new identity or capture metadata and makes no acquisition or publication claim.
    file contains reference definitions/usages (`[label][id]`, `[id]: target`),
    HTML tags, or an image/link-like construct outside this subset; the check is
    deliberately conservative and must not rely on `check_research.py`'s
-   permissive `local_links` as a containment proof. A target with an explicit
-   URI scheme or fragment-only link is left uninterpreted and never fetched.
-   Every other target is a local relative path: resolve it from the destination's
-   parent, reject absolute/drive/UNC paths, `..`, symlinks, and any canonical
+   permissive `local_links` as a containment proof. Classify drive (`C:`) and
+   UNC (`\\\\server\\\\share`) forms before URI schemes and reject them; only
+   a syntactically valid non-drive URI scheme is left uninterpreted and never
+   fetched. Fragment-only links are likewise uninterpreted. Every other target
+   is a local relative path: resolve it from the destination's parent, reject
+   absolute/drive/UNC paths, `..`, symlinks, and any canonical
    resolution outside the selected study, then require the already-existing
    target to be a regular file. The importer accepts no attachment/input set,
    copies no images/binaries, and rewrites no links. This conservative
@@ -172,7 +179,7 @@ network policy, QMD behavior, or canonical lifecycle is changed by this proposal
 
 | Claim if implemented | Test | Currently |
 |---|---|---|
-| Valid required RawCapture fields and optional documented description/tags/status forms are accepted; missing, duplicate, unknown, malformed, multiline, or unsupported YAML syntax is rejected without rewriting bytes | `tests/test_local_rawcapture_import.py::test_frontmatter_subset_is_deterministic` | not yet written |
+| Valid required RawCapture fields and optional documented inline-list `tags` are accepted; missing, duplicate, unknown, malformed, multiline, or unsupported YAML syntax is rejected without rewriting bytes | `tests/test_local_rawcapture_import.py::test_frontmatter_subset_is_deterministic` | not yet written |
 | Only direct `raw/NNN-<lowercase-slug>.md` absent destination names are accepted | `tests/test_local_rawcapture_import.py::test_destination_matches_capture_name_contract` | not yet written |
 | Input/destination traversal, symlink, non-regular and outside-root paths block before content read/write | `tests/test_local_rawcapture_import.py::test_unsafe_paths_block_without_mutation` | not yet written |
 | >64 MiB input blocks without output | `tests/test_local_rawcapture_import.py::test_oversized_capture_blocks` | not yet written |
