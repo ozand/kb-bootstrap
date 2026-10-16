@@ -39,6 +39,10 @@ def _reject_symlink_ancestors(path: Path, label: str) -> None:
             _fail("BLOCKED", f"{label} path contains a symlink")
 
 
+def _unsafe_input_spelling(value: str) -> bool:
+    return value.startswith(("\\\\", "//")) or bool(re.match(r"^[A-Za-z]:", value))
+
+
 def _contained_regular(root: Path, rel: Path, *, root_label: str) -> Path:
     if rel.is_absolute() or not rel.parts or any(p in {"", ".", ".."} for p in rel.parts):
         _fail("BLOCKED", f"{root_label} path is unsafe")
@@ -60,7 +64,7 @@ def _contained_regular(root: Path, rel: Path, *, root_label: str) -> Path:
     return target
 
 
-def _parse_scalar(value: str):
+def _parse_scalar(value: str, *, allow_empty: bool = False):
     value = value.strip()
     if not value or any(ord(ch) < 32 and ch != "\t" for ch in value):
         _fail("BLOCKED", "frontmatter scalar is blank or contains controls")
@@ -71,6 +75,8 @@ def _parse_scalar(value: str):
             _fail("BLOCKED", "frontmatter quoting is malformed")
         if not isinstance(parsed, str) or "\n" in parsed or "\r" in parsed:
             _fail("BLOCKED", "frontmatter scalar must be one line")
+        if not parsed and not allow_empty:
+            _fail("BLOCKED", "frontmatter scalar is blank")
         return parsed
     if value.startswith(("'", "[", "{", "|", ">", "&", "*", "!")):
         _fail("BLOCKED", "frontmatter scalar syntax is unsupported")
@@ -114,7 +120,8 @@ def _validate_frontmatter(data: bytes):
         if not KEY.fullmatch(key) or key in fields:
             _fail("BLOCKED", "frontmatter has an invalid or duplicate key")
         fields[key] = _parse_tags(value) if key == "tags" else (
-            "" if key == "entity" and not value.strip() else _parse_scalar(value)
+            "" if key == "entity" and not value.strip()
+            else _parse_scalar(value, allow_empty=(key == "entity"))
         )
     if set(fields) - (REQUIRED | {"tags"}) or not REQUIRED <= set(fields):
         _fail("BLOCKED", "frontmatter keys are unsupported or incomplete")
@@ -225,6 +232,8 @@ def import_capture(study_dir: Path, input_root: Path, input_relative: str,
                    destination_name: str) -> tuple[str, str]:
     study = study_dir.absolute()
     root = input_root.absolute()
+    if _unsafe_input_spelling(input_relative):
+        _fail("BLOCKED", "input path uses a drive or UNC spelling")
     if not DESTINATION.fullmatch(destination_name):
         _fail("BLOCKED", "destination name must match NNN-<lowercase-slug>.md")
     try:

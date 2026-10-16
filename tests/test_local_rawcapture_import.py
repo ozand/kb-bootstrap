@@ -1,5 +1,7 @@
 import importlib.util
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +42,20 @@ class LocalRawCaptureImportTests(unittest.TestCase):
 
     def run_import(self, dest="001-local.md"):
         return import_capture(self.study, self.input_root, "001-demo.md", dest)
+
+    def test_script_cli_reports_import_and_blocked_collision(self):
+        command = [sys.executable, str(SCRIPT), str(self.study),
+                   "--input-root", str(self.input_root), "--input", "001-demo.md",
+                   "--destination", "015-cli.md"]
+        success = subprocess.run(command, capture_output=True, text=True, check=False)
+        self.assertEqual(success.returncode, 0, success.stderr)
+        self.assertIn("IMPORTED: raw/015-cli.md", success.stdout)
+        imported = self.study / "raw/015-cli.md"
+        self.assertEqual(imported.read_bytes(), self.raw)
+        blocked = subprocess.run(command, capture_output=True, text=True, check=False)
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("BLOCKED: destination already exists", blocked.stdout)
+        self.assertEqual(imported.read_bytes(), self.raw)
 
     def test_valid_capture_copied_byte_identically_without_identity_minting(self):
         status, relative = self.run_import()
@@ -101,6 +117,19 @@ class LocalRawCaptureImportTests(unittest.TestCase):
                 with self.assertRaises(ImportErrorResult):
                     self.run_import("002-local.md")
                 self.assertFalse((self.study / "raw/002-local.md").exists())
+
+    def test_empty_quoted_required_fields_and_drive_unc_spellings_block(self):
+        for field in ("title", "url", "captured_by", "captured_at"):
+            line = next(line for line in self.raw.splitlines() if line.startswith(field.encode() + b": "))
+            empty = self.raw.replace(line, field.encode() + b': ""')
+            self.source.write_bytes(empty)
+            with self.subTest(field=field), self.assertRaises(ImportErrorResult):
+                self.run_import("013-local.md")
+            self.assertFalse((self.study / "raw/013-local.md").exists())
+        for spelling in (r"C:\capture.md", r"\\server\share.md"):
+            with self.subTest(spelling=spelling), self.assertRaises(ImportErrorResult):
+                import_capture(self.study, self.input_root, spelling, "014-local.md")
+            self.assertFalse((self.study / "raw/014-local.md").exists())
 
     def test_unsafe_source_path_and_symlink_are_blocked(self):
         with self.assertRaises(ImportErrorResult):
