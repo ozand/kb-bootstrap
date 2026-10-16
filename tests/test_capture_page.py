@@ -21,7 +21,7 @@ class CapturePageExclusiveTests(unittest.TestCase):
     def test_test_loader_does_not_write_bytecode_into_packaged_skill(self):
         self.assertFalse(any(SCRIPT.parent.rglob("*.pyc")))
         self.assertIn("def main", SCRIPT.read_text(encoding="utf-8"))
-        self.assertFalse(sys.dont_write_bytecode)
+        self.assertEqual(sys.dont_write_bytecode, _write_bytecode)
 
     def study(self, root):
         (root / "raw/img").mkdir(parents=True)
