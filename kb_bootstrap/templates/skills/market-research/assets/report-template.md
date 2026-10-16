@@ -48,6 +48,9 @@ Brief: [brief](../../research/<YYYY-MM-DD>_<slug>/brief.md). <N> products, <N> r
 ## 9. Limitations
 <!-- Blocked sources, what was seen only in docs, hypotheses, what needs an own test. -->
 
-## 10. Draft product cards
+## 10. Unsupported claims and remaining work
+<!-- Record claims the evidence does not support, and unresolved questions or follow-up work. -->
+
+## 11. Draft product cards
 <!-- Per product: 3–6 facts with raw links. Becomes kb/wiki/entities/ (directly in a
      single study; via consolidation in parallel studies). -->

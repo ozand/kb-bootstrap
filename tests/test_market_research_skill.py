@@ -60,6 +60,11 @@ class MarketResearchScaffoldTests(unittest.TestCase):
             self.assertTrue((skill / "scripts/capture_page.py").is_file())
             self.assertTrue((skill / "scripts/extract_markdown.js").is_file())
             self.assertTrue((skill / "assets/brief-template.md").is_file())
+            report_template = (skill / "assets/report-template.md").read_text(encoding="utf-8")
+            self.assertIn("## 10. Unsupported claims and remaining work", report_template)
+            self.assertIn("claims the evidence does not support", report_template)
+            self.assertIn("unresolved questions or follow-up work", report_template)
+            self.assertIn("## 11. Draft product cards", report_template)
             self.assertFalse(list(skill.rglob("__pycache__")))
             for folder in ["kb/research", "kb/wiki/entities", "kb/wiki/concepts", "kb/wiki/reports"]:
                 self.assertTrue((root / folder).is_dir(), folder)
