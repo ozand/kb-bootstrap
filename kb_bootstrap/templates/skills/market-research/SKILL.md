@@ -65,6 +65,14 @@ If kb-bootstrap is not installed, verify `git remote -v` and `gh repo view` by h
 
 ## Workflow
 
+A local-only study may stop after its files are reviewed in the owning working tree; no
+commit or push cadence is required. If selected captures are to be retained as tracked
+repository content, use the separate explicit Git-retention step below. This is not a local
+capture importer: collection still uses the existing Surf workflow unless the user supplies
+already saved material through another explicitly authorized process. Do not imply that
+local review proves source eligibility, completeness, screenshot provenance, or cross-study
+identity.
+
 Copy this checklist into your notes and tick it off:
 
 - [ ] 0. Look up what is known: `qmd search "<topic>" -c <project>-wiki` (collection names
