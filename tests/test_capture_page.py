@@ -131,6 +131,42 @@ class CapturePageExclusiveTests(unittest.TestCase):
             open_page.assert_not_called()
             self.assertEqual(list(outside.iterdir()), [])
 
+    def test_downloaded_image_uses_response_bytes_without_screenshot_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            payload = bytes((137, 80, 78, 71)) + b"x" * 2500
+            with patch.object(capture_page.urllib.request, "urlopen",
+                              return_value=io.BytesIO(payload)), \
+                 patch.object(capture_page, "surf", side_effect=AssertionError("unexpected screenshot")):
+                saved = capture_page.save_image("https://example.test/image.png",
+                                                root / "raw/img/001-1", "123456",
+                                                root, [])
+            self.assertEqual(saved.read_bytes(), payload)
+            self.assertEqual(saved.suffix, ".png")
+
+    def test_unsupported_download_uses_screenshot_fallback_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            payload = b"unsupported response"
+            def screenshot(*args):
+                if "--output" not in args:
+                    return ""
+                output = Path(args[args.index("--output") + 1])
+                output.write_bytes(b"synthetic screenshot")
+                return ""
+            with patch.object(capture_page.urllib.request, "urlopen",
+                              return_value=io.BytesIO(payload)), \
+                 patch.object(capture_page.time, "sleep"), \
+                 patch.object(capture_page, "surf", side_effect=screenshot):
+                created = []
+                saved = capture_page.save_image("https://example.test/image.png",
+                                                root / "raw/img/001-1", "123456", root, created)
+            self.assertEqual(saved.read_bytes(), b"synthetic screenshot")
+            self.assertEqual(created, [saved])
+            self.assertEqual(saved.name, "001-1.png")
+
     def test_image_collision_preserves_existing_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
