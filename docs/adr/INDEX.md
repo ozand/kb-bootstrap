@@ -30,3 +30,4 @@
 | ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
 | ADR-027 | Retain captured Markdown as owner-repository files | Accepted |
 | ADR-029 | Create new research captures with exclusive paths | Accepted |
+| ADR-030 | Reuse source identity only through an explicit capture envelope | Accepted |
