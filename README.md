@@ -1,10 +1,16 @@
 # Knowledge Base (OKF + QMD) Bootstrap Framework
 
-For local checks without QMD configuration, use `kb-bootstrap validate-core --dir kb` (optionally `--now <offset-aware-time>`). It checks canonical structure, provenance and graph integrity only; it does not check retrieval/index freshness, source truth or publication readiness. Existing `validate` still requires its QMD declaration checks. No capability configuration, model or network operation is created by `validate-core`.
+## When you need a project knowledge base
+
+Project knowledge gets scattered across notes, source files, and team handoffs. `kb-bootstrap` creates a local knowledge-base layout in a repository, with structured Markdown conventions and optional search tooling. Use it when you want a consistent place to organize and retrieve project knowledge; it does not write or validate your domain's facts for you.
+
+The framework combines the **Open Knowledge Format (OKF)** for structured documentation with **QMD** as an optional local search tool. QMD is not required for every local check: use `search-local` and `read-local` for bounded file-only discovery and reading when QMD is unavailable.
+
+`validate-core --dir kb` (optionally `--now <offset-aware-time>`) checks canonical structure, provenance, and graph integrity without QMD configuration, model, or network operation. It does not check retrieval/index freshness, source truth, or publication readiness. Legacy `validate` still requires its QMD declaration checks.
+
+For contributors writing project explanations or setup instructions, see the short [authoring guide](docs/AUTHORING_GUIDE.md).
 
 Current release: **0.4.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes and the [existing-consumer migration procedure](docs/MIGRATING_EXISTING_CONSUMERS.md) for staged adoption and rollback guidance.
-
-A portable CLI tool to instantly initialize a local Knowledge Base architecture in any repository. This framework combines the **Open Knowledge Format (OKF)** for structured documentation and **QMD** for semantic search.
 
 ## Core Concepts
 
@@ -13,7 +19,7 @@ A portable CLI tool to instantly initialize a local Knowledge Base architecture 
 
 ## Prerequisites & System Requirements
 
-Before using this framework, ensure your host environment has the required toolchain. If an AI agent is performing the setup, it should verify and install these dependencies first.
+The CLI and local file-only commands require Python. Install QMD only if you want QMD-backed semantic search; it is not required for `validate-core`, `search-local`, or `read-local`. If an AI agent is performing setup, it must not install tools without the user's authorization.
 
 1. **[Python 3.8+](https://www.python.org/downloads/)**
    - Required to run the `kb-bootstrap` CLI tool.
@@ -26,10 +32,10 @@ Before using this framework, ensure your host environment has the required toolc
      - macOS: `brew install pipx && pipx ensurepath`
      - Windows: `python -m pip install --user pipx` then `python -m pipx ensurepath`
 
-3. **[QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**
-   - The core engine for semantic search across the knowledge base.
-   - *Installation:* The npm installation requires [Node.js 22 or newer](https://nodejs.org/).
-     - Install QMD globally: `npm install -g @tobilu/qmd` (or `bun install -g @tobilu/qmd`).
+3. **Optional: [QMD (Quality Markdown Search)](https://github.com/tobi/qmd)**
+   - Needed only for the QMD-backed `search` command; local `search-local` / `read-local` and `validate-core` work without it.
+   - The npm installation requires [Node.js 22 or newer](https://nodejs.org/).
+     - If desired and authorized, install QMD globally: `npm install -g @tobilu/qmd` (or `bun install -g @tobilu/qmd`).
      - Ensure the installed `qmd` executable is available on your system `PATH`.
 
 The read-only `kb-bootstrap search` wrapper resolves the QMD executable through the
@@ -46,18 +52,18 @@ kb-bootstrap search "how is setup configured?" --project-root .
 
 ## Agent Instructions: How to bootstrap a project
 
-If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a link to this repository, follow this exact sequence:
+If a user asks to bootstrap a knowledge base, first identify the target repository and the operation they need. Do not install tools or write files until the user authorizes those actions.
 
-### Phase 1: Environment Check
-1. Verify `python` and `pipx` are installed. If missing, guide the user to install them or run the installation commands if you have host access.
-2. Verify `qmd` is available (`qmd --version`). If missing, explain that the npm installation requires Node.js 22 or newer, instruct the user to install QMD with `npm install -g @tobilu/qmd` (or `bun install -g @tobilu/qmd`) and verify it is on `PATH`.
+### Phase 1: Choose the needed capability
+1. Verify Python is available for the CLI. `pipx` is an optional installation method, not a product prerequisite.
+2. Ask whether the user needs QMD-backed search. QMD is optional: `validate-core`, `search-local`, and `read-local` do not require it. If QMD is wanted, report the Node.js 22+ requirement and request authorization before installing anything.
 
-### Phase 2: Tool Installation
-1. **Install the CLI tool globally:**
-   ```bash
-   pipx install git+https://github.com/ozand/kb-bootstrap.git
-   ```
-   *(If `pipx` fails, fallback to `python -m pip install --user git+https://github.com/ozand/kb-bootstrap.git`)*
+### Phase 2: Install only when authorized
+Install the CLI only if requested and authorized, using a chosen method such as:
+```bash
+pipx install git+https://github.com/ozand/kb-bootstrap.git
+```
+If `pipx` is unavailable, explain the alternative and wait for authorization rather than silently falling back to a global/user-site install.
 
 ### Phase 3: Project Initialization
 1. **Navigate to the target project root:**
@@ -70,12 +76,11 @@ If a user asks you to "bootstrap the knowledge base", "setup KB", or gives you a
 
    `single` and `umbrella` describe the generated knowledge content topology. They do not describe where the repository is hosted or deployed.
 
-3. **Verify the generated scaffold:**
-   - Check that `.agents/skills/` contains `kb-lookup`, `kb-wiki-builder`, `qmd-operator`, and `market-research`; `kb-capture` is generated only with `--with-project-lessons`.
-   - Check that `qmd.json`, `qmd/collections/wiki.yaml`, and `qmd/collections/raw.yaml` were created.
-   - Run `kb-bootstrap validate --dir kb --project-root .`.
-   - Run the project test command.
-   - Run `qmd update`, then smoke-test both generated collections with `qmd search`.
+3. **Verify only the requested setup:**
+   - Check that the expected generated skills and files exist.
+   - Run `kb-bootstrap validate-core --dir kb` for local structural checks, or `validate` when the repository's QMD declarations are configured and required.
+   - Run the project's documented test command when requested or appropriate.
+   - Update/search QMD only when the user requested QMD setup and authorized the index operation; QMD updates can write local index state.
 
 ## Repository remote and issue-routing policy
 
