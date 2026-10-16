@@ -25,7 +25,7 @@ SHA-256 of the committed source files at that revision: README `376af89889cd3e4b
 
 ## Prompt
 
-> In your own words, what does equal path+SHA-256 establish here? Name three conclusions it does not justify, and explain why stable-checkout matters. If the excerpt does not say, say so.
+> In your own words, what does equal path+SHA-256 establish in this manifest? Name at least three conclusions it does not justify, and explain why the stable-checkout condition matters. If the excerpt leaves a point unspecified, say so.
 
 The reader saw only the source excerpt and question, not this report's observation checklist or expected answer.
 
@@ -35,6 +35,6 @@ The reader saw only the source excerpt and question, not this report's observati
 
 ## Observation and limits
 
-The response correctly connects equal path+digest with exact-byte identity and the `unchanged` classification; it rejects truth, safety, authorization, retention-receipt, and race-free-snapshot inferences; it explains the stable-checkout caveat and reports manifest trust/creator as unspecified. **No material comprehension gap was observed for this bounded question.** The response is in Russian while the source is English; it remains attributed to one Pi role session (`01a1427c-7993-7426`), not a human/novice measurement. Prior project/task context may have primed familiarity with hashing; this is not an independent first-exposure or generalization test. No score, efficacy claim, or README failure is inferred. Issue #206's reader-gap-dependent criterion is therefore not evidenced as met by this observation.
+The response correctly connects equal path+digest with exact-byte identity and the `unchanged` classification; it rejects truth, safety, authorization, retention-receipt, and race-free-snapshot inferences; it explains the stable-checkout caveat and reports manifest trust/creator as unspecified. The response does not explicitly address external freshness. **No material comprehension gap was observed for this bounded question.** The response is in Russian while the source is English; it remains attributed to one Pi role session (`01a1427c-7993-7426`), not a human/novice measurement. Prior project/task context may have primed familiarity with hashing; this is not an independent first-exposure or generalization test. No score, efficacy claim, or README failure is inferred. Issue #206's reader-gap-dependent criterion is therefore not evidenced as met by this observation.
 
-No model was acquired, no external inference/provider, QMD, network, consumer data, runtime evaluation harness, or new scoring/schema was used. This record preserves one bounded observation only.
+No model was acquired or new inference service provisioned for this observation. It records one response from the already-authorized Pi role session only; no QMD operation, consumer data, runtime evaluation harness, or new scoring/schema was used.
