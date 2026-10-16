@@ -6,7 +6,7 @@
 **Supersedes**: None
 **Related**: Issue #125; ADR-024, ADR-026, ADR-027, ADR-029, ADR-030
 
-Owner acceptance: Issue #125, comment 6214765020, for reviewed contract at `ac74ecf0c47b34a6eb43f86f27cc2e1ee038cd98`.
+Owner acceptance: operator instruction “принимаю ADR-033”, recorded by the coordinator in Issue #125 comment 6215100810 for reviewed contract at `ac74ecf0c47b34a6eb43f86f27cc2e1ee038cd98`. The comment records the instruction; it is not owner-authored GitHub text.
 
 ## Context
 
