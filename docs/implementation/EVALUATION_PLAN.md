@@ -41,6 +41,8 @@ Configure a synthetic remote/publication adapter but provide no publication auth
 
 For the proposed v1 local capture path, select the input root explicitly as an operator action, then test untrusted references within supplied records. Include POSIX absolute paths, Windows drive and UNC paths, `../` traversal, a source-file symlink, a symlinked ancestor and a sibling outside the selected root. Put a unique harmless sentinel in an outside fixture and use read/converter/write spies to verify rejection before opening that content or producing output. Assert that diagnostics and receipts contain neither the sentinel nor uncontrolled absolute paths. Include an ordinary permitted file as a positive control; report unsupported symlink fixtures as skipped, not passed. The operator may select an input root outside the Git checkout: that explicit choice is not the same as granting arbitrary metadata references access outside that root. These are acceptance fixtures to implement with the approved contracts, not claims that new enforcement already exists.
 
+The advisory note [ADVISORY-ANALYSIS-PROJECT.md](ADVISORY-ANALYSIS-PROJECT.md) suggests possible progressive document/section/passage views and ambiguity cases. Treat these only as candidate questions for synthetic evaluation; this plan does not accept a passage schema, locator, hybrid retrieval path, or freshness claim.
+
 ## 3. Metrics
 
 Measure supported-answer rate and expected-topic coverage separately. Distinguish contradicted, formerly true but stale, unsupported and unanswered claims. Do not equate missing evidence with proven falsity.

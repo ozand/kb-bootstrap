@@ -16,6 +16,7 @@ Tracking: [epic #121](https://github.com/ozand/kb-bootstrap/issues/121). The own
 | [Agent tasks](AGENT_TASKS.md) | Copyable bounded Codex/agent tasks and verification receipt |
 | [Research baseline](RESEARCH_BASELINE.md) | Attribution, provenance and limits of the supplied reviews |
 | [Evaluation plan](EVALUATION_PLAN.md) | Synthetic scenarios, changing-source traces and optional-model comparisons |
+| [Advisory analysis: evidence-linked progressive access](ADVISORY-ANALYSIS-PROJECT.md) | Attributed design ideas for #127/#128/#131; not accepted requirements |
 
 ## What changes in the product framing
 

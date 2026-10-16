@@ -41,6 +41,10 @@ A local CPU model may reduce repeated expensive processing, but throughput and q
 
 The supplied Fastino review discussed GLiNER2/2.5, Decide, GLiGuard, PII, Pioneer Agent and PROBE. It reported benchmark caveats rather than a universal improvement. No numerical performance claim is adopted as a release target here. Use [Evaluation plan](EVALUATION_PLAN.md) to establish a local baseline and record failures as well as gains.
 
+## Additional advisory input (2026-10-16)
+
+The operator supplied a ChatGPT project conversation titled “Анализ проекта” as an advisory source relevant to progressive access and evidence-linked navigation. A bounded, attributed paraphrase is recorded in [ADVISORY-ANALYSIS-PROJECT.md](ADVISORY-ANALYSIS-PROJECT.md). The conversation is not independently verified implementation evidence, owner-approved product intent, or a benchmark; no full transcript or private consumer context is retained here. Its ideas do not accept ADR-028/031/032 or alter work-package order.
+
 ## Updating this baseline
 
 For a changed conclusion record the new source revision/date, what changed, which work-package assumption is affected, and whether a public contract needs reconsideration. Do not overwrite historical observations with a current claim without attribution. Raw source retention may require a separate permitted storage location; this public planning directory is not a dump of research originals.

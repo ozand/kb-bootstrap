@@ -31,6 +31,8 @@ A safe first Codex assignment is W11's characterization test for external Markdo
 
 After accepted capability/source/policy contracts, implement a minimal local capture path and collector-independent research import. Provide bounded file reading and optional retrieval adapters. Use those outputs to exercise read-only impact analysis and portable handoff. Add model ablations last, comparing against an unchanged baseline.
 
+Advisory note [ADVISORY-ANALYSIS-PROJECT.md](ADVISORY-ANALYSIS-PROJECT.md) records non-binding ideas relevant to W06/W07/W10: derived navigation without Markdown rewrites, ambiguous section locators, optional progressive retrieval, and the limits of byte identity. It changes no package dependency, ordering, or acceptance criterion; Proposed ADR-031 remains unaccepted.
+
 Do not create a dependency cycle: core ingestion/retrieval/evaluation must not require #100 or #109. ML setup consumes the core; it is not a prerequisite for it. #108 remote inference stays independent and disabled unless separately authorized.
 
 ## Existing issues: reuse instead of duplicate
