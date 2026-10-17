@@ -1,6 +1,7 @@
 """ADR-016 scaffold preflight regressions using synthetic targets."""
 import contextlib
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -320,9 +321,31 @@ class ScaffoldRepeatTests(unittest.TestCase):
             root.mkdir()
             unrelated = root / "notes.txt"
             unrelated.write_bytes(b"consumer-owned\\n")
-            with patch("kb_bootstrap.cli.shutil.copy2", side_effect=OSError("private path")):
-                self.assertEqual(self.run_cli("--target", str(root)), 1)
+            owned_partial = root / ".agents/skills/qmd-operator/SKILL.md"
+            real_copy = shutil.copy2
+            calls = 0
+
+            def copy_one_then_fail(source, destination, *args, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    return real_copy(source, destination, *args, **kwargs)
+                raise OSError("private copy error")
+
+            with patch("kb_bootstrap.cli.shutil.copy2", side_effect=copy_one_then_fail):
+                with patch("sys.stdout", new_callable=io.StringIO) as output:
+                    result = self.run_cli("--target", str(root))
+
+            self.assertEqual(result, 1)
+            self.assertEqual(
+                owned_partial.read_bytes(),
+                (self.package / "templates/skills/qmd-operator/SKILL.md").read_bytes(),
+            )
             self.assertEqual(unrelated.read_bytes(), b"consumer-owned\\n")
+            diagnostic = output.getvalue().splitlines()[-1]
+            self.assertIn("RESULT: BLOCKED", diagnostic)
+            self.assertIn("first initialization incomplete; owned files may remain", diagnostic)
+            self.assertNotIn("private copy error", diagnostic)
 
     @contextlib.contextmanager
     def _junction_fixture(self):
