@@ -32,3 +32,4 @@
 | ADR-029 | Create new research captures with exclusive paths | Accepted |
 | ADR-030 | Reuse source identity only through an explicit capture envelope | Accepted |
 | ADR-033 | Import one explicit local RawCapture without inference | Accepted |
+| ADR-034 | Project one explicit bounded Markdown section | Accepted |
