@@ -241,6 +241,23 @@ kb-bootstrap read-local "services/api.md" --dir kb --max-bytes 16384
 
 Local search uses literal Unicode case-folded substring matching and returns relative paths, a matched line/snippet, and available authored context. Resource ceilings can produce `PARTIAL`/exit 3; inspect `limiting_budget` before treating no returned match as complete. Reads return a bounded UTF-8 prefix and disclose truncation. See [ADR-017](docs/adr/ADR-017-add-bounded-local-search-and-read-commands.md) for the full contract. The existing `search` command remains the QMD-backed canonical/raw wrapper.
 
+Python callers that already selected a canonical Markdown file can project one exact section by heading path:
+
+```python
+import hashlib
+from pathlib import Path
+from kb_bootstrap.section_projection import project_section
+
+root = Path("kb")
+relative_path = "services/api.md"
+source_bytes = (root / relative_path).read_bytes()
+result = project_section(root, relative_path, hashlib.sha256(source_bytes).hexdigest(), ["Setup", "Timeouts"])
+if result["status"] == "COMPLETE":
+    print(result["text"])
+```
+
+The digest binds this call to the supplied file bytes; it does not establish source truth, freshness, or approval. The result includes a revision-scoped locator. A stale expected digest returns `REVISION_MISMATCH` with the observed digest and no section text. This Python API is not a CLI option and does not perform QMD lookup or discovery; see [ADR-034](docs/adr/ADR-034-project-one-explicit-bounded-markdown-section.md) for limits and outcomes.
+
 For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
 
 ```bash
