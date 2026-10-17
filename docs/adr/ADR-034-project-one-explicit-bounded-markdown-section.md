@@ -6,7 +6,7 @@
 **Supersedes**: None
 **Related**: Issue #127; ADR-017, ADR-018, ADR-019, ADR-021
 
-Owner acceptance: operator instruction “принимаю ADR-034”, recorded by the coordinator in Issue #127 comment 6228805066 for reviewed contract at `d7f53b43f58944afa47ab98454ceeeb4dd4753bc`. The comment is a coordinator record of the instruction, not owner-authored GitHub text.
+Owner acceptance: operator instruction “принимаю ADR-034”, recorded by the coordinator in Issue #127 comment 6228805066 for reviewed contract at `d7f53b43f58944afa47ab98454ceeeb4dd4753bc`. Narrow reason-mapping amendment accepted by the operator and recorded by the coordinator in Issue #127 comment 6229352121. These comments record actual operator instructions; they are not owner-authored GitHub comments.
 
 ## Context
 
@@ -24,7 +24,7 @@ If separately accepted, add one read-only section-projection module operation fo
 
 ### Outcomes
 
-The result is a bounded in-memory mapping with required field `status`. `BLOCKED` covers invalid roots, paths, selectors, unsafe/non-regular files, invalid UTF-8, and content that cannot be read safely; it includes a closed-category `reason` and contains no section text. `REVISION_MISMATCH` means the file was read and hashed within bounds but its digest differs from the supplied expected digest; it includes the observed digest and no section text. `NOT_FOUND`, `AMBIGUOUS`, and `UNSUPPORTED` contain a closed-category `reason` and no section text or section locator. `COMPLETE` and `TRUNCATED` contain `path`, `observed_sha256`, `heading_path`, resolved `occurrence`, inclusive `start_line`/`end_line`, `text`, and `truncated`; `COMPLETE` has `truncated: false`, `TRUNCATED` has `truncated: true`. No status includes fields that cannot be observed for that outcome. All outcomes preserve the caller's expected digest as input context, not as observed evidence.
+The result is a bounded in-memory mapping with required field `status`. `BLOCKED` covers invalid roots, paths, selectors, unsafe/non-regular files, invalid UTF-8, and content that cannot be read safely; it includes `reason: blocked` and contains no section text. `REVISION_MISMATCH` means the file was read and hashed within bounds but its digest differs from the supplied expected digest; it includes the observed digest and no section text, with no required `reason`. `NOT_FOUND` contains `reason: not_found`; `AMBIGUOUS` contains `reason: ambiguous`; `UNSUPPORTED` contains `reason: unsupported`. Those outcomes contain no section text or section locator. `COMPLETE` and `TRUNCATED` contain `path`, `observed_sha256`, `heading_path`, resolved `occurrence`, inclusive `start_line`/`end_line`, `text`, and `truncated`; `COMPLETE` has `truncated: false`, `TRUNCATED` has `truncated: true`. No status includes fields that cannot be observed for that outcome. All outcomes preserve the caller's expected digest as input context, not as observed evidence.
 
 ### What this IS
 
