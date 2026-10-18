@@ -59,11 +59,15 @@ If a user asks to bootstrap a knowledge base, first identify the target reposito
 2. Ask whether the user needs QMD-backed search. QMD is optional: `validate-core`, `search-local`, and `read-local` do not require it. If QMD is wanted, report the Node.js 22+ requirement and request authorization before installing anything.
 
 ### Phase 2: Install only when authorized
-Install the CLI only if requested and authorized, using a chosen method such as:
+Install the CLI only if requested and authorized. The default installs the current `main` tip:
 ```bash
 pipx install git+https://github.com/ozand/kb-bootstrap.git
 ```
-If `pipx` is unavailable, explain the alternative and wait for authorization rather than silently falling back to a global/user-site install.
+For a reproducible install of the older published v0.4.0 release, pin its tag explicitly:
+```bash
+pipx install git+https://github.com/ozand/kb-bootstrap.git@v0.4.0
+```
+The pinned release predates current unreleased `main` changes; it is not the latest `main` code. If `pipx` is unavailable, explain the alternative and wait for authorization rather than silently falling back to a global/user-site install.
 
 ### Phase 3: Project Initialization
 1. **Navigate to the target project root:**
