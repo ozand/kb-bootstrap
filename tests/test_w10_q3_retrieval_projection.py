@@ -1,86 +1,99 @@
-"""End-to-end synthetic Q3 path through existing W10 and local read APIs."""
+"""Q3 synthetic retrieval/read/projection path without answer-key query leakage."""
 import hashlib
+import re
 import tempfile
 from pathlib import Path
 
 from kb_bootstrap.local_retrieval import read_local, search_local
 from kb_bootstrap.section_projection import project_section
-from w10_fixture_support import T0_IDS, T1_IDS, materialize_question_input
+from w10_fixture_support import extract_fragments, materialize_question_input
 
 
 INPUTS = Path("docs/evaluation/W10-AGENT-INPUTS.md")
 SPEC = Path("docs/evaluation/W10-SYNTHETIC-SPEC.md")
+EXPECTED = {
+    "T0": {"PM-S1", "PM-S2", "PM-S3"},
+    "T1": {"PM-S1R", "PM-S2", "PM-S3", "PM-S4"},
+}
 
 
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def test_q3_retrieves_reads_and_projects_evidence_per_revision():
+def _run_visible_query(root: Path, question: str):
+    # The query is taken only from the agent-visible question, never the key.
+    match = re.search(r"\bPulse\b", question)
+    assert match is not None
+    query = match.group(0)
+    result, code = search_local(query, root)
+    assert code == 0
+
+    observed = set()
+    sections = {}
+    for record in result["results"]:
+        read, read_code = read_local(record["path"], root)
+        assert read_code == 0
+        assert read["status"] == "COMPLETE"
+        content = read["content"].encode("utf-8")
+        heading = re.search(rb"(?m)^### (PM-S1R?|PM-S2|PM-S3|PM-S4) .+$", content)
+        assert heading is not None
+        source_id = heading.group(1).decode("ascii")
+        observed.add(source_id)
+        heading_text = heading.group(0).decode("utf-8")[4:]
+        projection = project_section(root, record["path"], _sha(content), (heading_text,))
+        assert projection["status"] == "COMPLETE"
+        assert projection["observed_sha256"] == _sha(content)
+        assert projection["text"].encode("utf-8") == content
+        sections[source_id] = projection
+    return observed, sections
+
+
+def test_q3_searches_visible_question_then_reads_and_projects_revision_evidence():
     authoring = INPUTS.read_bytes()
     specification = SPEC.read_bytes()
-    # Q3 is dual-revision: use the fixture's separate views, never a union.
-    t0 = materialize_question_input(authoring, specification, "Q3").revision_views[0]
-    t1 = materialize_question_input(authoring, specification, "Q3").revision_views[1]
-
-    expected = {
-        "T0": {"PM-S1", "PM-S2", "PM-S3"},
-        "T1": {"PM-S1R", "PM-S2", "PM-S3", "PM-S4"},
-    }
-    assert t0.fragment_ids == T0_IDS
-    assert t1.fragment_ids == T1_IDS
-    assert expected["T0"] <= set(t0.fragment_ids)
-    assert expected["T1"] <= set(t1.fragment_ids)
+    fragments = extract_fragments(authoring)
+    # The existing fixture helper defines the agent-visible dual-revision Q3.
+    q3 = materialize_question_input(authoring, specification, "Q3")
+    assert [view.label for view in q3.revision_views] == ["T0", "T1"]
+    question = q3.question.decode("utf-8").split("\t", 1)[1].strip()
 
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory) / "kb"
         root.mkdir()
-        selected = {}
-        for view in (t0, t1):
-            relative = f"q3/{view.label.lower()}.md"
-            target = root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(view.content)
+        roots = {}
+        for view in q3.revision_views:
+            expected = EXPECTED[view.label]
+            assert expected <= set(view.fragment_ids)
+            revision_root = root / view.label.lower()
+            revision_root.mkdir()
+            roots[view.label] = revision_root
+            for source_id in sorted(expected):
+                target = revision_root / f"{source_id.lower()}.md"
+                target.write_bytes(fragments[source_id])
 
-            # Discover each expected source by search result, then read and
-            # project only the path actually returned; never seed lookup with
-            # the expected path.
-            retrieved_ids = set()
-            for fragment_id in sorted(expected[view.label]):
-                result, code = search_local(fragment_id, root)
-                assert code == 0
-                record = next(item for item in result["results"]
-                              if item["path"] == relative)
-                read, read_code = read_local(record["path"], root)
-                assert read_code == 0
-                assert read["status"] == "COMPLETE"
-                assert read["content"] == view.content.decode("utf-8")
-                retrieved_ids.add(fragment_id)
-            assert retrieved_ids == expected[view.label]
-            selected[view.label] = (target, view.content, retrieved_ids)
+            observed, sections = _run_visible_query(revision_root, question)
+            assert observed == expected
+            coverage = len(observed & expected) / len(expected)
+            assert coverage == 1.0
+            assert set(sections) == observed
 
-            # Fixture evidence coverage is a finite ID-set ratio, not answer
-            # correctness or semantic quality. The denominator is this view's
-            # declared Q3 evidence only.
-            assert len(retrieved_ids) / len(expected[view.label]) == 1.0
+        # A missing required T0 source is a real retrieval miss, not silently
+        # removed from the denominator or counted as successful coverage.
+        missing_id = "PM-S2"
+        missing_path = roots["T0"] / f"{missing_id.lower()}.md"
+        missing_path.unlink()
+        observed, _ = _run_visible_query(roots["T0"], question)
+        assert missing_id not in observed
+        missing_coverage = len(observed & EXPECTED["T0"]) / len(EXPECTED["T0"])
+        assert missing_coverage < 1.0
 
-            # Each fragment has its own exact heading. Project a real section
-            # using the content's observed digest and assert the returned bytes.
-            for fragment_id in sorted(expected[view.label]):
-                heading = next(line.removeprefix("### ") for line in view.content.decode().splitlines()
-                               if line.startswith(f"### {fragment_id} "))
-                section = project_section(root, relative, _sha(view.content), (heading,))
-                assert section["status"] == "COMPLETE"
-                assert section["observed_sha256"] == _sha(view.content)
-                assert section["text"].startswith(f"### {heading}\n")
-                assert fragment_id in section["text"]
-
-        # A same-path revision replacement invalidates the prior expected
-        # digest. This demonstrates byte-revision mismatch only, not semantic
-        # staleness or external freshness.
-        old_target, old_bytes, _ = selected["T0"]
+        # A same-path byte revision invalidates the earlier expected digest.
+        old_path = roots["T0"] / "pm-s1.md"
+        old_bytes = fragments["PM-S1"]
         old_digest = _sha(old_bytes)
-        new_bytes = selected["T1"][1]
-        old_target.write_bytes(new_bytes)
-        mismatch = project_section(root, "q3/t0.md", old_digest, ("PM-S1 — Pulse",))
-        assert mismatch == {"status": "REVISION_MISMATCH", "observed_sha256": _sha(new_bytes)}
+        old_path.write_bytes(fragments["PM-S1R"])
+        heading = next(line.removeprefix("### ") for line in fragments["PM-S1R"].decode().splitlines()
+                       if line.startswith("### PM-S1R "))
+        mismatch = project_section(roots["T0"], "pm-s1.md", old_digest, (heading,))
+        assert mismatch == {"status": "REVISION_MISMATCH", "observed_sha256": _sha(fragments["PM-S1R"])}
