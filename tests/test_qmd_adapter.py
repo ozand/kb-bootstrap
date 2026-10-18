@@ -107,3 +107,24 @@ class BoundedQmdTests(unittest.TestCase):
             self.assertIsNotNone(validate_records([good], 'collection', root, 10))
             for bad in (None, 1, [], 'text', {'file': 'qmd://other/a.md', 'title': 'X', 'score': 1}, {**good, 'score': True}, {**good, 'score': float('nan')}, {**good, 'file': 'qmd://collection/../a.md'}):
                 self.assertIsNone(validate_records([bad], 'collection', root, 10))
+
+    def test_records_cannot_label_excluded_paths_as_canonical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            included = 'nested/проверка.md'
+            excluded = (
+                'raw/source.md', 'research/brief.md', 'lessons/example.md',
+                '.hidden/source.md', 'nested/.secret.md', 'INDEX.md', 'nested/LoG.md',
+            )
+            for relative in (included, *excluded):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('synthetic fixture', encoding='utf-8')
+
+            accepted = {'file': 'qmd://collection/' + included, 'title': 'Synthetic', 'score': 0}
+            self.assertIsNotNone(validate_records([accepted], 'collection', root, 10, 'smoke'))
+            for relative in excluded:
+                with self.subTest(path=relative):
+                    record = {'file': 'qmd://collection/' + relative, 'title': 'Synthetic', 'score': 0}
+                    self.assertTrue((root / relative).is_file())
+                    self.assertIsNone(validate_records([record], 'collection', root, 10, 'smoke'))
