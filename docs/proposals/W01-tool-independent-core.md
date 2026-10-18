@@ -3,7 +3,7 @@
 **Status**: Proposed
 **ADR number**: Unassigned
 **Date**: 2026-09-28
-**Related**: GitHub issues #121 and #122; ADR-003, ADR-006, ADR-009, ADR-014
+**Related**: GitHub issues #121 and #122; ADR-003, ADR-006, ADR-009, ADR-014, ADR-015, ADR-022, ADR-028, ADR-034
 
 ## Context and scope
 
@@ -14,29 +14,37 @@ does not supersede an Accepted ADR, accept W09, define a persisted format, or au
 runtime implementation.
 
 Current behavior is coupled in several observable places. `kb_bootstrap/cli.py` makes
-QMD declaration validation part of `validate`, initializes `qmd.json` and two QMD
-collections for both layouts, and installs QMD- and Surf-oriented skills. The QMD
+QMD declaration validation part of legacy `validate`, initializes `qmd.json` and two
+QMD collections for both layouts, and installs QMD- and Surf-oriented skills. The QMD
 validator checks declarations and paths, not the QMD executable or index. Repository
 doctor separately invokes Git and `gh` and fails closed when publication identity
-cannot be established. `docs/VALIDATION_COMPOSITION.md` already separates universal
-conformance, consumer policy, and retrieval/index freshness. ADR-009 keeps publication
-as an explicit local export and excludes network distribution; ADR-014 makes local
-inference optional and forbids implicit model acquisition.
+cannot be established. `docs/VALIDATION_COMPOSITION.md` separates universal
+conformance, consumer policy, and retrieval/index freshness. Accepted ADR-015 adds
+`validate-core` using local profile/provenance/graph checks while preserving legacy
+`validate` and initialization. Accepted ADR-022 keeps external-action authority
+separate from capability selection/readiness. Accepted ADR-034 adds a bounded
+revision-scoped Markdown section projection without a capability registry or CLI
+selector. ADR-009's explicit local export boundary and ADR-014's optional local
+inference/acquisition boundary remain unchanged.
 
 ### Observed and proposed behavior
 
+Current behavior below is refreshed from main `fa4eacbb9f5276f3654b8fb1f4ea7d7b3cf0124b`; it describes only the cited accepted contracts and source paths, not a global runtime test.
+
 | Concern | Current, source-grounded behavior | Proposed behavior |
 |---|---|---|
-| Canonical files | `validate` runs profile, provenance, graph, then QMD declarations (`cli.py:259-277`). | A core validation entry point runs only local canonical structure, metadata, provenance, and graph checks. |
-| QMD | Both layouts generate declarations; missing declarations fail `validate` (`cli.py:480-523`, `qmd_validator.py`). Runtime registration/update remains separate per `VALIDATION_COMPOSITION.md`. | `search` is a stable operation and QMD can be one explicitly selected adapter. Declaration validity, selection, probe evidence, and operation authorization remain distinct. |
-| Search | `search` directly uses QMD (`cli.py:137-149,311-315`). | Search reports its selected adapter and separate configuration, readiness-evidence, and authorization results. Core file reading remains available without search. |
-| Collection/research | The packaged market-research skill requires Surf and describes QMD as optional. | `collect` is outside core; Surf can be one adapter, but no collector, browser, network, service, or model is selected implicitly. |
-| Entity inference | `inspect-gliner` and checkpoint verification are explicit local commands (`cli.py:123-133,300-307`). | `entity-inference` is optional and GLiNER can be one adapter; no download, cloud fallback, or hidden inference occurs in core. |
-| GitHub publication | `doctor` checks Git root, origin, `gh` default, and default branch (`repository_doctor.py`). | `remote-publication` is an operation and GitHub can be one adapter. Its existing doctor remains required for the GitHub path. |
-| Bundle publication | ADR-009 requires an explicit output and exclusively creates a local ZIP. | Local artifact construction remains separate from remote publication and needs its own local-write authorization. |
-| Layout | `single` and `umbrella` choose generated directory shapes (`cli.py:479-516`). | They are storage/layout choices only, never domain, sensitivity, tenancy, deployment, or capability presets. |
+| Canonical files | Accepted ADR-015 provides `validate-core` local profile/provenance/graph checks; legacy `validate` retains QMD declaration/path validation. | Preserve both commands; report only checks actually invoked, without inferring policy or retrieval readiness. |
+| QMD | Both layouts generate declarations; legacy `validate` checks declarations/paths. Runtime registration, update, and retrieval evidence remain separate (`VALIDATION_COMPOSITION.md`). | Keep declaration, selection, observation, freshness, and operation authority distinct; no implicit registration, update, fallback, or probe. |
+| Search | Legacy `search` uses QMD; accepted ADR-017 adds bounded file-only `search-local`/`read-local`; ADR-018/019 constrain the optional lexical adapter; accepted ADR-034 adds a module-only selected-section projection. | No search behavior change; the capability proposal does not add a CLI selector, registry, or new retrieval result contract. |
+| Collection/research | The packaged market-research skill requires Surf and describes QMD as optional. | Collection remains outside required core; no collector, browser, network, service, or model is selected implicitly. |
+| Entity inference | `inspect-gliner` and checkpoint verification are explicit local commands. | Inference remains optional; no download, cloud fallback, or hidden inference is introduced by this proposal. |
+| GitHub publication | `doctor` checks repository identity for the documented GitHub path; accepted ADR-022 keeps external-action authority explicit and separate. | Preserve the existing doctor and publication boundary; this proposal grants no action authority. |
+| Bundle publication | ADR-009 requires an explicit output and exclusively creates a local ZIP. | Local artifact construction and remote publication remain separate under their existing contracts. |
+| Layout | `single` and `umbrella` choose generated directory shapes. | They remain storage/layout choices only, never domain, sensitivity, tenancy, deployment, or capability presets. |
 
 ## Proposed decision
+
+This broad W01 proposal remains **unaccepted**. The bounded selection/observation matrix is separately Proposed in ADR-028; neither document changes runtime behavior or accepts the broader adapter/schema/migration choices.
 
 Define the **required core** as deterministic operations over explicitly bounded local
 files: canonical read/edit guidance, canonical profile and provenance checks, graph
@@ -217,13 +225,12 @@ to the required deterministic core. Its outbound-publication and path rules requ
 local-artifact and trusted-root distinctions above. W01 does not modify W09 or require
 its unfinished follow-up.
 
-For the first additive core-only validation slice, review the separate
-[Proposed ADR-015](../adr/ADR-015-add-core-only-validation-without-changing-legacy-validate.md).
-That slice needs only the local-check boundary and compatible CLI contract; it does
-not depend on this wider proposal's capability vocabulary, adapter namespace,
-authorization aggregation or persisted schema. Those remain separate decisions
-requiring approval before their own implementation. Consumer policy remains consumer-owned and versioned;
-no universal policy engine is introduced.
+Accepted ADR-015 is implemented; it authorizes only the additive `validate-core`
+contract. It deliberately does not accept this proposal's wider capability vocabulary,
+adapter namespace, authorization aggregation, or persisted schema. ADR-028 is the
+bounded Proposed decision for selection/observation and validation/authority
+distinctions; consumer policy remains consumer-owned and versioned. No universal
+policy engine is introduced.
 
 ## Alternatives (not accepted defaults)
 
