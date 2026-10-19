@@ -2,6 +2,8 @@ import hashlib
 import json
 import tempfile
 import unittest
+import stat
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -345,6 +347,11 @@ class EvidenceBindingTests(unittest.TestCase):
         self.binding["bindings"][0]["review_actor"] = "https://user@example.test"
         self._write_binding()
         self.assertEqual(self.resolve(), {"status": "BLOCKED", "reason": "invalid_binding"})
+
+    def test_reparse_point_components_block_before_open(self):
+        with patch.object(Path, "lstat", return_value=SimpleNamespace(st_file_attributes=0x400, st_mode=stat.S_IFDIR)):
+            self.assertTrue(evidence_binding._traverses_reparse_point(self.binding_root))
+            self.assertEqual(self.resolve(), {"status": "BLOCKED", "reason": "unsafe_or_inaccessible_path"})
 
     def test_selected_root_and_input_paths_are_explicit(self):
         self.assertEqual(self.resolve(project_root=self.binding_root, binding_path="../binding.json"),

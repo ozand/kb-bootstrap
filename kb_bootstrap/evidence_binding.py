@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
@@ -46,12 +47,29 @@ def _permission(check: Optional[Callable[[], bool]], message: str) -> None:
         raise PermissionError(message)
 
 
+def _traverses_reparse_point(path: Path) -> bool:
+    """Reject symlink/junction/reparse components before resolving or opening a path."""
+    try:
+        absolute = path.absolute()
+        current = Path(absolute.anchor)
+        for part in absolute.parts[1:]:
+            current /= part
+            details = current.lstat()
+            attributes = getattr(details, "st_file_attributes", 0)
+            reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            if current.is_symlink() or attributes & reparse_flag:
+                return True
+        return False
+    except (OSError, ValueError):
+        return True
+
+
 def _safe_root(value: str | Path) -> Optional[Path]:
     if not isinstance(value, (str, Path)):
         return None
     try:
         raw = Path(value)
-        if not raw.is_absolute() or _traverses_symlink(raw) or not raw.is_dir():
+        if not raw.is_absolute() or _traverses_reparse_point(raw) or _traverses_symlink(raw) or not raw.is_dir():
             return None
         return raw.resolve()
     except (OSError, TypeError, ValueError):
@@ -157,7 +175,8 @@ def _read_selected(root: Path, relative: str, limit: int) -> Tuple[Optional[byte
         return None, "unsafe_or_inaccessible_path"
     candidate = root.joinpath(*relative.split("/"))
     try:
-        if _traverses_symlink(candidate) or not candidate.is_file() or candidate.is_symlink():
+        if (_traverses_reparse_point(candidate) or _traverses_symlink(candidate)
+                or not candidate.is_file() or candidate.is_symlink()):
             return None, "unsafe_or_inaccessible_path"
         before = _signature(candidate)
         if before[2] > limit:
@@ -180,12 +199,18 @@ def _envelope(project_root, metadata_path, corpus_root, selected_paths):
     if corpus_relative is None or corpus_relative.is_absolute() or ".." in corpus_relative.parts:
         return None, None, "unsafe_or_inaccessible_path"
     corpus = project.joinpath(*corpus_relative.parts)
-    if _traverses_symlink(corpus) or not corpus.is_dir():
+    if _traverses_reparse_point(corpus) or _traverses_symlink(corpus) or not corpus.is_dir():
         return None, None, "unsafe_or_inaccessible_path"
     try:
         if Path(metadata_path).is_absolute() or ".." in Path(metadata_path).parts:
             return None, None, "unsafe_or_inaccessible_path"
     except TypeError:
+        return None, None, "unsafe_or_inaccessible_path"
+    metadata = project / Path(metadata_path)
+    if _traverses_reparse_point(metadata) or _traverses_symlink(metadata):
+        return None, None, "unsafe_or_inaccessible_path"
+    if any(_traverses_reparse_point(corpus / Path(path)) or _traverses_symlink(corpus / Path(path))
+           for path in selected_paths):
         return None, None, "unsafe_or_inaccessible_path"
     valid, errors, record = _validate_source_capture(
         metadata_path, project, corpus_relative, selected_paths
