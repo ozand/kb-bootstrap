@@ -216,7 +216,10 @@ write; they do not use last-writer-wins.
 ## Case 6 — interruption during publication
 
 An authorized coordinator begins publishing local `R1`, but interruption occurs
-before independently observing a GitHub object containing `out-1`.
+before independently observing a GitHub object containing `out-1`. A distinct
+local checkpoint `R5-publication-incomplete` is then saved from baseline `R1` to
+record the unknown remote outcome; `publication.local_revision` names the attempted
+remote target revision, not the new checkpoint's own revision.
 
 ```yaml
 baseline_id: R1

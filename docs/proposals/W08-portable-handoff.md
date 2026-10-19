@@ -211,12 +211,15 @@ never implicit completion.
 
 Local save and GitHub publication are two operations with separate outcomes. A
 successful local save records `github_state: not-requested` unless an explicitly
-authorized publisher later updates it from separately checked evidence. An
+authorized publisher later updates it from separately checked evidence. A
 publication with a lost acknowledgement preserves the local record but leaves
 the remote outcome `unknown`; it proves neither failure nor absence of a remote
-object. Before any retry, an authorized actor must reconcile the exact intended
-remote object through a read-only operation. Only authoritative evidence may
-then record `published` or `failed`; no retry is implicit. A published proposal
+object. The local checkpoint may advance its own record revision while recording
+that unknown outcome; `publication.local_revision` identifies the record revision
+whose publication was attempted, not the checkpoint's own identity. Before any
+retry, an authorized actor must reconcile the exact intended remote object through
+a read-only operation. Only authoritative evidence may then record `published`
+or `failed`; no retry is implicit. A published proposal
 remains provisional unless the W05-owned acceptance evidence is independently
 observed. Neither publication nor acceptance automatically promotes content to
 the canonical KB or a rebuildable search index.
