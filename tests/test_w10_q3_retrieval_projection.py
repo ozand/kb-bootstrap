@@ -36,7 +36,7 @@ def _run_visible_query(root: Path, question: str):
         assert read_code == 0
         assert read["status"] == "COMPLETE"
         content = read["content"].encode("utf-8")
-        heading = re.search(rb"(?m)^### (PM-S1R?|PM-S2|PM-S3|PM-S4) .+$", content)
+        heading = re.search(rb"(?m)^### ([A-Z]+-[A-Z0-9]+) [^\r\n]+$", content)
         assert heading is not None
         source_id = heading.group(1).decode("ascii")
         observed.add(source_id)
@@ -63,6 +63,7 @@ def test_q3_searches_visible_question_then_reads_and_projects_revision_evidence(
         root.mkdir()
         roots = {}
         observed_by_revision = {}
+        coverage_by_revision = {}
         for view in q3.revision_views:
             expected = EXPECTED[view.label]
             assert expected <= set(view.fragment_ids)
@@ -76,27 +77,31 @@ def test_q3_searches_visible_question_then_reads_and_projects_revision_evidence(
                 target.write_bytes(fragments[source_id])
 
             observed, sections = _run_visible_query(revision_root, question)
-            coverage = len(observed & expected) / len(expected)
+            baseline_coverage = len(observed & expected) / len(expected)
             assert observed <= set(view.fragment_ids)
             assert set(sections) == observed
+            assert 0.0 <= baseline_coverage <= 1.0
             observed_by_revision[view.label] = observed
+            coverage_by_revision[view.label] = baseline_coverage
 
         # A missing required T0 source is a real retrieval miss, not silently
         # removed from the denominator or counted as successful coverage.
-        missing_id = next(iter(EXPECTED["T0"] & observed_by_revision["T0"]))
+        retrieved_expected_t0 = sorted(EXPECTED["T0"] & observed_by_revision["T0"])
+        assert retrieved_expected_t0
+        missing_id = retrieved_expected_t0[0]
         missing_path = roots["T0"] / f"{missing_id.lower()}.md"
         missing_path.unlink()
         observed, _ = _run_visible_query(roots["T0"], question)
         assert missing_id not in observed
         missing_coverage = len(observed & EXPECTED["T0"]) / len(EXPECTED["T0"])
-        assert missing_coverage < 1.0
+        assert missing_coverage < coverage_by_revision["T0"]
 
         # A same-path byte revision invalidates the earlier expected digest.
         old_path = roots["T0"] / "pm-s1.md"
         old_bytes = fragments["PM-S1"]
         old_digest = _sha(old_bytes)
         old_path.write_bytes(fragments["PM-S1R"])
-        heading = next(line.removeprefix("### ") for line in fragments["PM-S1R"].decode().splitlines()
+        heading = next(line[len("### "):] for line in fragments["PM-S1R"].decode().splitlines()
                        if line.startswith("### PM-S1R "))
         mismatch = project_section(roots["T0"], "pm-s1.md", old_digest, (heading,))
         assert mismatch == {"status": "REVISION_MISMATCH", "observed_sha256": _sha(fragments["PM-S1R"])}
