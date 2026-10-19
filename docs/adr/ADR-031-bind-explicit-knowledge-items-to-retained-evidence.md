@@ -1,10 +1,12 @@
 # ADR-031: Bind explicit knowledge items to retained evidence
 
-**Status**: Proposed
-**Date**: 2026-10-14
+**Status**: Accepted
+**Date**: 2026-10-19
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #128; ADR-006, ADR-010, ADR-024, ADR-026
+
+Owner acceptance: Issue #128, comment 6258638640 (2026-10-19), explicitly accepts the reviewed normative text in PR #215 at `408984c5306605e5074336234e1c96ba2ff7198a`. The coordinator record reports the operator's instruction and is not an owner-authored GitHub approval or independent authentication evidence.
 
 ## Context
 
