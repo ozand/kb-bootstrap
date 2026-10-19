@@ -1,10 +1,12 @@
 # ADR-036: Define a minimal JSON format for evidence binding
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-19
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #128; Accepted ADR-031; ADR-006, ADR-017, ADR-024, ADR-026
+
+Owner acceptance: Issue #128, comment 6270603599 (2026-10-19), explicitly accepts the reviewed normative text at PR #218 source head `ed3b79abd9c5ebc2d5824bca7cf95894506d3da5`. This is a coordinator record of the operator instruction, not an owner-authored GitHub comment or independent authentication evidence.
 
 ## Context
 

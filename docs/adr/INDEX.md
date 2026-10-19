@@ -35,4 +35,4 @@
 | ADR-033 | Import one explicit local RawCapture without inference | Accepted |
 | ADR-034 | Project one explicit bounded Markdown section | Accepted |
 | ADR-035 | Require explicit local policy for evidence reading | Accepted |
-| ADR-036 | Define a minimal JSON format for evidence binding | Proposed |
+| ADR-036 | Define a minimal JSON format for evidence binding | Accepted |
