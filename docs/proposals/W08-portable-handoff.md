@@ -34,17 +34,24 @@ These axes are independent and must not be collapsed into one `status` field.
 
 ### Material observation
 
-For each opaque source/capture reference, record one of:
+For each opaque source/capture reference, record independent observation and
+analysis extents.
+
+The **observation** is one of:
 
 - `captured`: the referenced revision was retained, but reading is not claimed;
 - `read`: the bounded material identified by the reference was read;
-- `partially-read`: a stated subset was read and the unread remainder is named;
-- `partially-analyzed`: a stated subset was analyzed and the remainder is named.
+- `partially-read`: a stated subset was read and the unread remainder is named.
 
-`captured` does not imply `read`; reading does not imply analysis; and
-`partially-analyzed` does not imply whole-source analysis. `observation` records
-capture/read extent, while `analysis` independently records analysis extent; the
-bounded scopes and remainders state what each observation covers. A later
+The **analysis** is one of:
+
+- `not-started`: no analysis is claimed;
+- `partially-analyzed`: a stated subset was analyzed and the unanalyzed remainder is named;
+- `analyzed`: the declared analysis scope was completed; this does not imply that the entire source was analyzed unless the scope explicitly says so.
+
+`captured` does not imply `read`; reading does not imply analysis; and partial
+analysis does not imply completion of the declared analysis scope. The bounded
+observation and analysis scopes/remainders state what each extent covers. A later
 accepted W03 contract must define reference identity, revision comparison, and
 what it means for a capture to be retained. W08 only consumes those opaque values.
 
