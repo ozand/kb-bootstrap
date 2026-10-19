@@ -1,6 +1,6 @@
 # ADR-035: Require explicit local policy for evidence reading
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-19
 **Authors**: Pi coding agent
 **Supersedes**: None
