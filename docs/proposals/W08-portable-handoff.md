@@ -41,11 +41,12 @@ For each opaque source/capture reference, record one of:
 - `partially-read`: a stated subset was read and the unread remainder is named;
 - `partially-analyzed`: a stated subset was analyzed and the remainder is named.
 
-`captured` does not imply `read`; partial reading does not imply analysis; `read`
-does not imply analysis; and partial analysis never implies whole-source
-analysis. A later accepted W03 contract must define reference identity, revision
-comparison, and what it means for a capture to be retained. W08 only consumes
-those opaque values.
+`captured` does not imply `read`; reading does not imply analysis; and
+`partially-analyzed` does not imply whole-source analysis. `observation` records
+capture/read extent, while `analysis` independently records analysis extent; the
+bounded scopes and remainders state what each observation covers. A later
+accepted W03 contract must define reference identity, revision comparison, and
+what it means for a capture to be retained. W08 only consumes those opaque values.
 
 ### Output standing
 
@@ -85,9 +86,12 @@ baseline_id: <digest of the last successfully loaded record, or genesis>
 materials:
   - ref: <opaque W03-owned source/capture reference>
     revision: <opaque W03-owned revision>
-    observation: captured | partially-read | read | partially-analyzed
+    observation: captured | partially-read | read
+    observed_scope: <bounded description or none>
+    unread_remainder: <bounded unread portion or none>
+    analysis: not-started | partially-analyzed | analyzed
     analyzed_scope: <bounded description or none>
-    remainder: <bounded description or none>
+    unanalyzed_remainder: <bounded unanalyzed portion or none>
 outputs:
   - ref: <opaque W05-owned output reference>
     revision: <opaque output revision>
@@ -127,8 +131,8 @@ interface_questions: [<question for W03, W05, or W09>]
 
 Fields holding references do not define the referenced object's syntax. A
 consumer must preserve unknown reference values without interpreting them until
-their owning contract is accepted. `analyzed_scope` and `remainder` are bounded
-descriptions, not copied content or a claim registry.
+their owning contract is accepted. Observation/analysis scopes and remainders
+are bounded descriptions, not copied content or a claim registry.
 
 ## Save, load, check, and continue
 
@@ -147,14 +151,17 @@ descriptions, not copied content or a claim registry.
    agent needs the record and referenced retained artifacts, not the prior chat.
    Current authorization must be checked separately before any write or
    publication.
-4. **Save.** Build a complete candidate in a new local temporary artifact,
-   validate it, and replace the owned record atomically only if its
-   `baseline_id` still equals the loaded revision. Compute the result identity
-   over the exact UTF-8 payload bytes between the envelope boundaries, excluding
-   the envelope's `result_id` field itself; store that digest in the envelope and
-   use it as the next save's baseline. Failure before replacement leaves the
-   prior record authoritative for the local workflow and reports the candidate
-   as incomplete.
+4. **Save.** Build a complete candidate in a new local temporary artifact and
+   validate it. Under the proposed exclusive writer boundary, read and verify
+   the currently stored record identity immediately before replacement; replace
+   atomically only if that current identity equals the caller's `baseline_id`.
+   A comparison only with a revision cached at load time is insufficient: a
+   different writer may have replaced the record in the meantime. Compute the
+   result identity over the exact UTF-8 payload bytes between the envelope
+   boundaries, excluding the envelope's `result_id` field itself; store that
+   digest in the envelope and use it as the next save's baseline. Failure before
+   replacement leaves the prior record authoritative for the local workflow and
+   reports the candidate as incomplete.
 5. **Re-check.** Reload the saved bytes, recompute their identity, and check
    referenced revisions and completion predicates. Report unavailable checks as
    unavailable, not passing.

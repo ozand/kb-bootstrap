@@ -41,17 +41,19 @@ they deliberately do not define or duplicate the dependency-owned schemas.
 
 **Baseline `R0`:** `genesis`. Agent A has retained two captures. It reads all of
 the first and only section `heading` of the second, then is interrupted before
-analysis or publication.
+analysis or publication. Reading the section is not a claim that either source
+was analyzed.
 
 ```yaml
 baseline_id: genesis
 result_id: R0
 materials:
   - {ref: capture:amber, revision: rev-a1, observation: read,
-     analyzed_scope: none, remainder: analysis not started}
+     observed_scope: entire source, unread_remainder: none,
+     analysis: not-started, analyzed_scope: none, unanalyzed_remainder: entire source}
   - {ref: capture:blue, revision: rev-b1, observation: partially-read,
-     analyzed_scope: none,
-     remainder: defined-terms section not read; analysis not started}
+     observed_scope: heading section, unread_remainder: defined-terms section,
+     analysis: not-started, analyzed_scope: none, unanalyzed_remainder: entire source}
 outputs: []
 steps:
   - step_id: retain-inputs
@@ -86,9 +88,13 @@ baseline_id: R0
 result_id: R1
 materials:
   - {ref: capture:amber, revision: rev-a1, observation: read,
-     analyzed_scope: headings and defined terms, remainder: none}
+     observed_scope: entire source, unread_remainder: none,
+     analysis: analyzed, analyzed_scope: headings and defined terms,
+     unanalyzed_remainder: none}
   - {ref: capture:blue, revision: rev-b1, observation: read,
-     analyzed_scope: headings and defined terms, remainder: none}
+     observed_scope: entire source, unread_remainder: none,
+     analysis: analyzed, analyzed_scope: headings and defined terms,
+     unanalyzed_remainder: none}
 outputs:
   - {ref: output:term-note, revision: out-1, standing: provisional,
      acceptance_evidence_ref: none}
