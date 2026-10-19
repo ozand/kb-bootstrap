@@ -32,7 +32,7 @@ source bodies or a second source schema.
 
 These axes are independent and must not be collapsed into one `status` field.
 
-### Material observation
+#### Material observation and analysis
 
 For each opaque source/capture reference, record independent observation and
 analysis extents.
