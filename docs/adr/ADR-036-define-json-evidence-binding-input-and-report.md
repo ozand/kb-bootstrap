@@ -25,9 +25,9 @@ If accepted, use one UTF-8 JSON object as an optional caller-selected binding in
 }
 ```
 
-`knowledge.path` is the single normalized project-relative Markdown path; `sha256` is its expected exact-byte digest. `bindings` is a bounded array. Each entry contains a stable-in-this-file `binding_id`, baseline `source_id`, `representation_id`, and `observed_sha256`. It may contain `current`, an object with explicit current `source_id` and `representation_id`; omission means no mapping and therefore `missing`. Explicit null, incomplete mapping objects, duplicate IDs, malformed values, unknown fields, duplicate JSON keys, or unsupported schema/version block the invocation before a report. IDs and digests are strings only; the resolver observes actual bytes through ADR-024/026 and requires each binding's digest to equal its validated baseline representation digest.
+`knowledge.path` is the single normalized project-relative Markdown path; `sha256` is its expected exact-byte digest. `bindings` is a bounded array. Each entry contains a stable-in-this-file `binding_id`, baseline `source_id`, `representation_id`, and `observed_sha256`. It may contain `current`, an object with explicit current `source_id` and `representation_id`; omission means no mapping and therefore `missing`. Duplicate `(source_id, representation_id)` pairs in one binding document are rejected; each distinct binding ID must have unique values. Optional `applicability`, `scope`, and `context` are consumer-authored descriptive strings, each at most 2048 UTF-8 bytes and containing no forbidden control characters; optional `retention_class` and `owner_policy_ref` are bounded non-empty strings at most 256 UTF-8 bytes. Optional `review_actor` is a sanitized attribution string at most 256 UTF-8 bytes following ADR-006's actor convention; it is not authenticated identity. These qualifiers grant no read, retention, review, or publication authority. Explicit null, incomplete mapping objects, duplicate IDs/pairs, malformed values, unknown fields, duplicate JSON keys, or unsupported schema/version block the invocation before a report. IDs and digests are strings only; the resolver observes actual bytes through ADR-024/026 and requires each binding's digest to equal its validated baseline representation digest.
 
-Optional `fragment` is a revision-bound locator with `representation_id` matching the binding's baseline representation and positive one-based `start_line`/`end_line` integers (`start_line <= end_line`). It is navigation metadata only; no relocation or semantic support is inferred. V1 omits fragment relocation and richer coordinate systems; consumers needing those require a later accepted format decision.
+Optional `fragment` is a revision-bound locator with `representation_id` matching the binding's baseline representation and positive one-based inclusive `start_line`/`end_line` integers (`start_line <= end_line`). Coordinates apply to the exact validated UTF-8 text bytes of that representation after decoding; LF and CRLF each delimit one line, and lone CR is ordinary line content. Invalid UTF-8 or an out-of-range line blocks the invocation. The locator is navigation metadata only; no relocation or semantic support is inferred. V1 omits fragment relocation and richer coordinate systems; consumers needing those require a later accepted format decision.
 
 The binding example is illustrative only:
 
@@ -52,7 +52,7 @@ The ephemeral JSON report contains no source payloads or absolute paths:
 }
 ```
 
-`status` is `COMPLETE` or `BLOCKED`. A blocked response contains a bounded reason and no partial reference list. A complete response sorts references by source ID, representation ID, then revision, and emits only `unchanged`, `changed`, or `missing`. The document summary follows ADR-031 precedence: any changed knowledge revision or reference yields `changed`; else any missing reference yields `missing`; else `unchanged`. Output is a transient result, not a second persisted binding format, cache, approval, or authority record. It uses ADR-031's ceilings; exceeding any cap blocks without truncation-as-success.
+`status` is `COMPLETE` or `BLOCKED`. A blocked response contains a bounded reason and no partial reference list. A complete response emits one report item per reference plus exactly one document summary item, so the total cap of 1000 report items permits at most 999 references across the binding document; if the binding count exceeds that effective cap, block without truncation. Sort reference items by source ID, representation ID, revision, then binding ID as a deterministic tie-break. Each reference emits only `unchanged`, `changed`, or `missing`. The document summary follows ADR-031 precedence: any changed knowledge revision or reference yields `changed`; else any missing reference yields `missing`; else `unchanged`. Output is a transient result, not a second persisted binding format, cache, approval, or authority record. It uses ADR-031's other ceilings; exceeding any cap blocks without truncation-as-success.
 
 V1 parsing rejects duplicate object keys, unknown fields, malformed types, unsupported versions, and non-UTF-8 input. All paths use ADR-010/017/024/026 validation; this ADR creates no alternate path rule. Canonical JSON byte serialization is not required for the binding input; hashes always refer to observed file bytes, not model-supplied or reserialized JSON digests.
 
@@ -92,13 +92,14 @@ Rejected because the bounded task is a binding/report format; authority, retenti
 
 | Claim if accepted and implemented | Synthetic test | Currently |
 |---|---|---|
-| V1 accepts the illustrated minimal document and rejects unknown version/field, duplicate key, null mapping, or duplicate binding ID | `test_binding_json_v1_strict_shape` | not yet written |
+| V1 accepts the illustrated document and rejects unknown version/field, duplicate key, null mapping, duplicate binding ID, or duplicate source/representation pair | `test_binding_json_v1_strict_shape` | not yet written |
+| Optional qualifiers remain bounded descriptive strings with no authority; actor attribution is not authentication | `test_qualifier_bounds_and_non_authority` | not yet written |
 | Each baseline reference exists and its declared digest equals validated baseline bytes before current comparison | `test_binding_matches_validated_baseline` | not yet written |
 | Missing mapping yields `missing`; explicit mapping yields deterministic unchanged/changed states | `test_explicit_current_mapping_matrix` | not yet written |
 | Knowledge drift affects summary before missing/unchanged aggregation | `test_document_summary_precedence` | not yet written |
 | Fragment locator is tied to representation ID and valid one-based line range; relocation is not inferred | `test_fragment_locator_bounds_and_revision` | not yet written |
 | Malformed/unsupported inputs and exceeded ADR-031 ceilings block without partial-success output | `test_blocked_no_partial_report` | not yet written |
-| Report is bounded, sorted, payload-free, relative-path-only, and transient | `test_report_shape_bounds_and_no_payload` | not yet written |
+| Report is bounded to at most 999 references plus one document summary, sorted deterministically including binding-ID ties, payload-free, relative-path-only, and transient | `test_report_shape_bounds_and_no_payload` | not yet written |
 
 ## Rollback
 
