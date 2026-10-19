@@ -25,9 +25,11 @@ If accepted, use one UTF-8 JSON object as an optional caller-selected binding in
 }
 ```
 
-`knowledge.path` is the single normalized project-relative Markdown path; `sha256` is its expected exact-byte digest. `bindings` is a bounded array. Each entry contains a stable-in-this-file `binding_id`, baseline `source_id`, `representation_id`, and `observed_sha256`. It may contain `current`, an object with explicit current `source_id` and `representation_id`; omission means no mapping and therefore `missing`. Duplicate `(source_id, representation_id)` pairs in one binding document are rejected; each distinct binding ID must have unique values. Optional `applicability`, `scope`, and `context` are consumer-authored descriptive strings, each at most 2048 UTF-8 bytes and containing no forbidden control characters; optional `retention_class` and `owner_policy_ref` are bounded non-empty strings at most 256 UTF-8 bytes. Optional `review_actor` is a sanitized attribution string at most 256 UTF-8 bytes following ADR-006's actor convention; it is not authenticated identity. These qualifiers grant no read, retention, review, or publication authority. Explicit null, incomplete mapping objects, duplicate IDs/pairs, malformed values, unknown fields, duplicate JSON keys, or unsupported schema/version block the invocation before a report. IDs and digests are strings only; the resolver observes actual bytes through ADR-024/026 and requires each binding's digest to equal its validated baseline representation digest.
+`knowledge.path` is the single normalized project-relative Markdown path; `sha256` is its expected exact-byte digest. `bindings` is a bounded array. Each binding contains a unique `binding_id`, optional bounded descriptive qualifiers, and a required `evidence` array containing 1 to 100 reference objects. Each evidence reference contains baseline `source_id`, `representation_id`, and `observed_sha256`; it may contain `current`, an object with explicit current `source_id` and `representation_id`. An omitted `current` means no mapping and therefore `missing`. Duplicate baseline `(source_id, representation_id)` pairs within one binding are rejected; the same pair may occur in a separate binding and does not imply independent support.
 
-Optional `fragment` is a revision-bound locator with `representation_id` matching the binding's baseline representation and positive one-based inclusive `start_line`/`end_line` integers (`start_line <= end_line`). Coordinates apply to the exact validated UTF-8 text bytes of that representation after decoding; LF and CRLF each delimit one line, and lone CR is ordinary line content. Invalid UTF-8 or an out-of-range line blocks the invocation. The locator is navigation metadata only; no relocation or semantic support is inferred. V1 omits fragment relocation and richer coordinate systems; consumers needing those require a later accepted format decision.
+Optional `applicability`, `scope`, and `context` are consumer-authored descriptive strings, each at most 2048 Unicode characters and containing no forbidden control characters. Optional `retention_class` and `owner_policy_ref` are bounded non-empty strings at most 256 Unicode characters. Optional `review_actor` is a sanitized attribution string at most 256 Unicode characters following ADR-006's actor convention; it is not authenticated identity. These qualifiers grant no read, retention, review, or publication authority. Explicit null, incomplete mapping objects, duplicate binding IDs or duplicate evidence pairs within one binding, malformed values, unknown fields, duplicate JSON keys, or unsupported schema/version block the invocation before a report. IDs and digests are strings only; the resolver observes actual bytes through ADR-024/026 and requires each reference digest to equal its validated baseline representation digest.
+
+A reference may also contain `fragment`, a revision-bound locator with `representation_id` matching that reference's baseline representation and positive one-based inclusive `start_line`/`end_line` integers (`start_line <= end_line`). Coordinates apply to the exact validated UTF-8 text bytes of that representation after decoding; LF and CRLF each delimit one line, and lone CR is ordinary line content. Invalid UTF-8 or an out-of-range line blocks the invocation. The locator is navigation metadata only; no relocation or semantic support is inferred. V1 omits fragment relocation and richer coordinate systems; consumers needing those require a later accepted format decision.
 
 The binding example is illustrative only:
 
@@ -35,10 +37,13 @@ The binding example is illustrative only:
 {
   "schema": "kb-bootstrap.evidence-bindings", "version": 1,
   "knowledge": {"path": "kb/notes/topic.md", "sha256": "<observed-doc-sha256>"},
-  "bindings": [{"binding_id": "b1", "source_id": "s1", "representation_id": "r1",
-    "observed_sha256": "<observed-baseline-sha256>",
-    "current": {"source_id": "s1-current", "representation_id": "r2"},
-    "fragment": {"representation_id": "r1", "start_line": 4, "end_line": 7}}]
+  "bindings": [{"binding_id": "b1", "applicability": "topic scope",
+    "evidence": [{"source_id": "s1", "representation_id": "r1",
+      "observed_sha256": "<observed-baseline-sha256>",
+      "current": {"source_id": "s1-current", "representation_id": "r2"},
+      "fragment": {"representation_id": "r1", "start_line": 4, "end_line": 7}},
+      {"source_id": "s2", "representation_id": "r3",
+       "observed_sha256": "<observed-baseline-sha256-2>"}]}]
 }
 ```
 
@@ -48,11 +53,15 @@ The ephemeral JSON report contains no source payloads or absolute paths:
 {
   "status": "COMPLETE",
   "knowledge": {"path": "kb/notes/topic.md", "summary": "changed"},
-  "references": [{"binding_id": "b1", "state": "changed", "reason": "digest_changed"}]
+  "references": [{"binding_id": "b1", "source_id": "s1", "representation_id": "r1",
+    "observed_sha256": "<observed-baseline-sha256>", "raw_path": "kb/raw/evidence.md",
+    "current": {"source_id": "s1-current", "representation_id": "r2",
+      "observed_sha256": "<observed-current-sha256>", "raw_path": "kb/raw/evidence-v2.md"},
+    "state": "changed", "reason": "digest_changed"}]
 }
 ```
 
-`status` is `COMPLETE` or `BLOCKED`. A blocked response contains a bounded reason and no partial reference list. A complete response emits one report item per evidence reference plus exactly one document summary item, so the total cap of 1000 report items permits at most 999 evidence references aggregated across all bindings; if the total evidence-reference count exceeds that cap, block without truncation. The separate maximum of 1000 bindings and maximum 100 references per binding still apply; they do not replace this aggregate report cap. Sort reference items by source ID, representation ID, revision, then binding ID as a deterministic tie-break. Each reference emits only `unchanged`, `changed`, or `missing`. The document summary follows ADR-031 precedence: any changed knowledge revision or reference yields `changed`; else any missing reference yields `missing`; else `unchanged`. Output is a transient result, not a second persisted binding format, cache, approval, or authority record. It uses ADR-031's other ceilings; exceeding any cap blocks without truncation-as-success.
+`status` is `COMPLETE` or `BLOCKED`. A blocked response contains a bounded reason and no partial reference list. A complete response emits one report item per evidence reference plus exactly one document summary item, so the total cap of 1000 report items permits at most 999 evidence references aggregated across all bindings; if the total evidence-reference count exceeds that cap, block without truncation. The separate maximum of 1000 bindings and maximum 100 references per binding still apply; they do not replace this aggregate report cap. Sort reference items by source ID, representation ID, revision, binding ID, then evidence-array order as the deterministic tie-break. Each reference item includes its binding ID, baseline source/representation IDs, observed digest, and ADR-026-validated project-relative `raw_path`. When an explicit current mapping resolves, include the mapped current IDs, validated digest, and project-relative path; when no mapping exists, omit `current` rather than inventing identity. Missing mapped items retain the explicit mapped IDs but omit unobserved digest/path fields. No item contains source body or absolute path. Each reference emits only `unchanged`, `changed`, or `missing`. The document summary follows ADR-031 precedence: any changed knowledge revision or reference yields `changed`; else any missing reference yields `missing`; else `unchanged`. Output is a transient result, not a second persisted binding format, cache, approval, or authority record. It uses ADR-031's other ceilings; exceeding any cap blocks without truncation-as-success.
 
 V1 parsing rejects duplicate object keys, unknown fields, malformed types, unsupported versions, and non-UTF-8 input. All paths use ADR-010/017/024/026 validation; this ADR creates no alternate path rule. Canonical JSON byte serialization is not required for the binding input; hashes always refer to observed file bytes, not model-supplied or reserialized JSON digests.
 
@@ -92,14 +101,14 @@ Rejected because the bounded task is a binding/report format; authority, retenti
 
 | Claim if accepted and implemented | Synthetic test | Currently |
 |---|---|---|
-| V1 accepts the illustrated document and rejects unknown version/field, duplicate key, null mapping, duplicate binding ID, or duplicate source/representation pair | `test_binding_json_v1_strict_shape` | not yet written |
-| Optional qualifiers remain bounded descriptive strings with no authority; actor attribution is not authentication | `test_qualifier_bounds_and_non_authority` | not yet written |
-| Each baseline reference exists and its declared digest equals validated baseline bytes before current comparison | `test_binding_matches_validated_baseline` | not yet written |
-| Missing mapping yields `missing`; explicit mapping yields deterministic unchanged/changed states | `test_explicit_current_mapping_matrix` | not yet written |
+| V1 accepts the illustrated nested-reference document and rejects unknown version/field, duplicate key, null mapping, duplicate binding ID, or duplicate source/representation pair within one binding | `test_binding_json_v1_strict_shape` | not yet written |
+| Optional qualifiers remain bounded descriptive strings with no authority; review actor is limited to 256 Unicode characters and is not authentication | `test_qualifier_bounds_and_non_authority` | not yet written |
+| Every nested baseline reference exists and its declared digest equals validated baseline bytes before current comparison | `test_binding_matches_validated_baseline` | not yet written |
+| Nested evidence references with omitted mapping yield `missing`; explicit mapping yields deterministic unchanged/changed states | `test_explicit_current_mapping_matrix` | not yet written |
 | Knowledge drift affects summary before missing/unchanged aggregation | `test_document_summary_precedence` | not yet written |
 | Fragment locator is tied to representation ID and valid one-based line range; relocation is not inferred | `test_fragment_locator_bounds_and_revision` | not yet written |
 | Malformed/unsupported inputs and exceeded ADR-031 ceilings block without partial-success output | `test_blocked_no_partial_report` | not yet written |
-| Report is bounded by aggregate evidence-reference count (at most 999) plus one document summary, even across multiple bindings; e.g. 1000 references block while 999 fit, with deterministic order, no payloads, relative paths, and transient output | `test_report_shape_bounds_and_no_payload` | not yet written |
+| Report items carry validated project-relative baseline identity and explicit current identity only when mapped; aggregate count is at most 999 references plus one summary across all bindings, e.g. 1000 block while 999 fit | `test_report_shape_bounds_and_no_payload` | not yet written |
 
 ## Rollback
 
