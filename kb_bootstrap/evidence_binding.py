@@ -457,7 +457,7 @@ def resolve_evidence_binding(
                 "source_id": ref["source_id"],
                 "representation_id": ref["representation_id"],
                 "observed_sha256": base_rep["revision"]["digest"],
-                "raw_path": Path(base_rep["raw_path"]).as_posix(),
+                "raw_path": (Path(baseline_corpus_root) / base_rep["raw_path"]).as_posix(),
             }
             if current_map is None:
                 state, why = "missing", "current_mapping_absent"
@@ -471,7 +471,7 @@ def resolve_evidence_binding(
                     "source_id": current_source["source_id"],
                     "representation_id": current_rep["representation_id"],
                     "observed_sha256": current_digest,
-                    "raw_path": Path(current_rep["raw_path"]).as_posix(),
+                    "raw_path": (Path(current_corpus_root) / current_rep["raw_path"]).as_posix(),
                 }
                 if current_digest == ref["observed_sha256"]:
                     state, why = "unchanged", "byte_revision_matches"

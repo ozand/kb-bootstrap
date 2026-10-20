@@ -108,11 +108,11 @@ class EvidenceBindingTests(unittest.TestCase):
             knowledge_path="topic.md",
             baseline_metadata_path="capture.yaml",
             baseline_project_root=self.base_project,
-            baseline_corpus_root=self.base_corpus,
+            baseline_corpus_root=kwargs.pop("baseline_corpus_root", self.base_corpus),
             baseline_selected_paths=["evidence.md"],
             current_metadata_path="capture.yaml",
             current_project_root=self.current_project,
-            current_corpus_root=self.current_corpus,
+            current_corpus_root=kwargs.pop("current_corpus_root", self.current_corpus),
             current_selected_paths=["evidence.md"],
             authorize_validation_read=lambda: True,
             authorize_processing_and_report=lambda: True,
@@ -121,13 +121,19 @@ class EvidenceBindingTests(unittest.TestCase):
         return resolve_evidence_binding(**args)
 
     def test_complete_unchanged_mapping_emits_exact_bounded_report(self):
-        report = self.resolve()
+        (self.base_project / "raw/baseline").mkdir(parents=True)
+        (self.current_project / "raw/current").mkdir(parents=True)
+        (self.base_project / "raw/baseline/evidence.md").write_bytes(self.base_bytes)
+        (self.current_project / "raw/current/evidence.md").write_bytes(self.current_bytes)
+        self._write_envelope(self.base_meta, "source-base", "rep-base", self.base_bytes)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        report = self.resolve(baseline_corpus_root="raw/baseline", current_corpus_root="raw/current")
         self.assertEqual(report["status"], "COMPLETE")
         self.assertEqual(report["knowledge"]["summary"], "unchanged")
         self.assertEqual(report["references"][0]["state"], "unchanged")
         self.assertEqual(report["references"][0]["reason"], "byte_revision_matches")
-        self.assertEqual(report["references"][0]["raw_path"], "evidence.md")
-        self.assertEqual(report["references"][0]["current"]["raw_path"], "evidence.md")
+        self.assertEqual(report["references"][0]["raw_path"], "raw/baseline/evidence.md")
+        self.assertEqual(report["references"][0]["current"]["raw_path"], "raw/current/evidence.md")
         self.assertNotIn("Evidence baseline", repr(report))
         self.assertNotIn(str(self.root), repr(report))
 
@@ -244,6 +250,9 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(report["knowledge"]["summary"], "changed")
         self.assertEqual([(r["source_id"], r["state"]) for r in report["references"]],
                          [("source-b", "changed"), ("source-base", "unchanged"), ("source-c", "missing")])
+        self.assertEqual([r["raw_path"] for r in report["references"]],
+                         ["corpus/b.md", "corpus/evidence.md", "corpus/c.md"])
+        self.assertEqual(report["references"][0]["current"]["raw_path"], "corpus/b.md")
         self.assertNotIn("current", report["references"][2])
         self.assertEqual(report["references"][2]["reason"], "current_mapping_absent")
 
