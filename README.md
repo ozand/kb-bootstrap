@@ -262,6 +262,27 @@ if result["status"] == "COMPLETE":
 
 The digest binds this call to the supplied file bytes; it does not establish source truth, freshness, or approval. The result includes a revision-scoped locator. A stale expected digest returns `REVISION_MISMATCH` with the observed digest and no section text. This Python API is not a CLI option and does not perform QMD lookup or discovery; see [ADR-034](docs/adr/ADR-034-project-one-explicit-bounded-markdown-section.md) for limits and outcomes.
 
+A caller can report the metadata for an already-produced projection result without executing the projection again:
+
+```python
+from kb_bootstrap.section_projection_reporting import report_section_projection
+
+already_produced = {
+    "status": "COMPLETE", "path": "guide.md", "observed_sha256": "a" * 64,
+    "heading_path": ["Setup"], "occurrence": 1, "start_line": 1,
+    "end_line": 2, "text": "# Setup\nSteps\n", "truncated": False,
+}
+report = report_section_projection(
+    selection_state="CONFIGURED", required=True, result=already_produced
+)
+print(report)
+# {'selection_state': 'CONFIGURED', 'required': True, 'operation': 'project_section',
+#  'operation_status': 'COMPLETE', 'observation': 'AVAILABLE',
+#  'requirement_satisfied': True}
+```
+
+The report contains exactly these six fields, preserves ordinary projection outcomes, and never includes section text or path. It is a pure metadata report: it does not read files, run projection, or grant authority. See [ADR-037](docs/adr/ADR-037-report-one-section-projection-result.md).
+
 For a caller-authorized, read-only evidence-impact check, use the Python API with explicit JSON binding input and complete baseline/current source envelopes. The trusted host must bind its policy decisions to this exact operation, purpose, input roots, and any expected revisions; callbacks below are not credentials or a persisted grant. The example assumes the files and envelopes already exist and that the caller has computed any expected digests independently.
 
 ```python
