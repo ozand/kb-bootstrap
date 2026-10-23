@@ -262,6 +262,36 @@ if result["status"] == "COMPLETE":
 
 The digest binds this call to the supplied file bytes; it does not establish source truth, freshness, or approval. The result includes a revision-scoped locator. A stale expected digest returns `REVISION_MISMATCH` with the observed digest and no section text. This Python API is not a CLI option and does not perform QMD lookup or discovery; see [ADR-034](docs/adr/ADR-034-project-one-explicit-bounded-markdown-section.md) for limits and outcomes.
 
+For a caller-authorized, read-only evidence-impact check, use the Python API with explicit JSON binding input and complete baseline/current source envelopes. The trusted host must bind its policy decisions to this exact operation, purpose, input roots, and any expected revisions; callbacks below are not credentials or a persisted grant. The example assumes the files and envelopes already exist and that the caller has computed any expected digests independently.
+
+```python
+from pathlib import Path
+from kb_bootstrap.evidence_binding import resolve_evidence_binding
+
+# The integration supplies these callbacks from the trusted operator workflow.
+result = resolve_evidence_binding(
+    project_root=Path("kb").resolve(),
+    binding_path="bindings/topic.json",
+    knowledge_path="wiki/concepts/topic.md",
+    baseline_metadata_path="captures/baseline.yaml",
+    baseline_project_root=Path(".").resolve(),
+    baseline_corpus_root="raw/baseline",
+    baseline_selected_paths=["evidence.md"],  # Relative to raw/baseline
+    current_metadata_path="captures/current.yaml",
+    current_project_root=Path(".").resolve(),
+    current_corpus_root="raw/current",
+    current_selected_paths=["evidence.md"],  # Relative to raw/current
+    # Optional caller-known digests: binding, knowledge, baseline_metadata,
+    # current_metadata, and selected_files keyed as '<side>:<relative-path>'.
+    # Selected-file entries only check already validated bytes; they add no reads.
+    authorize_validation_read=trusted_host_validation_read,
+    authorize_processing_and_report=trusted_host_processing_and_report,
+)
+print(result["status"], result.get("knowledge"), result.get("references"))
+```
+
+The resolver has no CLI, does no discovery or QMD/network access, and writes no files. It reads exactly the explicitly selected binding, knowledge, metadata, and envelope-selected retained evidence files; ensure each input is authorized for this operation. Its JSON report is ephemeral. Hashes bind observed bytes only, not entailment, source truth, freshness, review, or approval. A denied host precondition raises `PermissionError` outside the ADR-036 report; these callbacks do not authenticate the caller, enforce revocation, or provide host-egress isolation. See [ADR-031](docs/adr/ADR-031-bind-explicit-knowledge-items-to-retained-evidence.md), [ADR-035](docs/adr/ADR-035-require-explicit-local-policy-for-evidence-reading.md), and [ADR-036](docs/adr/ADR-036-define-json-evidence-binding-input-and-report.md) for limits and boundaries.
+
 For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
 
 ```bash
