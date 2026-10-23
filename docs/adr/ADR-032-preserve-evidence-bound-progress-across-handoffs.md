@@ -1,6 +1,6 @@
 # ADR-032: Preserve evidence-bound progress across research handoffs
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-19
 **Authors**: Pi coding agent
 **Supersedes**: None
