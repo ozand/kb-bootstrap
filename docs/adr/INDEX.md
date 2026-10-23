@@ -31,8 +31,9 @@
 | ADR-027 | Retain captured Markdown as owner-repository files | Accepted |
 | ADR-028 | Separate optional capability state from validation and authority | Accepted |
 | ADR-029 | Create new research captures with exclusive paths | Accepted |
-| ADR-031 | Bind explicit knowledge items to retained evidence | Accepted |
 | ADR-030 | Reuse source identity only through an explicit capture envelope | Accepted |
+| ADR-031 | Bind explicit knowledge items to retained evidence | Accepted |
+| ADR-032 | Preserve evidence-bound progress across research handoffs | Accepted |
 | ADR-033 | Import one explicit local RawCapture without inference | Accepted |
 | ADR-034 | Project one explicit bounded Markdown section | Accepted |
 | ADR-035 | Require explicit local policy for evidence reading | Accepted |
