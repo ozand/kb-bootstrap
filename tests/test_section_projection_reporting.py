@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch
+from kb_bootstrap.local_retrieval import MAX_OUTPUT, json_bytes
 from kb_bootstrap.section_projection_reporting import report_section_projection
 
 DIGEST = "a" * 64
@@ -49,11 +50,16 @@ class SectionProjectionReportingTests(unittest.TestCase):
         surrogate=chr(0xd800)
         for changes in ({"text":surrogate},{"path":surrogate},{"heading_path":[surrogate]}):
             with self.assertRaises(ValueError): self.report(result=success(**changes))
-        with self.assertRaises(ValueError): self.report(result={"status":"BLOCKED","reason":"blocked","extra":"x"*300000})
+        path_bytes = MAX_OUTPUT - len(json_bytes(success(path=""))) - 1
+        exact_size = success(path="x" * path_bytes)
+        self.assertEqual(len(json_bytes(exact_size)) + 1, MAX_OUTPUT)
+        self.assertEqual(self.report(result=exact_size)["operation_status"], "COMPLETE")
+        with self.assertRaises(ValueError): self.report(result=dict(exact_size, path=exact_size["path"] + "x"))
 
     def test_output_privacy_input_immutability_and_no_projection(self):
         value=success(); before=dict(value)
-        with patch("kb_bootstrap.section_projection.project_section",side_effect=AssertionError("executed")): output=self.report(result=value)
+        with patch("kb_bootstrap.section_projection.project_section",side_effect=AssertionError("executed")), patch("builtins.open",side_effect=AssertionError("I/O")), patch("os.open",side_effect=AssertionError("I/O")), patch("subprocess.run",side_effect=AssertionError("process")):
+            output=self.report(result=value)
         self.assertEqual(value,before); self.assertNotIn("path",output); self.assertNotIn("text",output); self.assertEqual(len(output),6)
 
 if __name__ == "__main__": unittest.main()
