@@ -1,6 +1,6 @@
 # ADR-037: Report one section-projection operation result
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-23
 **Authors**: Pi coding agent
 **Supersedes**: None
