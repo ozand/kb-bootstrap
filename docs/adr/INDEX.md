@@ -29,9 +29,12 @@
 | ADR-025 | Publish a source capture as one exclusive archive | Superseded by ADR-027 |
 | ADR-026 | Look up caller-selected retained evidence without discovery | Accepted |
 | ADR-027 | Retain captured Markdown as owner-repository files | Accepted |
+| ADR-028 | Separate optional capability state from validation and authority | Accepted |
 | ADR-029 | Create new research captures with exclusive paths | Accepted |
 | ADR-030 | Reuse source identity only through an explicit capture envelope | Accepted |
 | ADR-031 | Bind explicit knowledge items to retained evidence | Accepted |
 | ADR-032 | Preserve evidence-bound progress across research handoffs | Proposed |
 | ADR-033 | Import one explicit local RawCapture without inference | Accepted |
 | ADR-034 | Project one explicit bounded Markdown section | Accepted |
+| ADR-035 | Require explicit local policy for evidence reading | Accepted |
+| ADR-036 | Define a minimal JSON format for evidence binding | Accepted |
