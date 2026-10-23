@@ -1,6 +1,6 @@
 # ADR-028: Separate optional capability state from validation and authority
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-13
 **Authors**: Pi coding agent
 **Supersedes**: None
