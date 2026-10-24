@@ -28,7 +28,7 @@ With any subcommand, including `validate-core`, it is an argparse error with exi
 
 A successful first core-only initialization creates only these managed paths (plus listed parent directories):
 
-- Both layouts: `.agents/skills/kb-wiki-builder/SKILL.md`; `.gitignore` with existing additive generated-artifact rules; `kb/raw/.gitkeep`, `kb/research/.gitkeep`, `kb/wiki/entities/.gitkeep`, `kb/wiki/concepts/.gitkeep`, and `kb/wiki/reports/.gitkeep`. Parent directories: `.agents/skills`, `.agents/skills/kb-wiki-builder`, `kb`, `kb/raw`, `kb/research`, `kb/wiki`, and the four `kb/wiki/*` directories.
+- Both layouts: `.agents/skills/kb-wiki-builder/SKILL.md`; `.gitignore` with existing additive generated-artifact rules; `kb/raw/.gitkeep`, `kb/research/.gitkeep`, `kb/wiki/entities/.gitkeep`, `kb/wiki/concepts/.gitkeep`, and `kb/wiki/reports/.gitkeep`. Parent directories: `.agents`, `.agents/skills`, `.agents/skills/kb-wiki-builder`, `kb`, `kb/raw`, `kb/research`, `kb/wiki`, and the four `kb/wiki/*` directories.
 - `single`: common paths only.
 - `umbrella`: common paths plus `kb/apps/`, `kb/systems/`, `kb/architecture/`.
 

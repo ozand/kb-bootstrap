@@ -66,6 +66,11 @@ def test_guide_separates_qmd_declarations_from_runtime_evidence():
     assert "checks repository declaration syntax" in content
     assert "does not prove that a collection is registered, indexed, fresh, searchable, complete, or relevant" in content
     assert "`qmd collection add` and `qmd update` mutate local QMD runtime/index state" in content
+    assert "only when QMD maintenance is explicitly selected" in content
+    assert "`qmd update` is not a collection selector" in content
+    assert "Legacy `kb-bootstrap search` remains distinct" in content
+    assert "`kb-bootstrap search-qmd` adapter" in content
+    assert "does not register collections, update the index" in content
     assert "qmd search \"<canonical smoke query>\" -c <project>-wiki" in content
     assert "qmd search \"<raw smoke query>\" -c <project>-raw" in content
 
