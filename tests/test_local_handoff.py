@@ -25,7 +25,9 @@ class LocalHandoffTests(unittest.TestCase):
     def test_strict_json_rejects_duplicate_float_bom_and_digest(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "record.json"
-            for raw in (b'{"schema":1,"schema":2}', b"\\xef\\xbb\\xbf{}", b'{"x":1.0}'):
+            for raw in (b'{"schema":1,"schema":2}', b"\\xef\\xbb\\xbf{}", b'{"x":1.0}',
+                        b'{"x":NaN}', b'{"revision":1e0}', b'{"x":"\\u0001"}',
+                        b'{"x":"\\ud800"}'):
                 path.write_bytes(raw)
                 self.assertEqual(load_record(path)["status"], "invalid")
 
@@ -50,6 +52,17 @@ class LocalHandoffTests(unittest.TestCase):
             except (OSError, NotImplementedError):
                 self.skipTest("symlinks unavailable")
             self.assertEqual(load_record(target)["status"], "invalid")
+
+    def test_accepted_outputs_require_distinct_evidence_refs(self):
+        record = make_record()
+        record["steps"] = []
+        record["outputs"] = [
+            {"ref": "output:a", "revision": "same", "standing": "accepted", "acceptance_evidence_ref": "evidence:a"},
+            {"ref": "output:b", "revision": "same", "standing": "accepted", "acceptance_evidence_ref": "evidence:a"},
+        ]
+        record["result_id"] = hashlib.sha256(json.dumps(record, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(check_record(record, lambda *a, **k: {"status": "passed"}),
+                         {"status": "invalid", "reason": "invalid-record"})
 
     def test_create_load_and_permission_denied_before_io(self):
         with tempfile.TemporaryDirectory() as folder:
