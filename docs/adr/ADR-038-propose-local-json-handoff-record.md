@@ -1,6 +1,6 @@
 # ADR-038: Propose a bounded local JSON handoff record
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-23
 **Authors**: Pi coding agent
 **Supersedes**: None
