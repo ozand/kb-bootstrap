@@ -19,6 +19,22 @@ class CoreOnlyInitializationTests(unittest.TestCase):
                 code = exc.code
         return code, out.getvalue(), err.getvalue()
 
+    def invoke_bytes(self, *args):
+        class BinaryCapture:
+            def __init__(self):
+                self.buffer = io.BytesIO()
+            def write(self, text):
+                raise AssertionError("binary receipt must use the UTF-8 buffer")
+            def flush(self):
+                pass
+        out, err = BinaryCapture(), BinaryCapture()
+        with patch("sys.argv", ["kb-bootstrap", *map(str, args)]), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code = main()
+            except SystemExit as exc:
+                code = exc.code
+        return code, out.buffer.getvalue(), err.buffer.getvalue()
+
     def test_core_only_single_has_exact_allowlist_and_local_core_works(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "new"
@@ -85,6 +101,66 @@ class CoreOnlyInitializationTests(unittest.TestCase):
             code, _, err = self.invoke("--core-only", "validate-core")
             self.assertEqual(code, 2)
             self.assertIn("initialization-only", err)
+
+    def test_abbreviated_core_flag_with_subcommand_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "new"
+            code, out, err = self.invoke("--core", "validate-core", "--dir", target)
+            self.assertEqual(code, 2)
+            self.assertEqual(out, "")
+            self.assertIn("initialization-only", err)
+            self.assertFalse(target.exists())
+
+    def test_nested_missing_target_creates_ancestors(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "missing-parent" / "kb"
+            code, out, err = self.invoke("--target", root, "--core-only")
+            self.assertEqual((code, err), (0, ""))
+            self.assertTrue(out.startswith("CORE_ONLY_CREATED\n"))
+            self.assertTrue((root / "kb/wiki/concepts/.gitkeep").is_file())
+
+    def test_nested_target_failure_reports_partial_without_outside_paths(self):
+        original_mkdir = Path.mkdir
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "first" / "second" / "kb"
+            created_ancestor = root.parents[1]
+            def fail_second_ancestor(path, *args, **kwargs):
+                if path == root.parent:
+                    raise OSError("private nested target path")
+                return original_mkdir(path, *args, **kwargs)
+            with patch.object(Path, "mkdir", fail_second_ancestor):
+                code, out, err = self.invoke("--target", root, "--core-only")
+            self.assertEqual((code, out), (1, ""))
+            self.assertEqual(err, "CORE_ONLY_PARTIAL\nLAYOUT=single\nREASON=io_error\nQMD=NOT_CONFIGURED\nSURF=NOT_CONFIGURED\n")
+            self.assertTrue(created_ancestor.is_dir())
+            self.assertFalse(root.exists())
+            self.assertNotIn(temp, err)
+
+    def test_core_only_receipts_are_lf_only_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "new"
+            code, out, err = self.invoke_bytes("--target", root, "--core-only")
+            self.assertEqual((code, err), (0, b""))
+            self.assertIn(b"CORE_ONLY_CREATED\nLAYOUT=single\n", out)
+            self.assertNotIn(b"\r", out)
+            code, out, err = self.invoke_bytes("--target", root, "--core-only")
+            self.assertEqual((code, out), (1, b""))
+            self.assertEqual(err, b"CORE_ONLY_BLOCKED\nREASON=fresh_target_required\n")
+            self.assertNotIn(b"\r", err)
+
+    def test_partial_receipt_is_lf_only_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "partial"
+            original = Path.open
+            def fail_on_gitignore(path, *args, **kwargs):
+                if path.name == ".gitignore":
+                    raise OSError("private path")
+                return original(path, *args, **kwargs)
+            with patch.object(Path, "open", fail_on_gitignore):
+                code, out, err = self.invoke_bytes("--target", root, "--core-only")
+            self.assertEqual((code, out), (1, b""))
+            self.assertTrue(err.startswith(b"CORE_ONLY_PARTIAL\nLAYOUT=single\n"))
+            self.assertNotIn(b"\r", err)
 
     def test_pre_mutation_io_failures_are_blocked_on_stderr(self):
         original_mkdir = Path.mkdir

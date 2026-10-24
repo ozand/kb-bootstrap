@@ -68,6 +68,8 @@ def _core_only_target_state(target: Path):
             return None
         if os.path.islink(current) or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
             return None
+        if current != raw and not os.path.isdir(current):
+            return None
     try:
         info = os.lstat(raw)
         if not os.path.isdir(raw) or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
@@ -80,6 +82,15 @@ def _core_only_target_state(target: Path):
         return raw
     except OSError:
         return None
+
+
+def _print_core_only_receipt(receipt, stream):
+    binary = getattr(stream, "buffer", None)
+    if binary is not None:
+        binary.write((receipt + "\n").encode("utf-8"))
+        binary.flush()
+    else:
+        stream.write(receipt + "\n")
 
 
 def _core_only_receipt(kind, layout=None, created=(), reason=None):
@@ -124,8 +135,19 @@ def _initialize_core_only(target: Path, layout: str):
     created = []
     mutated = False
     try:
-        if not root.exists():
-            root.mkdir()
+        missing_ancestors = []
+        current = root
+        while True:
+            try:
+                os.lstat(current)
+                break
+            except FileNotFoundError:
+                missing_ancestors.append(current)
+                if current.parent == current:
+                    break
+                current = current.parent
+        for ancestor in reversed(missing_ancestors):
+            ancestor.mkdir()
             mutated = True
         for relative in directories:
             path = root / relative
@@ -380,7 +402,9 @@ def main():
     )
     raw_args = sys.argv[1:]
     preliminary_args, unknown_args = parser.parse_known_args(raw_args)
-    if "--core-only" in raw_args and (preliminary_args.command or "--core-only" in unknown_args):
+    if (preliminary_args.core_only or "--core-only" in raw_args) and (
+        preliminary_args.command or "--core-only" in unknown_args
+    ):
         parser.error("--core-only is initialization-only")
     args = parser.parse_args(raw_args)
 
@@ -581,10 +605,10 @@ def main():
     target = Path(args.target)
     if args.core_only:
         if args.with_project_lessons:
-            print(_core_only_receipt("CORE_ONLY_BLOCKED", reason="conflicting_flags"), file=sys.stderr)
+            _print_core_only_receipt(_core_only_receipt("CORE_ONLY_BLOCKED", reason="conflicting_flags"), sys.stderr)
             return 1
         status, receipt, to_stderr = _initialize_core_only(target, args.type)
-        print(receipt, file=sys.stderr if to_stderr else sys.stdout)
+        _print_core_only_receipt(receipt, sys.stderr if to_stderr else sys.stdout)
         return status
     pkg_dir = Path(__file__).parent.resolve()
     action, guard_report = scaffold_preflight(
