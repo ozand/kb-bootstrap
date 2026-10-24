@@ -102,8 +102,6 @@ def _validate_inner(record):
             return "invalid-schema"
         if (not _safe_text(item["ref"], 1024) or item["ref"] in material_refs
                 or not _safe_text(item["revision"], 1024)
-                or item["observation"] not in {"captured", "partially-read", "read"}
-                or item["analysis"] not in {"not-started", "partially-analyzed", "analyzed"}
                 or any(not _safe_text(item[k], 512, empty=True) for k in
                        ("observed_scope", "unread_remainder", "analyzed_scope", "unanalyzed_remainder"))):
             return "invalid-schema"

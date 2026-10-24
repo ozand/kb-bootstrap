@@ -102,6 +102,32 @@ class LocalHandoffTests(unittest.TestCase):
         self.assertEqual(result["steps"][0]["current_resumability"], "revalidation-required")
         self.assertEqual(record, original)
 
+    def test_save_failure_outcomes_preserve_or_report_unknown(self):
+        import kb_bootstrap.local_handoff as module
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "record.json"
+            original = save_record(path, make_record(), permission=True)
+            old_bytes = path.read_bytes()
+            candidate = dict(original["record"]); candidate["revision"] = 2
+            candidate["result_id"] = hashlib.sha256(json.dumps({k:v for k,v in candidate.items() if k!="result_id"},ensure_ascii=False,separators=(",",":")).encode()).hexdigest()
+            args = {"expected_record_id": original["record"]["record_id"], "expected_revision": 1,
+                    "expected_result_id": original["result_id"], "permission": True}
+            with patch.object(module.os, "replace", side_effect=OSError("precommit")):
+                failed = save_record(path, candidate, **args)
+            self.assertEqual(failed["status"], "io-error")
+            self.assertEqual(path.read_bytes(), old_bytes)
+            real_read = module._read_record
+            calls = []
+            def read_then_fail(target):
+                calls.append(target)
+                if len(calls) > 1:
+                    raise OSError("postcommit readback unavailable")
+                return real_read(target)
+            with patch.object(module, "_read_record", side_effect=read_then_fail):
+                unknown = save_record(path, candidate, **args)
+            self.assertEqual(unknown["status"], "unknown")
+            self.assertEqual(load_record(path)["record"]["revision"], 2)
+
     def test_attempt_limit_blocks_without_trimming(self):
         from kb_bootstrap.local_handoff import _history_conflict
         record = make_record()
