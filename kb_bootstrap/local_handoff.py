@@ -8,6 +8,8 @@ import re
 import stat
 import tempfile
 import threading
+import msvcrt
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -15,6 +17,8 @@ SCHEMA = "kb-local-handoff/v1"
 MAX_BYTES = 1024 * 1024
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _LOCK = threading.RLock()
+_PROCESS_LOCKS = {}
+_PROCESS_LOCKS_GUARD = threading.Lock()
 
 def _pairs(pairs):
     result = {}
@@ -61,6 +65,52 @@ def _reparse(path):
         return False
     except (OSError, ValueError):
         return True
+
+
+@contextmanager
+def _exclusive_writer(path):
+    """Serialize CAS writers using a persistent target-derived sibling lock."""
+    target = Path(path).absolute()
+    identity = os.path.normcase(os.path.realpath(str(target)))
+    name = ".kb-handoff-lock-" + hashlib.sha256(identity.encode("utf-8")).hexdigest() + ".lock"
+    lock_path = target.parent / name
+    if _reparse(target.parent) or (lock_path.exists() and _reparse(lock_path)):
+        raise OSError("unsafe lock path")
+    with _PROCESS_LOCKS_GUARD:
+        local_lock = _PROCESS_LOCKS.setdefault(identity, threading.RLock())
+    local_lock.acquire()
+    stream = None
+    try:
+        if os.name == "nt":
+            created = False
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+                created = True
+            except FileExistsError:
+                fd = os.open(lock_path, os.O_RDWR)
+            stream = os.fdopen(fd, "r+b")
+            if created:
+                stream.write(b"\x00")
+                stream.flush()
+            stream.seek(0)
+            try:
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as error:
+                raise BlockingIOError("record writer is busy") from error
+            yield
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+            stream = os.fdopen(fd, "r+b")
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            yield
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    finally:
+        if stream is not None:
+            stream.close()
+        local_lock.release()
 
 
 def _ordered(value, keys):
@@ -437,7 +487,7 @@ def save_record(path, candidate, *, expected_record_id=None, expected_revision=N
     try:
         if _reparse(target.parent) or (target.exists() and _reparse(target)):
             return {"status": "conflict", "record": None, "result_id": None}
-        with _LOCK:
+        with _LOCK, _exclusive_writer(target):
             if expected_record_id is None and expected_revision is None and expected_result_id is None:
                 if candidate_record["revision"] != 1:
                     return {"status": "invalid", "record": None, "result_id": None}
@@ -493,5 +543,7 @@ def save_record(path, candidate, *, expected_record_id=None, expected_revision=N
             except Exception:
                 return {"status": "unknown", "record": None, "result_id": None}
             return {"status": "replaced", "record": verified, "result_id": digest}
+    except BlockingIOError:
+        return {"status": "conflict", "record": None, "result_id": None}
     except OSError:
         return {"status": "io-error", "record": None, "result_id": None}

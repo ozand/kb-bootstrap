@@ -21,6 +21,19 @@ def make_record():
                       "disposal": "caller"}, "assumptions": [], "open_questions": []}
 
 
+def _race_writer(path, label, expected, barrier, queue):
+    from kb_bootstrap.local_handoff import _digest
+    candidate = make_record()
+    candidate["record_id"] = expected[0]
+    candidate["revision"] = expected[1] + 1
+    candidate["objective"] = label
+    candidate["result_id"] = _digest(candidate)
+    barrier.wait()
+    result = save_record(path, candidate, expected_record_id=expected[0],
+                         expected_revision=expected[1], expected_result_id=expected[2], permission=True)
+    queue.put((label, result["status"]))
+
+
 class LocalHandoffTests(unittest.TestCase):
     def test_strict_json_rejects_duplicate_float_bom_and_digest(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -166,6 +179,28 @@ class LocalHandoffTests(unittest.TestCase):
             "state": "pending", "observed_at": "synthetic"})
         next_record["result_id"] = hashlib.sha256(json.dumps({k:v for k,v in next_record.items() if k!="result_id"},ensure_ascii=False,separators=(",",":")).encode()).hexdigest()
         self.assertTrue(_history_conflict(record, next_record))
+
+    def test_two_process_same_baseline_has_one_winner(self):
+        import multiprocessing
+        from kb_bootstrap.local_handoff import _digest
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "record.json"
+            initial = make_record()
+            original = save_record(path, initial, permission=True)
+            expected = (original["record"]["record_id"], original["record"]["revision"], original["result_id"])
+            barrier = multiprocessing.Barrier(2)
+            queue = multiprocessing.Queue()
+            workers = [multiprocessing.Process(target=_race_writer,
+                args=(str(path), name, expected, barrier, queue)) for name in ("winner-a", "winner-b")]
+            for process in workers: process.start()
+            for process in workers: process.join(10)
+            self.assertTrue(all(not process.is_alive() and process.exitcode == 0 for process in workers))
+            results = [queue.get(timeout=2) for _ in workers]
+            self.assertEqual(sorted(status for _, status in results), ["conflict", "replaced"])
+            stored = load_record(path)["record"]
+            self.assertEqual(stored["revision"], 2)
+            self.assertIn(stored["objective"], {"winner-a", "winner-b"})
+            self.assertEqual(stored["result_id"], _digest(stored))
 
     def test_replacement_rejects_history_regression_and_allows_append(self):
         with tempfile.TemporaryDirectory() as folder:
