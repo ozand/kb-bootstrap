@@ -1,6 +1,6 @@
 # ADR-039: Propose opt-in core-only initialization
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-24
 **Authors**: Pi coding agent
 **Supersedes**: None
