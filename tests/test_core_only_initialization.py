@@ -86,6 +86,31 @@ class CoreOnlyInitializationTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("initialization-only", err)
 
+    def test_pre_mutation_io_failures_are_blocked_on_stderr(self):
+        original_mkdir = Path.mkdir
+        for existing_target, failure_path in ((False, "new"), (True, ".agents")):
+            with self.subTest(existing_target=existing_target), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "new"
+                if existing_target:
+                    root.mkdir()
+                before = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+                def fail_mkdir(path, *args, **kwargs):
+                    if path.name == failure_path:
+                        raise OSError(f"private path {path}")
+                    return original_mkdir(path, *args, **kwargs)
+
+                with patch.object(Path, "mkdir", fail_mkdir):
+                    code, out, err = self.invoke("--target", root, "--core-only")
+                self.assertEqual((code, out), (1, ""))
+                self.assertEqual(err, "CORE_ONLY_BLOCKED\nREASON=io_error\n")
+                self.assertNotIn(temp, err)
+                self.assertEqual(before, {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()})
+                if existing_target:
+                    self.assertEqual(list(root.iterdir()), [])
+                else:
+                    self.assertFalse(root.exists())
+
     def test_partial_failure_keeps_created_prefix_and_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "partial"

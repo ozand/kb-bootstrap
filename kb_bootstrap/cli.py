@@ -140,7 +140,7 @@ def _initialize_core_only(target: Path, layout: str):
                 output.write(payload)
     except (OSError, UnicodeError):
         if not mutated:
-            return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="io_error"), False
+            return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="io_error"), True
         return 1, _core_only_receipt("CORE_ONLY_PARTIAL", layout, created, "io_error"), True
     return 0, _core_only_receipt("CORE_ONLY_CREATED", layout, created), False
 
