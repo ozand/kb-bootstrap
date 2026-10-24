@@ -8,7 +8,6 @@ import re
 import stat
 import tempfile
 import threading
-import msvcrt
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -82,6 +81,7 @@ def _exclusive_writer(path):
     stream = None
     try:
         if os.name == "nt":
+            import msvcrt
             created = False
             try:
                 fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)

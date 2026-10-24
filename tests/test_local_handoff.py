@@ -180,6 +180,21 @@ class LocalHandoffTests(unittest.TestCase):
         next_record["result_id"] = hashlib.sha256(json.dumps({k:v for k,v in next_record.items() if k!="result_id"},ensure_ascii=False,separators=(",",":")).encode()).hexdigest()
         self.assertTrue(_history_conflict(record, next_record))
 
+    def test_platform_lock_imports_are_branch_local(self):
+        import ast
+        import kb_bootstrap.local_handoff as module
+        tree = ast.parse(Path(module.__file__).read_text(encoding="utf8"))
+        top_imports = {alias.name for node in tree.body if isinstance(node, ast.Import) for alias in node.names}
+        self.assertNotIn("msvcrt", top_imports)
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_exclusive_writer")
+        branch = next(node for node in ast.walk(function) if isinstance(node, ast.If)
+                      and isinstance(node.test, ast.Compare) and isinstance(node.test.left, ast.Attribute)
+                      and node.test.left.attr == "name")
+        windows_imports = {alias.name for node in ast.walk(branch.body[0]) if isinstance(node, ast.Import) for alias in node.names}
+        posix_imports = {alias.name for node in ast.walk(branch.orelse[0]) if isinstance(node, ast.Import) for alias in node.names}
+        self.assertIn("msvcrt", windows_imports)
+        self.assertIn("fcntl", posix_imports)
+
     def test_two_process_same_baseline_has_one_winner(self):
         import multiprocessing
         from kb_bootstrap.local_handoff import _digest
