@@ -79,9 +79,11 @@ Use the raw collection to gather evidence and the wiki collection to verify the 
 1. Read the target source from `<project>-raw` via QMD or context-mode tools.
 2. Draft the OKF document based on the template.
 3. Write the file to its proper canonical location.
-4. Run the mandatory completion gate:
-   - `kb-bootstrap validate --dir kb --project-root .`;
-   - the project test command;
-   - `qmd update`, followed by smoke searches in `<project>-wiki` and `<project>-raw`.
+4. Run checks required by the work performed; report each result separately:
+   - For ordinary local file-based work without QMD retrieval/indexing, run `kb-bootstrap validate-core --dir kb` and label it as local profile/provenance/graph checks only. This does not establish consumer policy compliance or publication readiness.
+   - Report QMD retrieval/index checks as **NOT RUN** unless the selected QMD registration, update, and search checks were actually performed and their evidence recorded. A successful legacy `validate` does not establish QMD runtime/index readiness.
+   - Report universal kb-bootstrap conformance as **NOT RUN** unless `kb-bootstrap validate --dir kb --project-root .` actually ran; report its actual pass/fail independently.
+   - If QMD retrieval/indexing is selected, retain the QMD operator workflow: verify registration, run `qmd update`, and smoke-search both `<project>-wiki` and `<project>-raw`. Run `kb-bootstrap validate --dir kb --project-root .` when its legacy declaration checks are required; this command and initialization retain their existing QMD declaration requirements. A configured but broken selected QMD workflow is a failure, not a reason to skip it.
+   - Run a consumer policy validator or project test command only when the consumer workflow defines one; report whether it passed, failed, or was not run. Core validation does not authorize skipping required consumer checks.
 
-Do not report completion if validation/tests fail or if the QMD update/search steps were not actually verified. Treat universal kb-bootstrap conformance, repository-owned policy validation, and retrieval/index freshness as separate outcomes; one pass does not prove another. The upstream [validation composition guidance](https://github.com/ozand/kb-bootstrap/blob/main/docs/VALIDATION_COMPOSITION.md) defines the reporting boundary.
+Do not report a required check complete unless its evidence was actually verified. Treat universal kb-bootstrap conformance, repository-owned policy validation, publication checks, and retrieval/index freshness as separate outcomes; one pass does not prove another. The upstream [validation composition guidance](https://github.com/ozand/kb-bootstrap/blob/main/docs/VALIDATION_COMPOSITION.md) defines the reporting boundary.
