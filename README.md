@@ -458,3 +458,24 @@ This generates:
 - Centralized `kb/apps/`, `kb/systems/`, `kb/architecture/`, and retained `kb/raw/` directories.
 - Anchored `.gitignore` rules that preserve canonical and sanitized Markdown knowledge.
 - Read-only/search skills placed in the root `.agents/skills/`; `kb-capture` is added only with `--with-project-lessons`.
+
+### Local research handoff (ADR-038)
+
+This optional Python API carries bounded research progress in an explicitly selected local JSON record. Create the record before work, save/check it before handoff, and pass only the record plus explicitly retained artifacts to the next process; prior chat history is not required. Record references are opaque and evidence remains owner-checked; loading is not a trust or truth claim.
+
+The package exposes `load_record(path)`, `check_record(record, checker)`, and `save_record(path, candidate, ..., permission=...)` in `kb_bootstrap.local_handoff`. Example using a caller-created synthetic v1 record:
+
+```python
+from pathlib import Path
+from kb_bootstrap.local_handoff import load_record, check_record
+
+loaded = load_record(Path("handoff.json"))
+if loaded["status"] != "loaded":
+    raise ValueError(loaded["reason"])
+checked = check_record(loaded["record"], owner_checker)
+print(checked["study_state"])
+```
+
+The owner checker must attest current opaque input/output/evidence revisions; its `passed` result is not authenticated by the record. `save_record` requires an out-of-record caller decision for this exact local path and retention/access boundary before target I/O. ADR-035 evidence-read permission does not grant write permission; the Boolean/caller decision is not a policy engine. Use synthetic/local-only data for examples; do not process sensitive/private artifacts without the separately required permissions and safeguards.
+
+There is no CLI, daemon, session discovery, remote publication, transcript copying, QMD/index write, or knowledge promotion. Replacement preserves historical attempt prefixes under a local exclusive-writer compare-and-replace boundary; no distributed or hostile-writer guarantee is made. Follow the selected owner's retention/access policy.
