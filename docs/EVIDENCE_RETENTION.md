@@ -100,6 +100,31 @@ A durable receipt reports evidence; it does not authorize a retry, mutation, del
 6. Verify the retained record at the claimed storage/availability layer.
 7. Report the durable and ephemeral portions separately, including `NOT VERIFIED` or `UNKNOWN` where evidence is missing.
 
+## Manual removal-impact worksheet
+
+This optional, manual exercise records bounded observations about owner-enumerated references; it is not a scan, deletion procedure, schema, or completeness claim. Read the applicable owner policy and permissions first. An owner must explicitly enumerate the references and permitted observation methods for `capture`, `knowledge`, `search_projection`, and `backup`; do not discover extra locations by scanning. Keep owner-reported claims separate from what was actually observed, how it was observed, and whether that observation was permitted. Report unlisted layers as `unknown`.
+
+The labels `known-retained`, `known-disposed`, `unverified`, and `unknown` below are illustrative vocabulary only—not a normative enum, schema, or runtime format. A `known-disposed` label requires an appropriate bounded observation by an authorized owner; it does not prove that every copy was erased. An owner assertion alone is not independent verification. Do not open a revoked file to check it: revocation stops new reads and derivations, not automatically retained bytes. An authorized pre-revocation receipt is historical evidence only; current availability or status may remain unknown. A backup not queried under explicit permission is unknown, never absent or cleared. Git history and other copies may remain; do not promise their erasure. See accepted [ADR-035](adr/ADR-035-require-explicit-local-policy-for-evidence-reading.md) for the separate local evidence-read boundary and [ADR-038](adr/ADR-038-propose-local-json-handoff-record.md) for its handoff-record contract; neither is replaced or expanded here.
+
+1. Read the applicable retention/access policy and confirm who may observe each layer; do not treat this worksheet as permission.
+2. Have the owner list the bounded references in the four categories above, including expected revisions if known. Mark anything not explicitly listed unknown.
+3. For each listed reference, record the owner's claim separately from an authorized, bounded observation and its method. If access is revoked, record that new reads stop; do not inspect the file.
+4. Note residual impact and the next action only if separately authorized. Rebuildability does not make a projection canonical or prove removal from other layers.
+5. Mark unqueried layers and backup locations unknown; do not infer absence from a missing reference or from an unperformed check.
+6. Review the sanitized worksheet against the owner policy and retain it only under the applicable retention decision. It grants no access, deletion, publication, or egress authority and establishes no completeness, PII, or egress clearance.
+
+Synthetic example only; observations below are invented for the exercise and do not report a real tool run:
+
+| Ref / category | Owner-reported claim | Independently observed: what, how, permission boundary | Current knowledge | Residual impact / next authorized owner action |
+|---|---|---|---|---|
+| `demo-capture-1` / capture | Owner says a capture receipt was retained before access was revoked. | In this fictional exercise, a sanitized local metadata receipt is described as observed under pre-revocation permission; no source payload was opened. This is not a real observation. | `known-retained` (historical receipt only; current source status unknown) | Receipt may reveal that a capture existed, not its current contents or removal. Owner may review the receipt under current policy; no new source read is implied. |
+| `demo-note-1` / knowledge | Owner says the note refers to revoked material. | No read of the revoked note is permitted or attempted; only the caller's enumerated reference and claim are recorded. | `unverified` | A stale reference may remain. Owner must separately authorize any permitted remediation; revocation itself does not delete it. |
+| `demo-index-1` / search_projection | Owner says a local index entry may be rebuildable from permitted knowledge. | The synthetic inventory records this claim only; no index was opened or scanned. | `unknown` | A rebuildable projection is not canonical ownership and may retain stale text. Owner may authorize a bounded check or rebuild under its policy. |
+| `demo-backup-1` / backup | Owner says backups were not checked. | No backup access or query was authorized or performed. | `unknown` | Never describe the backup as absent or cleared. Owner may decide whether a bounded backup inquiry is permitted. |
+| `demo-git-history-1` / backup | Owner makes no claim about historical copies. | No repository-history search or rewrite was authorized or performed. | `unknown` | Historical copies may remain; no erasure promise. Any history action requires separate owner authorization and policy. |
+
+The table is a bounded teaching example, not evidence that any real layer was found, checked, retained, or disposed. Even authorized observations cover only their stated reference, method, time, and permission boundary; they do not prove whole-copy erasure or enumerate unlisted layers.
+
 ## Generic examples
 
 ### Repository-tracked
