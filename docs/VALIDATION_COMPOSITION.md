@@ -70,7 +70,14 @@ qmd search "<canonical smoke query>" -c <project>-wiki
 qmd search "<raw smoke query>" -c <project>-raw
 ```
 
-`qmd collection add` and `qmd update` mutate local QMD runtime/index state. Run them deliberately in the intended QMD index and environment.
+`qmd collection add` and `qmd update` mutate local QMD runtime/index state. Run them deliberately in the intended QMD index and environment, only when QMD maintenance is explicitly selected. `qmd update` is not a collection selector and may update more than one collection in the selected index; do not invent a collection-scoping option.
+
+Legacy `kb-bootstrap search` remains distinct from the separately bounded
+`kb-bootstrap search-qmd` adapter. `search-qmd` requires explicit collection,
+index, canonical directory, and pre-provisioned state; it performs read-only
+search and does not register collections, update the index, select ambient state,
+or fall back to legacy search. Optional QMD retrieval does not make QMD maintenance
+a default step for ordinary file-based work.
 
 The `=== QMD Collection Validation ===` section from `kb-bootstrap validate` checks repository declaration syntax, unique names, and configured paths only. It does not prove that a collection is registered, indexed, fresh, searchable, complete, or relevant.
 

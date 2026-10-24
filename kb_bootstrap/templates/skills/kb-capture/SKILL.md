@@ -51,11 +51,21 @@ Local capture is supported only when all three contract items exist:
 If any item is absent, stop with `RESULT: BLOCKED (local lesson contract unavailable)` without printing the resolved path or writing any file.
 
 1. Read the configured local store's `SCHEMA.md` and `index.yaml`.
-2. Allocate the next unused repository-local ID using the configured `id_prefix`.
-3. Create `kb/lessons/PROJECT-XXXX-<slug>.md` with matching frontmatter.
-4. Add one matching entry to `kb/lessons/index.yaml`.
-5. Validate that the filename ID, frontmatter ID, and index ID are identical and
-   unique before reporting success.
+2. Search and compare existing lessons for equivalent symptoms, causes, and
+   resolutions before drafting. If an equivalent lesson already covers the fix,
+   do not create a duplicate; report the existing lesson ID.
+3. Ground the draft in the available error and resolution evidence. Record the
+   relevant evidence in the lesson body when useful; the existing schema does not
+   require new evidence metadata. If evidence is missing, contradictory, or cannot
+   be checked, stop without writing rather than inventing details.
+4. Allocate the next unused repository-local ID using the configured `id_prefix`.
+5. Create a draft at the configured local store path with matching frontmatter.
+6. Add one matching entry to that store's `index.yaml`.
+7. Validate that the filename ID, frontmatter ID, and index ID are identical and
+   unique before reporting success. If any required check fails, stop and do not
+   report a successful capture.
 
 Capture only sanitized error signatures. Do not record credentials, private
-payloads, runtime state, or unstable temporary values.
+payloads, runtime state, or unstable temporary values. These checks guide the
+agent's pre-write comparison and validation; they do not add schema fields or
+replace the repository's existing validator.
