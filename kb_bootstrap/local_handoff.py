@@ -343,11 +343,11 @@ def load_record(path):
         data = _read_record(path)
     except TypeError:
         return {"status": "invalid", "reason": "invalid-schema"}
-    except OSError:
-        return {"status": "invalid", "reason": "io-error"}
     except ValueError as error:
         reason = "too-large" if "large" in str(error) else "invalid-schema"
         return {"status": "invalid", "reason": reason}
+    except OSError:
+        return {"status": "invalid", "reason": "io-error"}
     record, error = _decode(data)
     if error:
         return {"status": "invalid", "reason": error}
@@ -390,6 +390,8 @@ def _resumability(state, statuses):
     return "ready"
 
 def check_record(record, checker):
+    if not isinstance(record, dict) or not callable(checker):
+        return {"status": "invalid", "reason": "invalid-record"}
     error = _validate(record)
     if error:
         return {"status": "invalid", "reason": "invalid-record"}
@@ -483,8 +485,13 @@ def save_record(path, candidate, *, expected_record_id=None, expected_revision=N
     error = _validate(candidate_record)
     if error:
         return {"status": "invalid", "record": None, "result_id": None}
-    target = Path(path)
     try:
+        target = Path(path)
+    except (TypeError, ValueError, OSError):
+        return {"status": "invalid", "record": None, "result_id": None}
+    try:
+        if "\x00" in str(target):
+            return {"status": "invalid", "record": None, "result_id": None}
         if _reparse(target.parent) or (target.exists() and _reparse(target)):
             return {"status": "conflict", "record": None, "result_id": None}
         with _LOCK, _exclusive_writer(target):

@@ -35,6 +35,29 @@ def _race_writer(path, label, expected, barrier, queue):
 
 
 class LocalHandoffTests(unittest.TestCase):
+    def test_save_invalid_path_types_are_closed_and_denial_precedes_io(self):
+        import kb_bootstrap.local_handoff as module
+        record = make_record()
+        with patch.object(module.os, "open", side_effect=AssertionError("filesystem I/O")):
+            denied = save_record(None, record, permission=False)
+        self.assertEqual(denied["status"], "denied")
+        for path in (None, 7, object(), "bad\x00path"):
+            result = save_record(path, record, permission=True)
+            self.assertEqual(result["status"], "invalid")
+            self.assertIsNone(result["record"])
+            self.assertIsNone(result["result_id"])
+
+    def test_load_invalid_path_types_are_closed(self):
+        for path in (None, 7, object(), "bad\x00path"):
+            self.assertEqual(load_record(path)["status"], "invalid")
+
+    def test_check_invalid_record_and_checker_are_closed(self):
+        self.assertEqual(check_record(None, lambda *a, **k: {"status": "passed"}),
+                         {"status": "invalid", "reason": "invalid-record"})
+        record = make_record()
+        record["steps"] = []
+        record["result_id"] = __import__("kb_bootstrap.local_handoff", fromlist=["_digest"])._digest(record)
+        self.assertEqual(check_record(record, None)["status"], "invalid")
     def test_strict_json_rejects_duplicate_float_bom_and_digest(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "record.json"
