@@ -82,17 +82,18 @@ def test_consumer_guidance_links_to_composition_page():
         assert "separate outcomes" in skill
 
 
-def test_generated_wiki_guidance_gates_qmd_completion_on_selection():
+def test_generated_wiki_guidance_marks_universal_conformance_not_run():
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "consumer"
         with patch("sys.argv", ["kb-bootstrap", "--target", str(target)]):
             assert main() is None
-        generated = target / ".agents/skills/kb-wiki-builder/SKILL.md"
-        skill = generated.read_text(encoding="utf-8")
+        skill = (target / ".agents/skills/kb-wiki-builder/SKILL.md").read_text(encoding="utf-8")
 
     assert "ordinary local file-based work without QMD retrieval/indexing" in skill
     assert "kb-bootstrap validate-core --dir kb" in skill
-    assert "QMD retrieval/index checks were **NOT RUN**" in skill
+    assert "local profile/provenance/graph checks only" in skill
+    assert "QMD retrieval/index checks and universal kb-bootstrap conformance were **NOT RUN** unless" in skill
+    assert "kb-bootstrap validate --dir kb --project-root .` was actually run" in skill
     assert "If QMD retrieval/indexing is selected" in skill
     assert "qmd update" in skill
     assert "smoke-search both `<project>-wiki` and `<project>-raw`" in skill

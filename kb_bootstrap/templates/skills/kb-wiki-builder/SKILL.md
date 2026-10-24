@@ -80,7 +80,7 @@ Use the raw collection to gather evidence and the wiki collection to verify the 
 2. Draft the OKF document based on the template.
 3. Write the file to its proper canonical location.
 4. Run checks required by the work performed; report each result separately:
-   - For ordinary local file-based work without QMD retrieval/indexing, run `kb-bootstrap validate-core --dir kb`. State explicitly that QMD retrieval/index checks were **NOT RUN**; core validation is not evidence of QMD readiness, consumer policy compliance, or publication readiness.
+   - For ordinary local file-based work without QMD retrieval/indexing, run `kb-bootstrap validate-core --dir kb` and label it as local profile/provenance/graph checks only. State explicitly that QMD retrieval/index checks and universal kb-bootstrap conformance were **NOT RUN** unless `kb-bootstrap validate --dir kb --project-root .` was actually run. Core validation is not evidence of QMD readiness, consumer policy compliance, or publication readiness.
    - If QMD retrieval/indexing is selected, retain the QMD operator workflow: verify registration, run `qmd update`, and smoke-search both `<project>-wiki` and `<project>-raw`. Run `kb-bootstrap validate --dir kb --project-root .` when its legacy declaration checks are required; this command and initialization retain their existing QMD declaration requirements. A configured but broken selected QMD workflow is a failure, not a reason to skip it.
    - Run a consumer policy validator or project test command only when the consumer workflow defines one; report whether it passed, failed, or was not run. Core validation does not authorize skipping required consumer checks.
 
