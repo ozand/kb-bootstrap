@@ -31,6 +31,14 @@ class LocalHandoffTests(unittest.TestCase):
                 path.write_bytes(raw)
                 self.assertEqual(load_record(path)["status"], "invalid")
 
+    def test_integer_token_bounds_and_json_types_are_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "record.json"
+            for raw in (b'{"x":9223372036854775808}', b'{"x":-9223372036854775809}',
+                        b'{"x":true}', b'{"x":{} }'):
+                path.write_bytes(raw)
+                self.assertEqual(load_record(path)["status"], "invalid")
+
     def test_wrong_typed_enums_return_closed_invalid_result(self):
         record = make_record()
         record["materials"] = [{"ref": "s", "revision": "r", "observation": [],
