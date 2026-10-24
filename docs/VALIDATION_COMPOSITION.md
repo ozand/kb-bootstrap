@@ -56,6 +56,77 @@ The consumer must document what the command checks and which repository/version 
 
 ### 3. Retrieval/index freshness
 
+#### Optional manual QMD declarations for an existing core-only KB
+
+Core-only initialization intentionally creates no QMD configuration, and it cannot
+be rerun to add it. If the KB owner chooses QMD, first inspect and back up any
+existing `qmd.json` and `qmd/collections/` files. Preserve their bytes; do not
+replace, merge, or rerun initialization over an existing target. Resolve partial
+or conflicting declarations by owner review before editing. Create only absent
+files in the consumer's own change. This recipe declares configuration only; it
+does not install QMD, register collections, update an index, search, establish
+availability, or authorize those runtime actions.
+
+For either `single` or `umbrella`, the core-only layout has the shared `kb/wiki/`,
+`kb/raw/`, and `kb/research/` paths. An owner choosing the minimal dual-collection
+layout can create these declarations, replacing `<project>` with the intended
+QMD collection slug:
+
+`qmd.json`:
+
+```json
+{
+  "version": "1.0",
+  "workspace": {
+    "name": "<project>_kb",
+    "collections_dir": "./qmd/collections",
+    "db_path": ".qmd/vector.db"
+  },
+  "models": {
+    "embedding": "text-embedding-3-small"
+  }
+}
+```
+
+`qmd/collections/wiki.yaml`:
+
+```yaml
+name: <project>-wiki
+paths:
+  - ../../kb/wiki
+```
+
+`qmd/collections/raw.yaml`:
+
+```yaml
+name: <project>-raw
+paths:
+  - ../../kb/raw
+  - ../../kb/research
+```
+
+If using an ordinary legacy scaffold only as a reference, run its default
+initializer in a separate, absent, disposable directory owned by the caller;
+never target the existing KB. Compare only its `qmd.json` and collection path
+declarations. Its generated collection paths and name reflect that other target
+and its broader layout: adapt them to the actual core-only KB and chosen slug,
+never copy them blindly. No scaffold rerun is required for the manual example.
+
+After reviewing the declarations, check them without invoking QMD:
+
+```bash
+kb-bootstrap validate --dir kb --project-root .
+```
+
+This legacy validator checks collection YAML syntax, unique names, and declared
+paths alongside its other universal checks; it does not validate `qmd.json` or
+perform QMD runtime operations.
+`validate-core` remains the separate core-only check and does not validate QMD
+declarations. Publication, doctor, and consumer-owned policy checks are unchanged.
+Only if the owner separately chooses runtime work should they consult the
+[qmd-operator guide](../kb_bootstrap/templates/skills/qmd-operator/SKILL.md) and
+act deliberately under their permissions in the intended environment.
+
 For generated QMD collections, verify runtime state explicitly:
 
 ```bash
