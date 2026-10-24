@@ -204,6 +204,20 @@ The current `--type single|umbrella` option selects only the **content topology*
 
 Both topologies work in either standalone or embedded placement. No separate standalone/embedded generator modes are needed. A future `--layout` name could be a compatibility alias for `--type`; it would not introduce new behavior and is not currently implemented.
 
+### Opt in to a local-core scaffold
+
+For a fresh or empty target, `--core-only` creates the local knowledge folders and only the `kb-wiki-builder` skill. It creates no QMD files or optional lookup, capture, or research tools; the receipt says `NOT_CONFIGURED`, not disabled or unavailable. The flag is initialization-only, does not support repeats or mode conversion, and blocks rather than overwriting a nonempty target. `--type single|umbrella` still selects content layout, not a domain. The ordinary initialization command below remains unchanged when this flag is omitted.
+
+```bash
+kb-bootstrap --target ./my-kb --type single --core-only
+# Add and edit ordinary Markdown under ./my-kb/kb/wiki/.
+kb-bootstrap validate-core --dir ./my-kb/kb
+kb-bootstrap read-local concepts/example.md --dir ./my-kb/kb
+kb-bootstrap search-local "example" --dir ./my-kb/kb
+```
+
+`validate-core` checks universal local structure and graph integrity. Any consumer-owned policy check and any optional retrieval/index readiness check remain separate; none is implied by this workflow.
+
 ### Option 1: Single Content Layout (Default)
 For knowledge centered on one application or tool.
 ```bash

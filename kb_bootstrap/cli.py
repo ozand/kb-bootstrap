@@ -3,6 +3,7 @@ import shutil
 import argparse
 import json
 import sys
+import stat
 from pathlib import Path
 
 from .graph_linter import validate
@@ -53,6 +54,97 @@ def append_gitignore_rules(target: Path) -> None:
         )
 
 
+def _core_only_target_state(target: Path):
+    """Validate a fresh target without following symlinks or reparse points."""
+    raw = Path(os.path.abspath(os.fspath(target)))
+    current = Path(raw.anchor)
+    for part in raw.parts[1:]:
+        current = current / part
+        try:
+            info = os.lstat(current)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return None
+        if os.path.islink(current) or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
+            return None
+    try:
+        info = os.lstat(raw)
+        if not os.path.isdir(raw) or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
+            return None
+        with os.scandir(raw) as entries:
+            if next(entries, None) is not None:
+                return False
+        return raw
+    except FileNotFoundError:
+        return raw
+    except OSError:
+        return None
+
+
+def _core_only_receipt(kind, layout=None, created=(), reason=None):
+    lines = [kind]
+    if layout is not None:
+        lines.append(f"LAYOUT={layout}")
+    lines.extend(f"CREATED={path}" for path in created)
+    if reason is not None:
+        lines.append(f"REASON={reason}")
+    if kind != "CORE_ONLY_BLOCKED":
+        lines.extend(("QMD=NOT_CONFIGURED", "SURF=NOT_CONFIGURED"))
+    return "\n".join(lines)
+
+
+def _initialize_core_only(target: Path, layout: str):
+    safe_target = _core_only_target_state(target)
+    if safe_target is None:
+        return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="unsafe_target"), True
+    if safe_target is False:
+        return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="fresh_target_required"), True
+    root = safe_target
+    directories = [
+        ".agents", ".agents/skills", ".agents/skills/kb-wiki-builder",
+        "kb", "kb/raw", "kb/research", "kb/wiki", "kb/wiki/entities",
+        "kb/wiki/concepts", "kb/wiki/reports",
+    ]
+    if layout == "umbrella":
+        directories.extend(("kb/apps", "kb/systems", "kb/architecture"))
+    files = [
+        (".agents/skills/kb-wiki-builder/SKILL.md", Path(__file__).parent / "templates/skills/kb-wiki-builder/SKILL.md"),
+        (".gitignore", None),
+        ("kb/raw/.gitkeep", None), ("kb/research/.gitkeep", None),
+        ("kb/wiki/entities/.gitkeep", None), ("kb/wiki/concepts/.gitkeep", None),
+        ("kb/wiki/reports/.gitkeep", None),
+    ]
+    try:
+        payloads = [(name, source.read_bytes() if source is not None else
+                     "\n# kb-bootstrap generated artifacts\n/models/\n/artifacts/\n/kb/raw/**/*.log\n/kb/raw/**/*.bin\n/kb/raw/**/*.jsonl\n".encode("utf-8"))
+                    for name, source in files]
+    except (OSError, UnicodeError):
+        return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="io_error"), True
+    created = []
+    mutated = False
+    try:
+        if not root.exists():
+            root.mkdir()
+            mutated = True
+        for relative in directories:
+            path = root / relative
+            if not path.exists():
+                path.mkdir()
+                mutated = True
+        for relative, payload in payloads:
+            destination = root / relative
+            with destination.open("xb") as output:
+                mutated = True
+                created.append(relative)
+                output.write(payload)
+    except (OSError, UnicodeError):
+        if not mutated:
+            return 1, _core_only_receipt("CORE_ONLY_BLOCKED", reason="io_error"), False
+        return 1, _core_only_receipt("CORE_ONLY_PARTIAL", layout, created, "io_error"), True
+    return 0, _core_only_receipt("CORE_ONLY_CREATED", layout, created), False
+
+
 def _print_local_json(report):
     """Emit the local contract as UTF-8 independently of console code page."""
     text = json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n"
@@ -74,6 +166,7 @@ def main():
     )
     parser.add_argument("--target", default=".", help="Target directory for initialization (default: current directory)")
     parser.add_argument("--type", choices=["single", "umbrella"], default="single", help="Project architecture type")
+    parser.add_argument("--core-only", action="store_true", help="Create a fresh local-core scaffold without optional tools")
     parser.add_argument(
         "--with-project-lessons",
         action="store_true",
@@ -285,7 +378,11 @@ def main():
         default=".",
         help="Repository root containing the managed file (default: current directory)",
     )
-    args = parser.parse_args()
+    raw_args = sys.argv[1:]
+    preliminary_args, unknown_args = parser.parse_known_args(raw_args)
+    if "--core-only" in raw_args and (preliminary_args.command or "--core-only" in unknown_args):
+        parser.error("--core-only is initialization-only")
+    args = parser.parse_args(raw_args)
 
     if args.command in ("validate", "validate-core"):
         print(f"Validator: kb-bootstrap {__version__}")
@@ -482,6 +579,13 @@ def main():
         return 0 if is_valid else 1
 
     target = Path(args.target)
+    if args.core_only:
+        if args.with_project_lessons:
+            print(_core_only_receipt("CORE_ONLY_BLOCKED", reason="conflicting_flags"), file=sys.stderr)
+            return 1
+        status, receipt, to_stderr = _initialize_core_only(target, args.type)
+        print(receipt, file=sys.stderr if to_stderr else sys.stdout)
+        return status
     pkg_dir = Path(__file__).parent.resolve()
     action, guard_report = scaffold_preflight(
         target, pkg_dir, args.type, args.with_project_lessons
