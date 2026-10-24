@@ -111,7 +111,7 @@ Required tests if accepted; this proposal adds no tests/fixtures.
 | Exact `single` output without optional tools | `tests/test_cli.py::test_core_only_single_creates_exact_allowlist_without_optional_tools` |
 | Umbrella adds only its three layout directories | `tests/test_cli.py::test_core_only_umbrella_creates_exact_allowlist` |
 | Local maintenance works without QMD/Surf/gh/network; no subprocess/probe/network invoked | `tests/test_cli.py::test_core_only_uses_local_core_without_optional_execution` |
-| Flag placement and lessons incompatibility return argparse status 2 | `tests/test_cli.py::test_core_only_cli_placement_and_incompatible_options` |
+| Subcommand/option placement and syntax errors return argparse status 2; parsed `--with-project-lessons` conflict returns `CORE_ONLY_BLOCKED`/`conflicting_flags` with status 1 and no writes | `tests/test_cli.py::test_core_only_cli_placement_and_incompatible_options` |
 | Default artifact bytes, skill inventory, and repeat behavior unchanged | `tests/test_cli.py::test_default_init_artifacts_and_repeat_are_unchanged` |
 | Core repeat and cross-mode attempts block without mutation | `tests/test_cli.py::test_core_only_repeat_and_mode_switch_block_without_mutation` |
 | Nonempty target/collision blocks pre-write, preserving user/QMD/lesson content | `tests/test_cli.py::test_core_only_requires_empty_target_and_preserves_collisions` |
