@@ -461,21 +461,41 @@ This generates:
 
 ### Local research handoff (ADR-038)
 
-This optional Python API carries bounded research progress in an explicitly selected local JSON record. Create the record before work, save/check it before handoff, and pass only the record plus explicitly retained artifacts to the next process; prior chat history is not required. Record references are opaque and evidence remains owner-checked; loading is not a trust or truth claim.
+This Python API carries bounded progress in one explicitly selected local JSON record. Create it after retaining intended source bytes and before analysis; save/check before handoff, then provide the next process only the record and explicitly retained artifacts. Prior chat is unnecessary. References stay opaque; loading is not a trust or truth claim.
 
-The package exposes `load_record(path)`, `check_record(record, checker)`, and `save_record(path, candidate, ..., permission=...)` in `kb_bootstrap.local_handoff`. Example using a caller-created synthetic v1 record:
+The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It prints statuses only, not source text or ephemeral directory paths:
 
 ```python
+import hashlib
+import tempfile
 from pathlib import Path
-from kb_bootstrap.local_handoff import load_record, check_record
+from kb_bootstrap.local_handoff import save_record, load_record, check_record
 
-loaded = load_record(Path("handoff.json"))
-if loaded["status"] != "loaded":
-    raise ValueError(loaded["reason"])
-checked = check_record(loaded["record"], owner_checker)
-print(checked["study_state"])
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    retained = root / "source.txt"
+    retained.write_bytes(b"Synthetic source, section A.\\n")  # capture before work
+    revision = hashlib.sha256(retained.read_bytes()).hexdigest()
+    record = {
+        "schema": "kb-local-handoff/v1", "record_id": "demo-1", "revision": 1,
+        "study_ref": "study:demo", "objective": "Inspect synthetic source",
+        "scope": {"included": ["section A"], "excluded": []},
+        "materials": [{"ref": "source:demo", "revision": revision,
+            "observation": "captured", "observed_scope": "", "unread_remainder": "section A",
+            "analysis": "not-started", "analyzed_scope": "", "unanalyzed_remainder": "section A"}],
+        "outputs": [], "steps": [], "checks": {"run": [], "not_run": []},
+        "retention": {"owner": "demo caller", "storage_class": "runtime-ephemeral",
+            "storage_ref": "temporary demo", "retention_rule": "discard on exit",
+            "access": "caller", "integrity": "sha256", "availability": "not-verified",
+            "disposal": "caller"}, "assumptions": [], "open_questions": [],
+    }
+    path = root / "handoff.json"
+    saved = save_record(path, record, permission=True)  # caller authorized synthetic local path
+    loaded = load_record(path)
+    checked = check_record(loaded["record"], lambda *a, **k: {"status": "unavailable"})
+    print(saved["status"], loaded["status"], checked["study_state"])
 ```
 
-The owner checker must attest current opaque input/output/evidence revisions; its `passed` result is not authenticated by the record. `save_record` requires an out-of-record caller decision for this exact local path and retention/access boundary before target I/O. ADR-035 evidence-read permission does not grant write permission; the Boolean/caller decision is not a policy engine. Use synthetic/local-only data for examples; do not process sensitive/private artifacts without the separately required permissions and safeguards.
+The owner checker must attest current opaque input/output/evidence revisions; `passed` is not authenticated by the record. `permission=True` represents an out-of-record caller decision for this exact local path and retention/access boundary; it is not a policy engine. ADR-035 read permission does not grant write permission. Use synthetic/local-only data; sensitive processing needs separately verified permissions and safeguards.
 
 There is no CLI, daemon, session discovery, remote publication, transcript copying, QMD/index write, or knowledge promotion. Replacement preserves historical attempt prefixes under a local exclusive-writer compare-and-replace boundary; no distributed or hostile-writer guarantee is made. Follow the selected owner's retention/access policy.
