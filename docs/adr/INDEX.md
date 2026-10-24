@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+Coordinator delegation, ADR decision attribution, and independent review follow the single authority in [AGENTS.md](../../AGENTS.md); this index does not create an additional architecture gate.
+
 | Number | Title | Status |
 |---|---|---|
 | ADR-001 | Validate project-local lesson registries with a separate schema-aware command | Accepted — Implemented |
