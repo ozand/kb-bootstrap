@@ -458,3 +458,44 @@ This generates:
 - Centralized `kb/apps/`, `kb/systems/`, `kb/architecture/`, and retained `kb/raw/` directories.
 - Anchored `.gitignore` rules that preserve canonical and sanitized Markdown knowledge.
 - Read-only/search skills placed in the root `.agents/skills/`; `kb-capture` is added only with `--with-project-lessons`.
+
+### Local research handoff (ADR-038)
+
+This Python API carries bounded progress in one explicitly selected local JSON record. Create it after retaining intended source bytes and before analysis; save/check before handoff, then provide the next process only the record and explicitly retained artifacts. Prior chat is unnecessary. References stay opaque; loading is not a trust or truth claim.
+
+The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It prints statuses only, not source text or ephemeral directory paths:
+
+```python
+import hashlib
+import tempfile
+from pathlib import Path
+from kb_bootstrap.local_handoff import save_record, load_record, check_record
+
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    retained = root / "source.txt"
+    retained.write_bytes(b"Synthetic source, section A.\\n")  # capture before work
+    revision = hashlib.sha256(retained.read_bytes()).hexdigest()
+    record = {
+        "schema": "kb-local-handoff/v1", "record_id": "demo-1", "revision": 1,
+        "study_ref": "study:demo", "objective": "Inspect synthetic source",
+        "scope": {"included": ["section A"], "excluded": []},
+        "materials": [{"ref": "source:demo", "revision": revision,
+            "observation": "captured", "observed_scope": "", "unread_remainder": "section A",
+            "analysis": "not-started", "analyzed_scope": "", "unanalyzed_remainder": "section A"}],
+        "outputs": [], "steps": [], "checks": {"run": [], "not_run": []},
+        "retention": {"owner": "demo caller", "storage_class": "runtime-ephemeral",
+            "storage_ref": "temporary demo", "retention_rule": "discard on exit",
+            "access": "caller", "integrity": "sha256", "availability": "not-verified",
+            "disposal": "caller"}, "assumptions": [], "open_questions": [],
+    }
+    path = root / "handoff.json"
+    saved = save_record(path, record, permission=True)  # caller authorized synthetic local path
+    loaded = load_record(path)
+    checked = check_record(loaded["record"], lambda *a, **k: {"status": "unavailable"})
+    print(saved["status"], loaded["status"], checked["study_state"])
+```
+
+The owner checker must attest current opaque input/output/evidence revisions; `passed` is not authenticated by the record. `permission=True` represents an out-of-record caller decision for this exact local path and retention/access boundary; it is not a policy engine. ADR-035 read permission does not grant write permission. Use synthetic/local-only data; sensitive processing needs separately verified permissions and safeguards.
+
+There is no CLI, daemon, session discovery, remote publication, transcript copying, QMD/index write, or knowledge promotion. Replacement preserves historical attempt prefixes under a local compare-and-replace boundary serialized across local processes by an advisory sidecar lock derived from the selected target path. The sibling lock file is an operational artifact in the selected parent directory and persists to avoid stale-lock cleanup/inode races; it contains no record payload. Advisory locking assumes cooperating processes and a stable local filesystem; it makes no distributed or hostile-writer guarantee. Follow the selected owner's retention/access policy.
