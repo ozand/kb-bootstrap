@@ -41,3 +41,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-035 | Require explicit local policy for evidence reading | Accepted |
 | ADR-036 | Define a minimal JSON format for evidence binding | Accepted |
 | ADR-037 | Report one section-projection operation result | Accepted |
+| ADR-038 | Propose a bounded local JSON handoff record | Accepted |
