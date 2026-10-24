@@ -118,9 +118,10 @@ After reviewing the declarations, check them without invoking QMD:
 kb-bootstrap validate --dir kb --project-root .
 ```
 
-This legacy validator checks collection YAML syntax, unique names, and declared
-paths alongside its other universal checks; it does not validate `qmd.json` or
-perform QMD runtime operations.
+This legacy validator checks recognized collection names and paths, including
+path existence, but is not a general YAML syntax validator. Alongside its other
+universal checks, it does not validate `qmd.json` or perform QMD runtime
+operations.
 `validate-core` remains the separate core-only check and does not validate QMD
 declarations. Publication, doctor, and consumer-owned policy checks are unchanged.
 Only if the owner separately chooses runtime work should they consult the
