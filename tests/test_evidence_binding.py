@@ -330,6 +330,31 @@ class EvidenceBindingTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 self.resolve(authorize_validation_read=lambda: False)
 
+    def test_processing_denial_precedes_any_file_open_after_validation_read_allowed(self):
+        events = []
+        validation_read_calls = []
+        processing_report_calls = []
+
+        def allow_validation_read():
+            events.append("validation_read")
+            validation_read_calls.append(True)
+            return True
+
+        def deny_processing_report():
+            events.append("processing_report")
+            processing_report_calls.append(True)
+            return False
+
+        with patch("kb_bootstrap.raw_manifest.os.open") as open_spy:
+            with self.assertRaisesRegex(PermissionError, "^evidence processing/report denied$"):
+                self.resolve(authorize_validation_read=allow_validation_read,
+                             authorize_processing_and_report=deny_processing_report)
+
+        self.assertEqual(events, ["validation_read", "processing_report"])
+        self.assertEqual(validation_read_calls, [True])
+        self.assertEqual(processing_report_calls, [True])
+        open_spy.assert_not_called()
+
     def test_processing_denial_is_outside_wire_after_validation_reads(self):
         with self.assertRaises(PermissionError):
             self.resolve(authorize_processing_and_report=lambda: False)
