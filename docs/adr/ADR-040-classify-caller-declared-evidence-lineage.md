@@ -1,6 +1,6 @@
 # ADR-040: Classify caller-declared evidence lineage without certifying independence
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-25
 **Authors**: Pi coding agent
 **Supersedes**: None

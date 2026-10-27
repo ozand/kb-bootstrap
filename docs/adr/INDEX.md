@@ -43,4 +43,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-037 | Report one section-projection operation result | Accepted |
 | ADR-038 | Propose a bounded local JSON handoff record | Accepted |
 | ADR-039 | Propose opt-in core-only initialization | Accepted |
-| ADR-040 | Classify caller-declared evidence lineage without certifying independence | Proposed |
+| ADR-040 | Classify caller-declared evidence lineage without certifying independence | Accepted |
