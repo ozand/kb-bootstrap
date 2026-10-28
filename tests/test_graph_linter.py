@@ -38,7 +38,6 @@ class GraphLinterTests(unittest.TestCase):
     def test_root_relative_missing_reserved_excluded_and_unsafe_targets_fail(self):
         cases = (
             ("/missing.md", "missing.md"),
-            ("/index.md", "index.md"),
             ("/raw/missing.md", "raw/missing.md"),
             ("/lessons/item.md", "lessons/item.md"),
             ("/../outside.md", "[unsafe link target]"),
@@ -58,6 +57,79 @@ class GraphLinterTests(unittest.TestCase):
                 self.assertIn(marker, report)
                 self.assertIn("Nodes (MD Files): 2", report)
                 self.assertNotIn(str(root), report)
+
+    def test_existing_reserved_index_is_safe_reference_and_preserves_node(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "source.md", "[Index](nested/INDEX.md)\n")
+            self.write(root, "nested/INDEX.md", "# Index\n")
+            graph, _ = analyze_graph(root)
+            report, is_valid = validate(root)
+            self.assertTrue(is_valid, report)
+            self.assertEqual(graph.number_of_nodes(), 2)
+            self.assertIn(("source.md", "nested/INDEX.md"), graph.edges())
+            self.assertIn("ORPHANS (0 Incoming Links): 1", report)
+
+    def test_reserved_sources_still_fail_on_invalid_outgoing_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "index.md", "[Missing](missing.md)\n")
+            self.write(root, "nested/log.md", "[Missing](missing-too.md)\n")
+            graph, _ = analyze_graph(root)
+            report, is_valid = validate(root)
+            self.assertFalse(is_valid)
+            self.assertEqual(graph.number_of_nodes(), 2)
+            self.assertIn("missing.md", report)
+            self.assertIn("nested/missing-too.md", report)
+
+    def test_existing_lesson_schema_is_safe_reference_without_traversal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "source.md", "[Schema](lessons/SCHEMA.md)\n")
+            self.write(root, "lessons/SCHEMA.md", "[Missing](missing.md)\n")
+            graph, _ = analyze_graph(root)
+            report, is_valid = validate(root)
+            self.assertTrue(is_valid, report)
+            self.assertEqual(graph.number_of_nodes(), 1)
+            self.assertEqual(graph.number_of_edges(), 0)
+            self.assertNotIn("missing.md", report)
+
+    def test_only_exact_lesson_schema_is_a_safe_reference(self):
+        for target in ("lessons/nested/SCHEMA.md", "nested/lessons/SCHEMA.md"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write(root, "source.md", f"[Schema]({target})\n")
+                self.write(root, target, "[Missing](missing.md)\n")
+                graph, _ = analyze_graph(root)
+                report, is_valid = validate(root)
+                self.assertFalse(is_valid)
+                self.assertIn(target, report)
+                self.assertEqual(graph.number_of_nodes(), 1)
+                self.assertEqual(graph.number_of_edges(), 0)
+                self.assertNotIn("missing.md", report)
+
+    def test_missing_excluded_reference_target_remains_dead(self):
+        for target in ("nested/index.md", "lessons/SCHEMA.md"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write(root, "source.md", f"[Target]({target})\n")
+                report, is_valid = validate(root)
+                self.assertFalse(is_valid)
+                self.assertIn(target, report)
+
+    def test_unsafe_excluded_reference_symlink_remains_dead(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            self.write(Path(outside), "secret.md", "# Outside\n")
+            (root / "lessons").mkdir()
+            try:
+                (root / "lessons" / "SCHEMA.md").symlink_to(Path(outside) / "secret.md")
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation is unavailable")
+            self.write(root, "source.md", "[Schema](lessons/SCHEMA.md)\n")
+            report, is_valid = validate(root)
+            self.assertFalse(is_valid)
+            self.assertIn("[unsafe link target]", report)
 
     def test_symlinked_canonical_root_fails_closed_when_available(self):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
