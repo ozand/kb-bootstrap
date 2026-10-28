@@ -132,6 +132,22 @@ def analyze_graph(
             if not error and target in evidence_targets:
                 evidence_links.add((relative, target))
                 continue
+            if not error and target not in eligible_targets:
+                target_path = base_path / target
+                target_parts = Path(target).parts
+                is_lesson_schema = (
+                    any(part.casefold() == "lessons" for part in target_parts)
+                    and Path(target).name.casefold() == "schema.md"
+                )
+                is_reserved_target = Path(target).name.casefold() in RESERVED_FILENAMES
+                if (
+                    (is_lesson_schema or is_reserved_target)
+                    and not _traverses_symlink(target_path)
+                    and target_path.is_file()
+                ):
+                    if is_reserved_target and target != relative:
+                        graph.add_edge(relative, target)
+                    continue
             if error or target not in eligible_targets:
                 invalid_targets.add(target)
                 continue
