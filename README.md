@@ -12,6 +12,23 @@ For contributors writing project explanations or setup instructions, see the sho
 
 Current release: **0.4.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes and the [existing-consumer migration procedure](docs/MIGRATING_EXISTING_CONSUMERS.md) for staged adoption and rollback guidance.
 
+## Caller-declared evidence lineage
+
+The pure `kb_bootstrap.evidence_lineage.classify_evidence_lineage(records, coverage_complete)` helper classifies explicitly supplied lineage records; it does not inspect sources or verify independence. For example:
+
+```python
+from kb_bootstrap.evidence_lineage import classify_evidence_lineage
+
+records = [
+    {"id": "source-a", "kind": "independent", "upstream_ids": []},
+    {"id": "draft", "kind": "generated", "upstream_ids": ["source-a"]},
+    {"id": "copy", "kind": "reprint", "upstream_ids": ["draft"]},
+]
+print(classify_evidence_lineage(records, coverage_complete=True))
+```
+
+With complete caller-asserted coverage, each record reports the reachable declared root IDs. With incomplete coverage, the result is `unknown` without root counts. These declarations do not establish actual ancestry, support, truth, or independent evidence; the helper is separate from the evidence-binding resolver.
+
 ## Core Concepts
 
 - **[Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)**: A vendor-neutral Markdown and YAML-frontmatter format. The [kb-bootstrap canonical profile](docs/OKF_V0_2_CANONICAL_PROFILE.md) requires non-empty `type`, recommends `title`, `description`, `tags`, and `status: stable`, accepts unknown extensions, and keeps stricter dead-link checks separate from OKF conformance.
