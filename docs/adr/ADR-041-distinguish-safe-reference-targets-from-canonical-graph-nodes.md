@@ -27,7 +27,7 @@ If separately accepted, revise only graph-linter link-target classification so a
 
 This bounded compatibility correction does not change canonical concepts, lessons policy/schema, recursive lesson inspection, general Markdown parsing, QMD, canonical profile checks, or exporter behavior. Any exporter change requires demonstrated failure in an existing ADR-005 test and a separately scoped decision; none is proposed here.
 
-## Alternatives considered
+## Alternatives Considered
 
 ### Treat every existing Markdown file as a canonical graph node
 
@@ -63,7 +63,7 @@ The linter must preserve a narrow distinction between canonical nodes and safe e
 
 Canonical node membership, profile rules, lesson schema, safe-link syntax, graph source traversal, missing/unsafe failures, link contents, CLI, and ADR-005 exporter schema/behavior.
 
-## Proposed test contract
+## Test Contract
 
 Tests are proposed only; this ADR-preparation change does not implement them.
 
