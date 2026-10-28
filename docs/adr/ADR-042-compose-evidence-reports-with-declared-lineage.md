@@ -1,6 +1,6 @@
 # ADR-042: Compose evidence binding reports with declared lineage
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-28
 **Authors**: Pi coding agent
 **Supersedes**: None

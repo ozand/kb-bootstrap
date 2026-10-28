@@ -45,4 +45,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-039 | Propose opt-in core-only initialization | Accepted |
 | ADR-040 | Classify caller-declared evidence lineage without certifying independence | Accepted |
 | ADR-041 | Distinguish safe reference targets from canonical graph nodes | Accepted |
-| ADR-042 | Compose evidence binding reports with declared lineage | Proposed |
+| ADR-042 | Compose evidence binding reports with declared lineage | Accepted |
