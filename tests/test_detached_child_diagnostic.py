@@ -46,7 +46,9 @@ class DetachedChildEvidenceTests(unittest.TestCase):
         marker = root / "finished"
         child_code = (
             "import pathlib,time; time.sleep(1.5); "
-            "pathlib.Path('finished').write_text('done', encoding='ascii')"
+            "temporary=pathlib.Path('finished.tmp'); "
+            "temporary.write_text('done', encoding='ascii'); "
+            "temporary.replace(pathlib.Path('finished'))"
         )
         parent_code = (
             "import pathlib,subprocess,sys,time; "
