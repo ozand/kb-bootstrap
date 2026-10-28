@@ -1,6 +1,6 @@
 # ADR-041: Distinguish safe reference targets from canonical graph nodes
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-28
 **Authors**: Pi coding agent
 **Supersedes**: None
