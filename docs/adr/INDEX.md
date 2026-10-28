@@ -44,3 +44,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-038 | Propose a bounded local JSON handoff record | Accepted |
 | ADR-039 | Propose opt-in core-only initialization | Accepted |
 | ADR-040 | Classify caller-declared evidence lineage without certifying independence | Accepted |
+| ADR-041 | Distinguish safe reference targets from canonical graph nodes | Proposed |
