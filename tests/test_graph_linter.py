@@ -94,6 +94,20 @@ class GraphLinterTests(unittest.TestCase):
             self.assertEqual(graph.number_of_edges(), 0)
             self.assertNotIn("missing.md", report)
 
+    def test_only_exact_lesson_schema_is_a_safe_reference(self):
+        for target in ("lessons/nested/SCHEMA.md", "nested/lessons/SCHEMA.md"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write(root, "source.md", f"[Schema]({target})\n")
+                self.write(root, target, "[Missing](missing.md)\n")
+                graph, _ = analyze_graph(root)
+                report, is_valid = validate(root)
+                self.assertFalse(is_valid)
+                self.assertIn(target, report)
+                self.assertEqual(graph.number_of_nodes(), 1)
+                self.assertEqual(graph.number_of_edges(), 0)
+                self.assertNotIn("missing.md", report)
+
     def test_missing_excluded_reference_target_remains_dead(self):
         for target in ("nested/index.md", "lessons/SCHEMA.md"):
             with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
