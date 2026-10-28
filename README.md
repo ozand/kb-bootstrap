@@ -344,6 +344,30 @@ print(result["status"], result.get("knowledge"), result.get("references"))
 
 The resolver has no CLI, does no discovery or QMD/network access, and writes no files. It reads exactly the explicitly selected binding, knowledge, metadata, and envelope-selected retained evidence files; ensure each input is authorized for this operation. Its JSON report is ephemeral. Hashes bind observed bytes only, not entailment, source truth, freshness, review, or approval. A denied host precondition raises `PermissionError` outside the ADR-036 report; these callbacks do not authenticate the caller, enforce revocation, or provide host-egress isolation. See [ADR-031](docs/adr/ADR-031-bind-explicit-knowledge-items-to-retained-evidence.md), [ADR-035](docs/adr/ADR-035-require-explicit-local-policy-for-evidence-reading.md), and [ADR-036](docs/adr/ADR-036-define-json-evidence-binding-input-and-report.md) for limits and boundaries.
 
+To build a transient worklist, pass the report returned by the resolver and the complete caller-declared graph to the pure ADR-042 composition helper. Mapping is explicit; matching IDs or digests does not infer ancestry. The resolver result below is the output of the preceding call; this example performs no extra file access:
+
+```python
+from kb_bootstrap.evidence_review import compose_evidence_review_worklist
+
+lineage = [
+    {"id": "source-origin", "kind": "independent", "upstream_ids": []},
+    {"id": "source-reprint", "kind": "reprint", "upstream_ids": ["source-origin"]},
+]
+review = compose_evidence_review_worklist(
+    resolver_report=result,
+    lineage_records=lineage,
+    coverage_complete=True,
+    reference_lineage_ids={
+        (result["references"][0]["source_id"], result["references"][0]["representation_id"]): "source-reprint"
+    } if result["status"] == "COMPLETE" and result["references"] else {},
+)
+for item in review["worklist"]:
+    if item["review_required"]:
+        print(item["reference"]["source_id"], item["reference"]["state"], item["lineage"])
+```
+
+The example identity pair must be replaced with an actual COMPLETE report row. Unmapped lineage remains `unknown`; incomplete declared coverage exposes no roots. The helper validates but cannot authenticate a supplied report or verify ancestry, independence, truth, completeness, or authority. Its output does not grant permission or approve a lifecycle change. See [ADR-040](docs/adr/ADR-040-classify-caller-declared-evidence-lineage.md) and [ADR-042](docs/adr/ADR-042-compose-evidence-reports-with-declared-lineage.md).
+
 For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
 
 ```bash
