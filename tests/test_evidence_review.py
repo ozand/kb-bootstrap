@@ -6,7 +6,7 @@ D1, D2 = "1" * 64, "2" * 64
 def ref(source, state, digest=D1, binding="b1"):
     reason = {"unchanged":"byte_revision_matches", "changed":"byte_revision_differs", "missing":"current_mapping_absent"}[state]
     row = {"binding_id":binding,"source_id":source,"representation_id":"r1","observed_sha256":digest,"raw_path":"raw/e.md","state":state,"reason":reason}
-    row["current"] = {"source_id":"cur","representation_id":"r2"} if state == "missing" else {"source_id":"cur","representation_id":"r2","observed_sha256":D1,"raw_path":"current/e.md"}
+    row["current"] = {"source_id":"cur","representation_id":"r2"} if state == "missing" else {"source_id":"cur","representation_id":"r2","observed_sha256":D2 if state == "changed" else digest,"raw_path":"current/e.md"}
     return row
 
 def report(rows, summary=None):
@@ -48,6 +48,8 @@ class EvidenceReviewTests(unittest.TestCase):
         bad=[]
         item=copy.deepcopy(good); item["extra"]=1; bad.append(item)
         item=copy.deepcopy(good); item["references"][0]["reason"]="unknown"; bad.append(item)
+        item=copy.deepcopy(good); item["references"][0]["current"]["observed_sha256"]=D2; bad.append(item)
+        item=copy.deepcopy(good); item["references"][0]["current"]["observed_sha256"]=D1; item["references"][0]["state"]="changed"; item["references"][0]["reason"]="byte_revision_differs"; item["knowledge"]["summary"]="changed"; item["knowledge"]["observed_sha256"]=D2; bad.append(item)
         item=report([ref("a","missing")]); item["knowledge"]["summary"]="unchanged"; bad.append(item)
         bad.append({"status":"BLOCKED","reason":"unknown"})
         for index, value in enumerate(bad):

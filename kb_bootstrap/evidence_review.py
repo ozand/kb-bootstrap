@@ -105,6 +105,8 @@ def _validate_report(report):
                 _fail()
             if (state == "missing") == present_digest:
                 _fail()
+            if present_digest and (state == "unchanged") != (current["observed_sha256"] == digest):
+                _fail()
         elif state != "missing":
             _fail()
         # Rows with repeated full ordering keys preserve evidence-array order.
