@@ -58,6 +58,10 @@ def classify_evidence_lineage(records, coverage_complete):
             raise ValueError("invalid lineage input")
         by_id[identifier] = (kind, tuple(upstream_ids))
 
+    for _, upstream_ids in by_id.values():
+        if any(upstream not in by_id for upstream in upstream_ids):
+            raise ValueError("invalid lineage input")
+
     dependents = {identifier: [] for identifier in by_id}
     remaining = {}
     roots = {}

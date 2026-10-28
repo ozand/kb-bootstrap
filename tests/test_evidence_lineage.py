@@ -32,6 +32,8 @@ class EvidenceLineageTests(unittest.TestCase):
             [{"id": "a", "kind": "independent", "upstream_ids": ["a"]}],
             [{"id": "a", "kind": "generated", "upstream_ids": []}],
             [{"id": "a", "kind": "independent", "upstream_ids": ["b"]}],
+            [{"id": "g", "kind": "generated", "upstream_ids": ["missing"]}],
+            [{"id": "r", "kind": "reprint", "upstream_ids": ["missing"]}],
             [{"id": "a", "kind": "independent", "upstream_ids": []}] * 2,
             [
                 {"id": "a", "kind": "independent", "upstream_ids": []},
