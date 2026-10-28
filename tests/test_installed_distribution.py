@@ -193,7 +193,7 @@ class InstalledDistributionTests(unittest.TestCase):
         python = scripts / ("python.exe" if os.name == "nt" else "python")
         cli = scripts / ("kb-bootstrap.exe" if os.name == "nt" else "kb-bootstrap")
         _run(
-            [str(python), "-m", "pip", "install", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)],
+            [str(python), "-m", "pip", "install", "--force-reinstall", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)],
             cwd=temp_root,
             on_timeout=lambda: preserve_temp.append(True),
         )
