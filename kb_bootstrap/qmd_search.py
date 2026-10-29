@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import locale
 import shutil
 import subprocess
 from pathlib import Path
@@ -34,16 +35,19 @@ def _run(command: List[str], cwd: Path) -> Tuple[str, bool]:
         result = subprocess.run(
             resolved_command,
             cwd=str(cwd),
-            text=True,
             capture_output=True,
             check=False,
         )
     except OSError as exc:
         return f"{command[0]} could not be started: {exc}", False
     if result.returncode == 0:
-        return result.stdout.strip(), True
-    stderr = (getattr(result, "stderr", "") or "").strip()
-    stdout = (getattr(result, "stdout", "") or "").strip()
+        try:
+            return result.stdout.decode("utf-8").strip(), True
+        except UnicodeDecodeError:
+            return "", True
+    encoding = locale.getpreferredencoding(False)
+    stderr = (getattr(result, "stderr", b"") or b"").decode(encoding, errors="replace").strip()
+    stdout = (getattr(result, "stdout", b"") or b"").decode(encoding, errors="replace").strip()
     diagnostic = stderr or stdout or f"{command[0]} exited {result.returncode}"
     return diagnostic.splitlines()[0][:200], False
 
@@ -119,7 +123,7 @@ def search_qmd(
                 if not isinstance(parsed, list):
                     raise ValueError
                 results = parsed
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
                 errors.append("QMD search returned an invalid result")
 
     lines = [
