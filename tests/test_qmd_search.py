@@ -116,7 +116,7 @@ class QmdSearchTests(unittest.TestCase):
             windows_qmd = r"C:\\Program Files\\QMD\\qmd.cmd"
             with patch("kb_bootstrap.qmd_search.shutil.which", return_value=windows_qmd), patch(
                 "kb_bootstrap.qmd_search.subprocess.run",
-                return_value=type("Result", (), {"stdout": json.dumps(result), "returncode": 0})(),
+                return_value=type("Result", (), {"stdout": json.dumps(result).encode("utf-8"), "stderr": b"", "returncode": 0})(),
             ) as run:
                 report, valid = search_qmd("setup", project_root=root)
 
@@ -126,6 +126,36 @@ class QmdSearchTests(unittest.TestCase):
             self.assertEqual(command[0], windows_qmd)
             self.assertEqual(command[-2:], ["--", "setup"])
             self.assertFalse(run.call_args.kwargs.get("shell", False))
+
+    def test_utf8_qmd_json_survives_cp1252_parent_locale(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            payload = json.dumps(
+                [{"title": "источники", "file": "qmd://demo-wiki/source.md", "score": 0.9}],
+                ensure_ascii=False,
+            ).encode("utf-8")
+            result = type("Result", (), {"stdout": payload, "stderr": b"", "returncode": 0})()
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
+                "kb_bootstrap.qmd_search.locale.getpreferredencoding", return_value="cp1252"
+            ), patch("kb_bootstrap.qmd_search.subprocess.run", return_value=result) as run:
+                report, valid = search_qmd("sources", project_root=root)
+
+            self.assertTrue(valid)
+            self.assertIn("[CANONICAL] источники", report)
+            self.assertNotIn("text", run.call_args.kwargs)
+
+    def test_malformed_qmd_json_bytes_block_without_crashing_under_cp1252(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            result = type("Result", (), {"stdout": bytes([0x81]), "stderr": b"", "returncode": 0})()
+            with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
+                "kb_bootstrap.qmd_search.locale.getpreferredencoding", return_value="cp1252"
+            ), patch("kb_bootstrap.qmd_search.subprocess.run", return_value=result):
+                report, valid = search_qmd("sources", project_root=root)
+
+            self.assertFalse(valid)
+            self.assertIn("QMD search returned an invalid result", report)
+            self.assertIn("RESULT: BLOCKED", report)
 
     def test_search_wrapper_uses_only_read_only_qmd_search_command(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -158,7 +188,7 @@ class QmdSearchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_project(directory)
             failed = type(
-                "Result", (), {"stdout": "", "stderr": "Collection not found: demo-wiki\n", "returncode": 1}
+                "Result", (), {"stdout": b"", "stderr": b"Collection not found: demo-wiki\n", "returncode": 1}
             )()
             with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
                 "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
@@ -172,7 +202,7 @@ class QmdSearchTests(unittest.TestCase):
     def test_nonzero_exit_without_output_reports_exit_code(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_project(directory)
-            failed = type("Result", (), {"stdout": "", "stderr": "", "returncode": 3})()
+            failed = type("Result", (), {"stdout": b"", "stderr": b"", "returncode": 3})()
             with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
                 "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
             ):
@@ -185,7 +215,7 @@ class QmdSearchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_project(directory)
             failed = type(
-                "Result", (), {"stdout": "", "stderr": ("x" * 500) + "\nsecond line\n", "returncode": 1}
+                "Result", (), {"stdout": b"", "stderr": (("x" * 500) + "\nsecond line\n").encode("ascii"), "returncode": 1}
             )()
             with patch("kb_bootstrap.qmd_search.shutil.which", return_value="/usr/bin/qmd"), patch(
                 "kb_bootstrap.qmd_search.subprocess.run", return_value=failed
