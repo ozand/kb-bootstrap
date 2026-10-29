@@ -46,3 +46,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-040 | Classify caller-declared evidence lineage without certifying independence | Accepted |
 | ADR-041 | Distinguish safe reference targets from canonical graph nodes | Accepted |
 | ADR-042 | Compose evidence binding reports with declared lineage | Accepted |
+| ADR-043 | Clarify ADR-041's lesson schema destination | Proposed |
