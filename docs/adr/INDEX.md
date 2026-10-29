@@ -47,3 +47,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-041 | Distinguish safe reference targets from canonical graph nodes | Accepted |
 | ADR-042 | Compose evidence binding reports with declared lineage | Accepted |
 | ADR-043 | Clarify ADR-041's lesson schema destination | Accepted |
+| ADR-044 | Propose sanitized YAML parser diagnostics for canonical frontmatter | Proposed |
