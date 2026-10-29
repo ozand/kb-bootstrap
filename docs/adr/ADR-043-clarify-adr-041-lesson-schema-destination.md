@@ -1,6 +1,6 @@
 # ADR-043: Clarify ADR-041's lesson schema destination
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-29
 **Authors**: Pi coding agent
 **Supersedes**: A single destination-scope sentence in ADR-041, only if accepted
@@ -14,13 +14,13 @@ The owner’s explicit Issue #234 scope refinement instead names only `lessons/S
 
 ## Decision
 
-If accepted, supersede only the quoted ADR-041 destination-scope sentence above with this bounded rule:
+Supersede only the quoted ADR-041 destination-scope sentence above with this bounded rule:
 
 - A link may target the existing root-relative path spelled exactly `lessons/SCHEMA.md`. The link target is compared using that exact path and case; only this path qualifies. It must resolve to an existing regular file within the canonical root, and no component may traverse a symlink.
 - This exception checks only the explicitly named path for existence and safety. It does not read the target file’s contents, enumerate it, traverse it, or add it as a graph node, source, or edge.
 - All other links into excluded `lessons/` remain rejected as dead/invalid targets, including other Markdown files, nested `lessons/**/SCHEMA.md`, and case variants such as `Lessons/SCHEMA.md` or `lessons/schema.md`. Missing paths, non-regular files, and symlink/escaping paths remain rejected.
 
-This clarification records the existing implementation and owner-narrowed scope. It authorizes no runtime change. ADR-041 remains accepted and unchanged as historical text; only the quoted sentence is proposed for replacement upon acceptance of this ADR. No other ADR-041 decision or consequence is superseded. In particular, reserved `index.md`/`log.md` behavior, canonical graph nodes/sources, ordinary graph edges and orphan counting, diagnostics, safety checks, read-only behavior, and the ADR-005 exporter contract remain as ADR-041 states.
+This clarification records the existing implementation and owner-narrowed scope. It authorizes no runtime change. ADR-041 remains accepted and unchanged as historical text; only the quoted sentence is replaced by this ADR. No other ADR-041 decision or consequence is superseded. In particular, reserved `index.md`/`log.md` behavior, canonical graph nodes/sources, ordinary graph edges and orphan counting, diagnostics, safety checks, read-only behavior, and the ADR-005 exporter contract remain as ADR-041 states.
 
 ## Alternatives Considered
 
@@ -38,7 +38,7 @@ Rejected: the accepted wording and implemented owner-scoped behavior would remai
 
 ## Consequences
 
-The accepted contract, if this ADR is accepted, will unambiguously permit only the exact root-relative `lessons/SCHEMA.md` destination. It will not change behavior or grant access to other lesson paths. The earlier broad sentence remains visible in ADR-041 as historical accepted text, with this ADR identifying its scoped replacement.
+The accepted contract unambiguously permits only the exact root-relative `lessons/SCHEMA.md` destination. It will not change behavior or grant access to other lesson paths. The earlier broad sentence remains visible in ADR-041 as historical accepted text, with this ADR identifying its scoped replacement.
 
 ## Test Contract
 
