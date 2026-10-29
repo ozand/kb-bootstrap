@@ -1,6 +1,6 @@
 # ADR-044: Propose sanitized YAML parser diagnostics for canonical frontmatter
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-02
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -28,7 +28,7 @@ Never display or serialize `str(exc)`, `problem`, `context`, either mark's buffe
 
 No changes are authorized to validation traversal or read bounds, error categories outside malformed YAML, report sections, command selection, CLI exit codes, legacy `validate` behavior, JSON/output formats, stdout/stderr routing, configuration, autofix, dependencies, or other consumers of canonical profile/provenance reports. This is ordinary human-readable report text, not a new machine-readable contract. Independent review and explicit ADR acceptance are required before code changes; this proposal itself authorizes no runtime change.
 
-## Alternatives considered
+## Alternatives Considered
 
 ### Print PyYAML's error message
 
@@ -50,7 +50,7 @@ Rejected: one existing parse failure needs a fixed label and optional local line
 - This does not claim that line context alone explains the correction, or that YAML syntax is the only possible validation failure.
 - No accepted ADR is rewritten, and no runtime behavior changes until this decision is accepted and independently reviewed.
 
-## Test contract if accepted and implemented
+## Test Contract if accepted and implemented
 
 Use synthetic fixtures only. Cover actual scanner and parser failures, the unknown-`YAMLError` fallback, correct frontmatter-local numbering, missing and invalid marks, and a mark at end-of-input. Include a secret canary in malformed scalar/context text and assert that it never appears. Include a real malformed unquoted `: ` scalar; do not treat an em dash or any other valid YAML value as invalid merely to create a fixture. Assert the unchanged diagnostic prefix, deterministic fixed labels, no line when the mark is unusable, and unchanged source bytes.
 
