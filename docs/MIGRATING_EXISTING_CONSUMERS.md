@@ -113,6 +113,27 @@ kb-bootstrap check-completion \
   --pr <number>
 ```
 
+## OKF alignment compatibility preflight
+
+This section describes implemented behavior only. It does not migrate content or make
+an existing repository conform. Select one consumer checkout with its owner; do not
+read or validate its content until that owner permits it. The commands below are
+capabilities, not steps this guide runs automatically.
+
+| Behavior and source | Compatibility and detection | Remediation owner and rollback/deferral |
+|---|---|---|
+| Minimal OKF v0.2 profile (ADR-003; #88) | `validate` checks ordinary Markdown concepts for UTF-8, parseable mapping frontmatter, and non-empty `type`; unknown types and extra keys are accepted. It reports profile results separately from graph/QMD checks. Inspect the report on an owner-authorized stable checkout; validation is read-only, but assumes no concurrent replacement. | Project owner reviews any failing concept and edits it manually after preserving its authored bytes and unknown metadata. Keep a versioned, access-controlled backup/commit before changes; revert only that reviewed change to roll back. Defer when ownership or preservation is unclear. |
+| Reserved files and published bundle boundary (ADR-009; #88) | `index.md`/`log.md` are reserved case-insensitively in the concept boundary; the opt-in `export-published-bundle` validates and exports Markdown concepts plus permitted exact-lowercase reserved files to an exclusive ZIP. Raw and lesson trees remain in the working tree and are excluded from the artifact. Use `validate` or the explicit export only with owner permission; neither is an automatic migration. | Project owner reviews reserved-file diagnostics and decides any manual change. Preserve source bytes and unknown metadata; retain the original versioned checkout and archive the produced ZIP under owner retention policy. Roll back by discarding only the new ZIP or reverting reviewed edits; defer rather than relocating raw/lesson content. |
+| Canonical graph links and graph JSON (ADR-005; #89) | Relative links resolve from their source; leading `/` links resolve from the selected canonical root. Unsafe or unresolved local Markdown targets fail graph integrity. `export-graph` is optional, read-only, and keeps its graph result distinct from pure profile conformance. Inspect the separate report on an authorized checkout. | Project owner reviews and manually edits an authored link if appropriate; preserve original bytes/version first and revert that narrow edit if needed. Defer graph cleanup independently; a graph failure is not by itself an OKF-profile failure. |
+| Implemented provenance/freshness profile (ADR-006) | `validate` separately reports bounded `generated`, `verified`, `sources`, `status`, and `stale_after` checks. `--now` provides explicit comparison time; without it freshness is unknown. Resources are not fetched or opened; values are not echoed, source text is not rewritten, and unknown keys are preserved. Use the report only with project-owner authorization. | Project owner manually reviews any metadata change, retaining authored bytes and unknown fields in a versioned backup. Roll back only reviewed edits. Missing optional metadata may remain unknown; defer any ambiguous resource or actor interpretation. |
+| Additional provenance proposals (#90) and Attested Computation/result interpretation (#91) | Not delivered by the accepted ADRs above: proposed scope-bearing/resource forms, actor conventions, `sources.last_modified`/`usage_window`, and Attested Computation are not implied by current validation. Do not present them as validated or infer guarantees from the profile report. | No migration action is authorized by this guide. Defer until the applicable implementation and owner-reviewed contract are accepted; preserve existing metadata unchanged. |
+
+For each row, detection is limited to the explicitly selected checkout and the
+commands documented by the installed version. No step infers ownership from paths,
+reads arbitrary resources, or automatically repairs content. Keep backups and
+versioned records only under the consumer owner's retention policy; do not place raw
+corpus material, credentials, or private payloads in reports or migration receipts.
+
 ## Rollback and failure handling
 
 - If `doctor` fails, change nothing; correct repository/default configuration first.
