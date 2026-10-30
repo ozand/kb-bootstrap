@@ -49,3 +49,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-043 | Clarify ADR-041's lesson schema destination | Accepted |
 | ADR-044 | Propose sanitized YAML parser diagnostics for canonical frontmatter | Accepted |
 | ADR-045 | Propose a fixed remediation hint for malformed YAML frontmatter | Accepted |
+| ADR-046 | Propose a read-only scaffold preview | Accepted |
