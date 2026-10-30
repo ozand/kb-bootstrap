@@ -1,11 +1,26 @@
 import datetime
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
+import kb_bootstrap.canonical_profile as canonical_profile
 from kb_bootstrap.canonical_profile import validate_canonical_profile
+from kb_bootstrap.cli import main
+
+
+class _UnknownYamlError(yaml.YAMLError):
+    def __init__(self, mark):
+        super().__init__("PRIVATE-CANARY parser text")
+        self._mark = mark
+
+    @property
+    def problem_mark(self):
+        return self._mark
 
 
 class CanonicalProfileTests(unittest.TestCase):
@@ -191,6 +206,82 @@ class CanonicalProfileTests(unittest.TestCase):
             self.assertIn("canonical root is unavailable", report)
             self.assertNotIn(str(root), report)
             self.assertNotIn("private-profile-", report)
+
+    def test_yaml_parse_errors_use_fixed_categories_and_frontmatter_lines(self):
+        fixtures = (
+            ("---\ntype: Concept\n[broken\n---\n", "parser error", 2),
+            ("---\ntype: Concept\ntitle: PRIVATE-CANARY: second\n---\n", "scanner error", 2),
+        )
+        for content, category, line in fixtures:
+            with self.subTest(category=category), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = self.write(root, "invalid.md", content)
+                original = source.read_bytes()
+                report, valid = validate_canonical_profile(root)
+                diagnostic = next(row for row in report.splitlines() if "invalid.md:" in row)
+                self.assertFalse(valid)
+                self.assertIn("frontmatter is invalid YAML (" + category, diagnostic)
+                self.assertIn(f"at frontmatter line {line})", diagnostic)
+                self.assertNotIn("PRIVATE-CANARY", report)
+                self.assertEqual(source.read_bytes(), original)
+                if category == "scanner error":
+                    output = io.StringIO()
+                    with patch("sys.argv", ["kb-bootstrap", "validate-core", "--dir", str(root)]):
+                        with redirect_stdout(output):
+                            code = main()
+                    self.assertEqual(code, 1)
+                    self.assertIn(f"frontmatter is invalid YAML (scanner error at frontmatter line {line})", output.getvalue())
+                    self.assertNotIn("PRIVATE-CANARY", output.getvalue())
+
+    def test_yaml_error_line_is_omitted_for_missing_or_invalid_marks(self):
+        invalid_marks = (None, True, 1.5, "1", -1, 3)
+        for value in invalid_marks:
+            with self.subTest(mark=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write(root, "invalid.md", "---\ntype: Concept\n---\n")
+                error = _UnknownYamlError(None)
+                if value is not None:
+                    error._mark = type("Mark", (), {"line": value})()
+                with patch.object(canonical_profile.yaml, "load", side_effect=error):
+                    report, valid = validate_canonical_profile(root)
+                diagnostic = next(row for row in report.splitlines() if "invalid.md:" in row)
+                self.assertFalse(valid)
+                self.assertIn("frontmatter is invalid YAML (YAML error)", diagnostic)
+                self.assertNotIn("frontmatter line", diagnostic)
+                self.assertNotIn("PRIVATE-CANARY", report)
+
+    def test_yaml_error_accepts_end_of_frontmatter_mark(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "invalid.md", "---\ntype: Concept\n---\n")
+            error = _UnknownYamlError(type("Mark", (), {"line": 1})())
+            with patch.object(canonical_profile.yaml, "load", side_effect=error):
+                report, valid = validate_canonical_profile(root)
+            self.assertFalse(valid)
+            self.assertIn("frontmatter is invalid YAML (YAML error at frontmatter line 2)", report)
+
+    def test_unknown_yaml_error_uses_safe_line_and_never_leaks_parser_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "invalid.md", "---\ntype: Concept\n---\n")
+            mark = type("Mark", (), {"line": 1})()
+            with patch.object(
+                canonical_profile.yaml,
+                "load",
+                side_effect=_UnknownYamlError(mark),
+            ):
+                report, valid = validate_canonical_profile(root)
+            self.assertFalse(valid)
+            self.assertIn("frontmatter is invalid YAML (YAML error at frontmatter line 2)", report)
+            self.assertNotIn("PRIVATE-CANARY", report)
+
+    def test_valid_em_dash_frontmatter_remains_valid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "valid.md", "---\ntype: Concept\ntitle: An — example\n---\n")
+            report, valid = validate_canonical_profile(root)
+            self.assertTrue(valid)
+            self.assertIn("ERRORS: 0", report)
 
 
 if __name__ == "__main__":
