@@ -44,6 +44,22 @@ def _traverses_symlink(path: Path) -> bool:
     return False
 
 
+def _yaml_error_diagnostic(error: yaml.YAMLError, line_count: int) -> str:
+    if isinstance(error, yaml.scanner.ScannerError):
+        category = "scanner error"
+    elif isinstance(error, yaml.parser.ParserError):
+        category = "parser error"
+    else:
+        category = "YAML error"
+
+    diagnostic = f"frontmatter is invalid YAML ({category}"
+    mark = getattr(error, "problem_mark", None)
+    line = getattr(mark, "line", None)
+    if isinstance(line, int) and not isinstance(line, bool) and 0 <= line <= line_count:
+        diagnostic += f" at frontmatter line {line + 1}"
+    return diagnostic + ")"
+
+
 def _frontmatter(path: Path) -> Tuple[Dict[str, object], str]:
     if path.is_symlink() or _traverses_symlink(path):
         return {}, "symlinked path is not allowed"
@@ -57,10 +73,11 @@ def _frontmatter(path: Path) -> Tuple[Dict[str, object], str]:
         end = lines.index("---", 1)
     except ValueError:
         return {}, "missing exact YAML frontmatter"
+    frontmatter_lines = lines[1:end]
     try:
-        parsed = yaml.load("\n".join(lines[1:end]), Loader=_StringScalarLoader)
-    except yaml.YAMLError:
-        return {}, "frontmatter is invalid YAML"
+        parsed = yaml.load("\n".join(frontmatter_lines), Loader=_StringScalarLoader)
+    except yaml.YAMLError as error:
+        return {}, _yaml_error_diagnostic(error, len(frontmatter_lines))
     if not isinstance(parsed, dict):
         return {}, "frontmatter must be a mapping"
     return parsed, ""
