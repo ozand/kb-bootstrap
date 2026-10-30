@@ -1,6 +1,6 @@
 # ADR-045: Propose a fixed remediation hint for malformed YAML frontmatter
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-10-30
 **Authors**: Pi coding agent
 **Supersedes**: ADR-044 only for the addition of the fixed hint specified below
