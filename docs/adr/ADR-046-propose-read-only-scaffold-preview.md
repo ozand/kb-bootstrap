@@ -1,6 +1,6 @@
 # ADR-046: Propose a read-only scaffold preview
 
-**Status**: Proposed
+**Status**: Accepted
 
 **Date**: 2026-11-03
 
