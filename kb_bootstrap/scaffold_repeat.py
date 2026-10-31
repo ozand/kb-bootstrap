@@ -152,12 +152,17 @@ def _classify_file(root: Path, relative: str, expected: bytes) -> str:
         descriptor = os.open(path, flags)
         try:
             before_open = os.fstat(descriptor)
+            if (not stat.S_ISREG(before_open.st_mode)
+                    or before_open.st_size != len(expected)):
+                return "unavailable"
+            remaining = len(expected)
             chunks = []
-            while True:
-                chunk = os.read(descriptor, 65536)
+            while remaining:
+                chunk = os.read(descriptor, min(65536, remaining))
                 if not chunk:
-                    break
+                    return "unavailable"
                 chunks.append(chunk)
+                remaining -= len(chunk)
             actual = b"".join(chunks)
             after_open = os.fstat(descriptor)
         finally:

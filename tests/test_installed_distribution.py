@@ -33,10 +33,10 @@ REQUIRED_ASSETS = {
 }
 
 
-def _run(command, *, cwd, env=None, timeout=COMMAND_TIMEOUT, on_timeout=None):
+def _run(command, *, cwd, env=None, timeout=COMMAND_TIMEOUT, on_timeout=None, check=True):
     try:
         return subprocess.run(
-            command, cwd=cwd, env=env, check=True, capture_output=True,
+            command, cwd=cwd, env=env, check=check, capture_output=True,
             text=True, timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
@@ -179,6 +179,25 @@ class InstalledDistributionTests(unittest.TestCase):
 
     def test_installed_sdist_generates_research_and_lesson_assets_outside_checkout(self):
         self._assert_installed_artifact_generates_assets("sdist")
+
+    def test_installed_wheel_preview_cli_is_read_only_outside_checkout(self):
+        artifact = next(self.artifacts.glob("*.whl"))
+        temp_root = Path(tempfile.mkdtemp(prefix="kb-bootstrap-preview-wheel-"))
+        self.addCleanup(lambda: shutil.rmtree(temp_root, ignore_errors=True))
+        environment = temp_root / "venv"
+        venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
+        scripts = environment / ("Scripts" if os.name == "nt" else "bin")
+        python = scripts / ("python.exe" if os.name == "nt" else "python")
+        cli = scripts / ("kb-bootstrap.exe" if os.name == "nt" else "kb-bootstrap")
+        _run([str(python), "-m", "pip", "install", "--force-reinstall", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)], cwd=temp_root)
+        target = temp_root / "absent-parent" / "target"
+        for args in (("preview", "--target", str(target)), ("preview", "--target", str(target), "--core-only")):
+            result = _run([str(cli), *args], cwd=temp_root, env={**os.environ, "PYTHONPATH": ""}, timeout=COMMAND_TIMEOUT, on_timeout=lambda: None, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("RESULT: CHANGES REQUIRED", result.stdout)
+            self.assertFalse(target.parent.exists())
+        module_path = _run([str(python), "-c", "import kb_bootstrap; print(kb_bootstrap.__file__)"], cwd=temp_root, env={**os.environ, "PYTHONPATH": ""}).stdout.strip()
+        self.assertIn(str(environment), module_path)
 
     def _assert_installed_artifact_generates_assets(self, kind):
         artifact = next(self.artifacts.glob("*.whl" if kind == "wheel" else "*.tar.gz"))

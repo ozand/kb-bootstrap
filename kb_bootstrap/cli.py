@@ -407,7 +407,8 @@ def main():
     raw_args = sys.argv[1:]
     preliminary_args, unknown_args = parser.parse_known_args(raw_args)
     if (preliminary_args.core_only or "--core-only" in raw_args) and (
-        preliminary_args.command or "--core-only" in unknown_args
+        (preliminary_args.command and preliminary_args.command != "preview")
+        or "--core-only" in unknown_args
     ):
         parser.error("--core-only is initialization-only")
     args = parser.parse_args(raw_args)

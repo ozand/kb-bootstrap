@@ -13,7 +13,7 @@ import shutil
 from unittest.mock import patch
 
 from kb_bootstrap.cli import main
-from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files
+from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files, _classify_file
 from kb_bootstrap.qmd_names import project_slug
 
 
@@ -102,6 +102,24 @@ class ScaffoldRepeatTests(unittest.TestCase):
         self.assertEqual(expected["qmd.json"], config.replace("\n", os.linesep).encode())
         self.assertEqual(expected["qmd/collections/wiki.yaml"], wiki.replace("\n", os.linesep).encode())
         self.assertEqual(expected["qmd/collections/raw.yaml"], raw.replace("\n", os.linesep).encode())
+
+    def test_file_growth_during_comparison_is_bounded_and_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "expected"
+            path.write_bytes(b"abcd")
+            original_open = os.open
+            original_fstat = os.fstat
+            original_read = os.read
+            reads = []
+            def grow_before_open(file, flags, *args, **kwargs):
+                if os.fspath(file) == os.fspath(path):
+                    path.write_bytes(b"abcdefgh")
+                return original_open(file, flags, *args, **kwargs)
+            with patch("kb_bootstrap.scaffold_repeat.os.open", side_effect=grow_before_open), patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=lambda fd, size: (reads.append(size), original_read(fd, size))[1]):
+                state = _classify_file(root, "expected", b"abcd")
+            self.assertEqual(state, "unavailable")
+            self.assertEqual(reads, [])
 
     def test_inventory_uses_all_packaged_files(self):
         mapping = _inventory_files(self.package)
