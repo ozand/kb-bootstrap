@@ -124,6 +124,16 @@ def test_preview_rejects_literal_empty_before_filesystem_access(monkeypatch, tmp
     assert error.value.code == 2
 
 
+def test_preview_nonregular_expected_member_is_unsafe_without_open(tmp_path):
+    target = tmp_path / "nonregular-member"
+    target.mkdir()
+    member = target / "qmd.json"
+    member.mkdir(parents=True)
+    with patch("kb_bootstrap.scaffold_repeat.os.open", side_effect=AssertionError("nonregular member opened")):
+        output, code = preview(str(target), PACKAGE, "single")
+    assert code == 1 and "unsafe: qmd.json" in output and "RESULT: BLOCKED" in output
+
+
 def test_preview_unsafe_paths_block_before_content_open(tmp_path):
     target = tmp_path / "unsafe"
     target.mkdir()
@@ -180,22 +190,47 @@ def test_preview_unavailable_and_oversized_files_do_not_read_contents(tmp_path):
     assert code == 1 and "content differs: " + expected in out
 
 
-def test_preview_equal_size_reads_respect_per_file_and_total_payload_bounds(tmp_path):
+def test_preview_equal_size_reads_respect_each_file_and_total_payload_bounds(tmp_path):
     target = tmp_path / "bounded"
     expected = ordinary(target)
-    original = os.read
-    requested = []
-    with patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=lambda fd, size: (requested.append(size), original(fd, size))[1]):
+    original_open, original_read, original_close = os.open, os.read, os.close
+    descriptor_paths = {}
+    requested = {}
+    returned = {}
+    def observe_open(file, flags, *args, **kwargs):
+        descriptor = original_open(file, flags, *args, **kwargs)
+        descriptor_paths[descriptor] = Path(file).relative_to(target).as_posix()
+        return descriptor
+    def observe_read(descriptor, size):
+        name = descriptor_paths[descriptor]
+        requested[name] = requested.get(name, 0) + size
+        data = original_read(descriptor, size)
+        returned[name] = returned.get(name, 0) + len(data)
+        return data
+    def observe_close(descriptor):
+        descriptor_paths.pop(descriptor, None)
+        return original_close(descriptor)
+    with patch("kb_bootstrap.scaffold_repeat.os.open", side_effect=observe_open), patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=observe_read), patch("kb_bootstrap.scaffold_repeat.os.close", side_effect=observe_close):
         out, code = preview(str(target), PACKAGE, "single")
     assert code == 0
-    assert sum(requested) <= sum(map(len, expected.values()))
-    assert all(size <= max(map(len, expected.values())) for size in requested)
+    assert all(requested[name] <= len(expected[name]) for name in requested)
+    assert all(returned[name] <= len(expected[name]) for name in returned)
+    assert sum(returned.values()) <= sum(map(len, expected.values()))
     assert f"matching={len(expected)} missing=0 content differs=0 unsafe=0 unavailable=0" in out
 
 
 def test_preview_invokes_no_external_or_mutating_operations(tmp_path):
     target = tmp_path / "absent" / "target"
-    with patch("subprocess.run", side_effect=AssertionError("subprocess invoked")), patch("shutil.copytree", side_effect=AssertionError("copy invoked")), patch("pathlib.Path.mkdir", side_effect=AssertionError("directory created")):
+    import builtins
+    import socket
+    original_builtin_open, original_path_open = builtins.open, Path.open
+    def check_builtin_open(file, mode="r", *args, **kwargs):
+        assert not any(flag in mode for flag in "wax+"), "write-mode builtin open invoked"
+        return original_builtin_open(file, mode, *args, **kwargs)
+    def check_path_open(path, mode="r", *args, **kwargs):
+        assert not any(flag in mode for flag in "wax+"), "write-mode Path.open invoked"
+        return original_path_open(path, mode, *args, **kwargs)
+    with patch("subprocess.run", side_effect=AssertionError("subprocess invoked")), patch("socket.create_connection", side_effect=AssertionError("network invoked")), patch("socket.socket.connect", side_effect=AssertionError("network invoked")), patch("shutil.copytree", side_effect=AssertionError("copy invoked")), patch("pathlib.Path.mkdir", side_effect=AssertionError("directory created")), patch("builtins.open", side_effect=check_builtin_open), patch("pathlib.Path.open", new=check_path_open), patch("pathlib.Path.write_bytes", side_effect=AssertionError("write invoked")), patch("pathlib.Path.write_text", side_effect=AssertionError("write invoked")), patch("pathlib.Path.touch", side_effect=AssertionError("touch invoked")), patch("pathlib.Path.unlink", side_effect=AssertionError("unlink invoked")), patch("os.replace", side_effect=AssertionError("replace invoked")), patch("shutil.copy2", side_effect=AssertionError("copy invoked")):
         output, status = preview(str(target), PACKAGE, "single")
     assert status == 1 and "RESULT: CHANGES REQUIRED" in output
     assert not target.parent.exists()
@@ -210,13 +245,24 @@ def test_preview_whitespace_target_is_not_trimmed(monkeypatch):
     assert observed == ["   "]
 
 
+def _tree_snapshot(root):
+    rows = []
+    for path in sorted(root.rglob("*")):
+        info = path.lstat()
+        relative = path.relative_to(root).as_posix()
+        rows.append((relative, info.st_mode, info.st_size, info.st_mtime_ns, getattr(info, "st_file_attributes", 0), path.read_bytes() if path.is_file() and not path.is_symlink() else None))
+    return tuple(rows)
+
+
 def test_preview_is_repeatable_and_writes_nothing(tmp_path):
     target = tmp_path / "repeat"
     ordinary(target)
     canary = target / "unlisted"
     canary.write_bytes(b"stable")
-    snapshot = sorted((p.relative_to(target).as_posix(), p.read_bytes()) for p in target.rglob("*") if p.is_file())
+    before_target = _tree_snapshot(target)
+    before_parent = _tree_snapshot(tmp_path)
     first = preview(str(target), PACKAGE, "single")
     second = preview(str(target), PACKAGE, "single")
     assert first == second
-    assert snapshot == sorted((p.relative_to(target).as_posix(), p.read_bytes()) for p in target.rglob("*") if p.is_file())
+    assert before_target == _tree_snapshot(target)
+    assert before_parent == _tree_snapshot(tmp_path)

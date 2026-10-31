@@ -109,17 +109,22 @@ class ScaffoldRepeatTests(unittest.TestCase):
             path = root / "expected"
             path.write_bytes(b"abcd")
             original_open = os.open
-            original_fstat = os.fstat
             original_read = os.read
-            reads = []
-            def grow_before_open(file, flags, *args, **kwargs):
-                if os.fspath(file) == os.fspath(path):
-                    path.write_bytes(b"abcdefgh")
-                return original_open(file, flags, *args, **kwargs)
-            with patch("kb_bootstrap.scaffold_repeat.os.open", side_effect=grow_before_open), patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=lambda fd, size: (reads.append(size), original_read(fd, size))[1]):
+            requests = []
+            returned = []
+            def grow_during_read(fd, size):
+                requests.append(size)
+                data = original_read(fd, size)
+                returned.append(len(data))
+                if len(returned) == 1:
+                    with path.open("ab") as output:
+                        output.write(b"efgh")
+                return data
+            with patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=grow_during_read):
                 state = _classify_file(root, "expected", b"abcd")
             self.assertEqual(state, "unavailable")
-            self.assertEqual(reads, [])
+            self.assertLessEqual(sum(returned), len(b"abcd"))
+            self.assertTrue(all(size <= len(b"abcd") for size in requests))
 
     def test_inventory_uses_all_packaged_files(self):
         mapping = _inventory_files(self.package)
