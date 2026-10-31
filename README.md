@@ -235,6 +235,17 @@ kb-bootstrap search-local "example" --dir ./my-kb/kb
 
 `validate-core` checks universal local structure and graph integrity. Any consumer-owned policy check and any optional retrieval/index readiness check remain separate; none is implied by this workflow.
 
+### Read-only scaffold preview
+
+Preview compares the selected current-package inventory without creating or changing the target. It reports only relative paths and comparison categories; it is not an update authorization or a historical completeness check.
+
+```bash
+kb-bootstrap preview --target ./my-kb --type single
+kb-bootstrap preview --target ./my-kb --core-only
+```
+
+An absent target is reported as missing and remains absent. See [ADR-046](docs/adr/ADR-046-propose-read-only-scaffold-preview.md) for scope and limitations.
+
 ### Option 1: Single Content Layout (Default)
 For knowledge centered on one application or tool.
 ```bash

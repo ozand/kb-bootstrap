@@ -13,7 +13,7 @@ import shutil
 from unittest.mock import patch
 
 from kb_bootstrap.cli import main
-from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files
+from kb_bootstrap.scaffold_repeat import preflight, qmd_payloads, _inventory_files, _classify_file
 from kb_bootstrap.qmd_names import project_slug
 
 
@@ -102,6 +102,29 @@ class ScaffoldRepeatTests(unittest.TestCase):
         self.assertEqual(expected["qmd.json"], config.replace("\n", os.linesep).encode())
         self.assertEqual(expected["qmd/collections/wiki.yaml"], wiki.replace("\n", os.linesep).encode())
         self.assertEqual(expected["qmd/collections/raw.yaml"], raw.replace("\n", os.linesep).encode())
+
+    def test_file_growth_during_comparison_is_bounded_and_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "expected"
+            path.write_bytes(b"abcd")
+            original_open = os.open
+            original_read = os.read
+            requests = []
+            returned = []
+            def grow_during_read(fd, size):
+                requests.append(size)
+                data = original_read(fd, size)
+                returned.append(len(data))
+                if len(returned) == 1:
+                    with path.open("ab") as output:
+                        output.write(b"efgh")
+                return data
+            with patch("kb_bootstrap.scaffold_repeat.os.read", side_effect=grow_during_read):
+                state = _classify_file(root, "expected", b"abcd")
+            self.assertEqual(state, "unavailable")
+            self.assertLessEqual(sum(returned), len(b"abcd"))
+            self.assertTrue(all(size <= len(b"abcd") for size in requests))
 
     def test_inventory_uses_all_packaged_files(self):
         mapping = _inventory_files(self.package)
