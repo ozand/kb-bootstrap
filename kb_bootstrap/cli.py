@@ -195,6 +195,10 @@ def main():
         help="Generate an opt-in project-local lessons store and routing contract",
     )
     subparsers = parser.add_subparsers(dest="command")
+    preview_parser = subparsers.add_parser("preview", help="Read-only preview of expected scaffold files")
+    preview_parser.add_argument("--target", required=True, help="Explicit target root to inspect")
+    preview_parser.add_argument("--type", choices=["single", "umbrella"], default="single")
+    preview_parser.add_argument("--core-only", action="store_true", help="Select the ADR-039 core-only inventory")
     validate_parser = subparsers.add_parser(
         "validate", help="Validate Markdown links and QMD collection configuration"
     )
@@ -407,6 +411,14 @@ def main():
     ):
         parser.error("--core-only is initialization-only")
     args = parser.parse_args(raw_args)
+    if args.command == "preview" and args.target == "":
+        parser.error("preview --target must not be empty")
+
+    if args.command == "preview":
+        from .scaffold_preview import preview as scaffold_preview
+        report, status = scaffold_preview(args.target, Path(__file__).parent, args.type, args.core_only)
+        print(report)
+        return status
 
     if args.command in ("validate", "validate-core"):
         print(f"Validator: kb-bootstrap {__version__}")
