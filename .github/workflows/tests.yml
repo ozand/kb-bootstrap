@@ -33,10 +33,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install project and distribution-test tool
-        run: python -m pip install -e . build pytest "setuptools>=61.0"
+        run: python -m pip install -e . build pytest "setuptools>=61.0" wheel
 
       - name: Report sanitized interpreter and dependency provenance
-        run: python -c "import importlib.metadata as m, platform, sys, networkx, yaml; import kb_bootstrap; print('Python:', sys.version.split()[0], platform.platform()); print('kb-bootstrap:', m.version('kb-bootstrap'), kb_bootstrap.__file__); print('networkx:', networkx.__version__, networkx.__file__); print('PyYAML:', yaml.__version__, yaml.__file__)"
+        run: python -c "import importlib.metadata as m, platform, sys, networkx, yaml; import kb_bootstrap; print('Python:', sys.version.split()[0], platform.platform()); print('kb-bootstrap:', m.version('kb-bootstrap'), kb_bootstrap.__file__); print('networkx:', networkx.__version__, networkx.__file__); print('PyYAML:', yaml.__version__, yaml.__file__); print('setuptools:', m.version('setuptools')); print('wheel:', m.version('wheel'))"
 
       - name: Run unittest suite
         run: python -m unittest discover -s tests -v
