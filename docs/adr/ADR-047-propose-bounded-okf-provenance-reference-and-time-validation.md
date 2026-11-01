@@ -29,13 +29,13 @@ These are lexical classes only. The validator MUST NOT dereference, stat, open, 
 
 ### Actors
 
-Apply one bounded convention to `generated.by`, `verified[].by`, and `sources[].author`: a non-empty sanitized string of at most 256 characters, with no C0/DEL controls or surrounding whitespace, in exactly one of these forms:
+Apply one bounded convention to `generated.by`, `verified[].by`, and `sources[].author`. The preferred canonical forms are:
 
 - agent: `<producer>` or `<producer>/<version>`;
 - human: `human:<id>`;
 - automated process: `process:<id>`.
 
-`<producer>`, `<version>`, and `<id>` are non-empty opaque identifiers containing only ASCII letters, digits, `.`, `_`, `@`, `+`, and `-`. The components are not authenticated identities. For compatibility, an unqualified producer identifier remains valid; retain all currently accepted values that meet this convention and the existing bound/safety rules. Do not accept URL, path, drive/UNC, credential-bearing, or unsupported-scheme values as actors. Actor values must never appear in diagnostics, including dynamic error text.
+`<producer>`, `<version>`, and `<id>` are non-empty opaque identifiers containing only ASCII letters, digits, `.`, `_`, `@`, `+`, and `-`. Components are not authenticated identities. For backwards compatibility, also accept legacy opaque actor strings that satisfy ADR-006's existing `_safe_actor` rules: non-empty string, at most 256 characters, no control/DEL characters, URLs, absolute/local/drive/UNC paths, date-like values, credential-like assignments, or unsupported scheme syntax. This compatibility form intentionally includes previously valid values such as `Ada Lovelace`; it does not retroactively invalidate or require rewriting existing `generated.by` or `verified[].by` values. Apply the same canonical-or-safe-legacy rule to `sources[].author`, without claiming its prior unvalidated values were verified. Do not broaden ADR-006's safety exclusions. No automatic conversion or migration is proposed; producer adoption of the preferred forms can be a separate owner-controlled edit. Actor values must never appear in diagnostics, including dynamic error text.
 
 ### Declared source time and usage windows
 
@@ -55,16 +55,17 @@ Keep the existing deterministic report format and error categories; do not add a
 - **Treat every non-URL string as a scope** — rejected: ambiguous, breaks safe rejection of unsupported schemes, and hides path mistakes. Require the explicit `scope:` prefix.
 - **Permit parent traversal and normalize against the concept directory** — rejected: would introduce scope-dependent filesystem interpretation. Only bundle-root and non-traversing relative logical references are accepted.
 - **Use `last_modified` or usage-window bounds to classify freshness** — rejected: OKF identifies these as source credibility/usage signals, while ADR-006 defines freshness from `stale_after` and explicit time; no recency policy is requested by #90.
-- **Make fields required or rewrite legacy metadata** — rejected: optionality and read-only preservation are existing compatibility contracts.
+- **Require canonical actor syntax immediately and rewrite legacy values** — rejected: the existing ADR-006 validator accepts safe labels such as `Ada Lovelace`; invalidating or rewriting them is not required by Issue #90. Preserve them as bounded safe-legacy actors while documenting canonical forms for producers.
+- **Make fields required or rewrite metadata** — rejected: optionality and read-only preservation are existing compatibility contracts.
 
 ## Consequences
 
-Existing valid provenance remains valid; only the listed logical reference forms and recognized optional timestamps gain validation. Malformed recognized `last_modified`/`usage_window` fields that were previously ignored will now fail the separate provenance section. A passing check establishes bounded syntax only, not truth, independence, actor identity, source existence, reachability, trust, or currentness. The change requires focused synthetic fixture tests before runtime implementation; Issue #92 migration guidance is pending/maintained separately and is not delivered by this ADR.
+Existing valid provenance actor values remain valid under the explicit safe-legacy compatibility form; existing resource validation otherwise remains as specified by the additive rules. Only the listed logical reference forms and recognized optional timestamps gain validation. Malformed recognized `last_modified`/`usage_window` fields that were previously ignored will now fail the separate provenance section. A passing check establishes bounded syntax only, not truth, independence, actor identity, source existence, reachability, trust, or currentness. The change requires focused synthetic fixture tests before runtime implementation; Issue #92 migration guidance is pending/maintained separately and is not delivered by this ADR.
 
 ## Test Contract
 
 - Accept and reject every resource class and unsafe class; exercise percent encoding, one-time decoding, traversal/control/separator rejection, scopes, and preservation of existing valid HTTP(S)/relative values.
-- Accept agent/version, `human:`, and `process:` actor forms; reject malformed/unsafe forms without echoing values.
+- Accept canonical agent/version, `human:`, and `process:` actor forms plus safe legacy actor strings (including a synthetic `Ada Lovelace` fixture); reject malformed/unsafe forms without echoing values. Show existing safe actor values remain valid and actor policy is identical across all three actor locations.
 - Accept valid `last_modified`, shared and source-level windows, offsets, source override, equal bounds, and absent metadata; reject malformed, naive, missing, null, or reversed bounds.
 - Repeat reports with the same explicit `--now` and assert byte-identical output; assert `last_modified` and windows do not affect freshness.
 - Spy on network access and metadata-derived local opens/existence checks; assert none occur. Use canary metadata and byte snapshots to prove diagnostics do not leak values and source bytes remain unchanged.
