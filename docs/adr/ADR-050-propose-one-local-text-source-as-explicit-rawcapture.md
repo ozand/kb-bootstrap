@@ -43,6 +43,10 @@ This is not arbitrary Markdown acceptance, a general importer, source-capture en
 - **Normalize line endings, strip BOM, or decode with replacement:** rejected because these silently alter the caller's body and invalidate byte-fidelity claims.
 - **Add a framework CLI, dependency, source registry, or generic plugin API:** rejected; one packaged script and stdlib cover the demonstrated local operation.
 
+## Consequences
+
+This accepted contract permits a narrowly described offline producer while preserving the existing RawCapture/importer format. Callers must provide metadata explicitly, including a timestamp accepted by the current format; byte fidelity applies to the body suffix only. No runtime implementation, parser validation change, or unknown timestamp representation is included. Implementing the producer remains separately authorized work.
+
 ## Acceptance criteria if accepted and implemented
 
 - Synthetic UTF-8 text and Markdown input with explicit fields produces a valid RawCapture whose body suffix is byte-for-byte equal to source bytes for LF, CRLF, bare CR and no-final-newline cases. Metadata round-trip tests cover quotes, backslashes, colons, YAML-injection-looking strings, offset-aware timestamps, and splitline separators U+2028/U+2029; emitted quoted scalars parse back to the exact caller values through the existing importer parser and its timestamp check, while values it cannot preserve are rejected before publication.
