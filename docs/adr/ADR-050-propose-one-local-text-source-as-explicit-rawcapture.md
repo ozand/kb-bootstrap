@@ -33,7 +33,7 @@ Before publication, apply the ADR-033 constraints needed for the produced RawCap
 
 This is not arbitrary Markdown acceptance, a general importer, source-capture envelope, verified source record, URL fetch, adapter/plugin framework, study/report generator, timestamp service, text normalizer, attachment copier, link rewriter, or evidence of truth, authorship, permission, completeness, screenshot provenance, or external-byte fidelity. It does not alter `capture_page.py`, importer behavior, RawCapture schema, or existing accepted ADRs. A limitation of the existing contract remains: RawCapture requires a capture timestamp, and this producer cannot truthfully represent an unknown timestamp. A future choice to add an explicit unknown timestamp form needs a separate contract decision; do not silently invent a time. This acceptance does not itself authorize implementation; implementation remains a separate task under the delegated #125 architecture/technical acceptance authority.
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Require the caller to prepare a RawCapture manually:** safe and already compatible, but does not provide the requested direct local-text producer path.
 - **Feed arbitrary text to the ADR-033 importer:** rejected because it would require the importer to invent mandatory RawCapture fields or weaken its accepted grammar.
