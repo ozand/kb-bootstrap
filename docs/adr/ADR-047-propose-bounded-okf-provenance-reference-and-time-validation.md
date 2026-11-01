@@ -1,6 +1,6 @@
 # ADR-047: Propose bounded OKF provenance reference and time validation
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-04
 **Authors**: Pi coding agent
 **Supersedes**: None
