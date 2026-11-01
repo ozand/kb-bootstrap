@@ -395,7 +395,7 @@ class CanonicalProvenanceTests(unittest.TestCase):
 
     def test_resource_metadata_is_never_opened_or_networked(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             concept(root, "concept.md", "type: Concept\nsources: [{resource: /bundle/not-real, author: Ada Lovelace}]")
             original_open = Path.open
             opened_paths = []
@@ -414,7 +414,7 @@ class CanonicalProvenanceTests(unittest.TestCase):
 
     def test_safe_relative_resource_passes(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             concept(
                 root,
                 "concept.md",
