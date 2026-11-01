@@ -36,6 +36,10 @@ Use a linear-time prefix-function/KMP scan, reporting at most 100 offsets; if a 
 
 The companion output is transient and separate from both accepted report formats. Observation rows contain the exact baseline reference identity/digest and fragment locator and, only for a resolved explicit mapping, current IDs/digest; they contain outcome and bounded offsets only, no representation payload, absolute path, or copied fragment text. They cannot be fed back as authority or mutate bindings/knowledge. ADR-040 lineage and ADR-042 worklist behavior remain separate; the caller passes the unchanged resolver report to the existing composer and keeps its returned worklist unchanged beside the companion result. The companion never changes resolver states or lineage classifications.
 
+## Alternatives Considered
+
+This ADR is superseded only for aggregate scan-work budgeting and exhaustion behavior. ADR-052 governs that concern; this lifecycle reconciliation adds no alternative or new normative decision to ADR-051.
+
 ## Consequences
 
 A reviewer can distinguish exact byte continuity at the original offset, one exact moved occurrence, duplicate/overlapping occurrences, and no exact match, while retaining the accepted resolver's explicit mapping and access boundaries. Identical fragment bytes can occur in unrelated contexts; this result intentionally cannot resolve that ambiguity semantically. Changed surrounding context remains a human review concern.
@@ -57,6 +61,10 @@ These are proposed cases, not implemented tests or guarantees. Direct and compos
 ## Non-goals
 
 No changes to ADR-031/036/040/042, existing resolver outcomes or worklist schema; no text similarity, semantic equivalence, inference, automated relocation, binding/knowledge mutation, claim database, extra path discovery, lineage inference, lifecycle transition, or conclusion that absence of an exact fragment means deletion or retraction.
+
+## Test Contract
+
+The synthetic test cases below remain the test contract for ADR-051's continuity behavior. Their presence is not evidence that implementation or runtime tests exist; ADR-052 adds only scan-budget preparation/exhaustion test cases for its superseding scope.
 
 ## Rollback
 

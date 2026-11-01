@@ -26,6 +26,16 @@ Set the invocation-wide total scan-work maximum to **512 MiB (536,870,912 byte-w
 
 This sequence bounds repeated-locator extraction and makes budget exhaustion deterministic and atomic: either every eligible exact scan completes or the companion returns one blocked result with no partial observations. `aggregate_scan_budget_exceeded` is added to ADR-051's closed companion blocked-reason vocabulary. The ADR-036 report and ADR-042 composition input remain byte-for-byte unchanged even when companion work blocks. No report reference paths are reopened, no caller paths or authority are added, and trusted permission, expected-revision, path, snapshot, and existing selected-byte/report budgets remain authoritative.
 
+## Alternatives Considered
+
+### Retain only per-file and aggregate snapshot limits
+
+Rejected: these limit retained bytes, not repeated CPU scanning of one permitted representation across many references.
+
+### Truncate observations when a per-reference search budget expires
+
+Rejected: a prefix-only search cannot establish uniqueness or ambiguity and would produce partial output. Exhaustion blocks the companion atomically.
+
 ## Consequences
 
 At most 512 MiB of counted linear scan/preprocessing work is authorized per invocation, including at most 256 MiB of distinct baseline snapshot traversal, at most 64 MiB of fragment extraction/pattern bytes, and the remaining budget for repeated current-representation searches. A complete selected evidence input may yield an ADR-036 COMPLETE report alongside a companion BLOCKED result when continuity preparation or search exhausts its own aggregate budget; the wrapper preserves that distinction without partial or false uniqueness claims. The limits are proposed engineering ceilings, not measured throughput guarantees.
