@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import sys
@@ -13,6 +15,30 @@ class CliTests(unittest.TestCase):
     def run_cli(self, *args):
         with patch.object(sys, "argv", ["kb-bootstrap", *args]):
             return main()
+
+    def test_validate_core_cli_reports_adr047_fields_sanitely_and_read_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            concept = root / "concept.md"
+            concept.write_text(
+                "---\ntype: Concept\ngenerated: {by: legacy actor}\n"
+                "sources: [{resource: /bundle/ref, author: human:writer, "
+                "last_modified: 2026-09-14T00:00:00Z}]\n"
+                "usage_window: {from: 2026-09-13T00:00:00Z, to: 2026-09-14T00:00:00Z}\n"
+                "stale_after: 2026-09-15T00:00:00Z\n---\n",
+                encoding="utf-8",
+            )
+            original = concept.read_bytes()
+            output = io.StringIO()
+            with patch.object(sys, "argv", [
+                "kb-bootstrap", "validate-core", "--dir", directory,
+                "--now", "2026-09-14T12:00:00Z",
+            ]), contextlib.redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            self.assertIn("Freshness: fresh=1 stale=0 unknown=0 invalid=0", output.getvalue())
+            self.assertNotIn("legacy actor", output.getvalue())
+            self.assertNotIn("/bundle/ref", output.getvalue())
+            self.assertEqual(concept.read_bytes(), original)
 
     def test_single_generates_dual_collections_and_anchored_ignores(self):
         with tempfile.TemporaryDirectory() as directory:
