@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fractions import Fraction
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, unquote_to_bytes, urlsplit
 
 import yaml
 from yaml.constructor import ConstructorError
@@ -26,6 +26,9 @@ INVALID_PERCENT_PATTERN = re.compile(r"%(?![0-9A-Fa-f]{2})")
 RELATIVE_SEGMENT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]*$")
 CREDENTIAL_WORD_PATTERN = re.compile(
     r"(?i)(token|password|secret|api[_-]?key|authorization)\s*[:=]"
+)
+CANONICAL_ACTOR_PATTERN = re.compile(
+    r"^(?:[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)?|human:[A-Za-z0-9._@+-]+|process:[A-Za-z0-9._@+-]+)$"
 )
 
 
@@ -106,7 +109,7 @@ def parse_timestamp(value: object) -> Optional[Fraction]:
     return Fraction(whole_seconds) + fraction
 
 
-def _safe_actor(value: object) -> bool:
+def _safe_legacy_actor(value: object) -> bool:
     if not isinstance(value, str) or not value.strip() or len(value) > 256:
         return False
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
@@ -120,14 +123,49 @@ def _safe_actor(value: object) -> bool:
     return not CREDENTIAL_WORD_PATTERN.search(value)
 
 
+def _safe_actor(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) <= 256
+        and bool(CANONICAL_ACTOR_PATTERN.fullmatch(value) or _safe_legacy_actor(value))
+    )
+
+
+def _safe_path_segment(segment: str) -> bool:
+    if INVALID_PERCENT_PATTERN.search(segment):
+        return False
+    try:
+        decoded = unquote_to_bytes(segment).decode("utf-8", errors="strict")
+    except (UnicodeDecodeError, ValueError):
+        return False
+    if any(ord(character) < 32 or ord(character) == 127 for character in decoded):
+        return False
+    if "/" in decoded or "\\" in decoded or decoded in {".", ".."}:
+        return False
+    return bool(RELATIVE_SEGMENT_PATTERN.fullmatch(decoded))
+
+
+def _safe_scope(value: str) -> bool:
+    payload = value[len("scope:"):]
+    return (
+        1 <= len(payload) <= 256
+        and payload == payload.strip()
+        and all(character.isprintable() and ord(character) >= 32 and ord(character) != 127 for character in payload)
+    )
+
+
 def _safe_resource(value: object) -> bool:
-    if not isinstance(value, str) or not value.strip() or len(value) > 256:
+    if not isinstance(value, str) or not value:
+        return False
+    if value.startswith("scope:"):
+        return _safe_scope(value)
+    if len(value) > 256:
         return False
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
         return False
     if any(character.isspace() for character in value):
         return False
-    if value.startswith(("/", "\\")) or DRIVE_PATTERN.match(value):
+    if DRIVE_PATTERN.match(value):
         return False
     if CREDENTIAL_WORD_PATTERN.search(value) or INVALID_PERCENT_PATTERN.search(value):
         return False
@@ -137,7 +175,7 @@ def _safe_resource(value: object) -> bool:
     except ValueError:
         return False
     if parsed.scheme:
-        if parsed.scheme not in {"http", "https"} or "@" in parsed.netloc:
+        if parsed.scheme.lower() not in {"http", "https"} or "@" in parsed.netloc:
             return False
         try:
             hostname = parsed.hostname
@@ -161,13 +199,14 @@ def _safe_resource(value: object) -> bool:
             return False
         return True
 
-    if "%" in value or "\\" in value or "?" in value or "#" in value:
+    if "\\" in value or "?" in value or "#" in value:
         return False
-    parts = value.split("/")
-    if any(
-        part in {"", ".", ".."} or not RELATIVE_SEGMENT_PATTERN.fullmatch(part)
-        for part in parts
-    ):
+    bundle_root = value.startswith("/")
+    reference = value[1:] if bundle_root else value
+    if not bundle_root and reference.startswith("./"):
+        reference = reference[2:]
+    parts = reference.split("/")
+    if any(part == "" or not _safe_path_segment(part) for part in parts):
         return False
     return True
 
@@ -221,6 +260,22 @@ def _verified_errors(value: object) -> List[str]:
     return errors
 
 
+def _usage_window_errors(value: object, field: str) -> List[str]:
+    if not isinstance(value, dict):
+        return [f"{field} must be a mapping"]
+    errors: List[str] = []
+    bounds: Dict[str, Fraction] = {}
+    for bound in ("from", "to"):
+        timestamp = parse_timestamp(value.get(bound))
+        if timestamp is None:
+            errors.append(f"{field}.{bound} must be an offset-aware timestamp")
+        else:
+            bounds[bound] = timestamp
+    if len(bounds) == 2 and bounds["from"] > bounds["to"]:
+        errors.append(f"{field} bounds are reversed")
+    return errors
+
+
 def _sources_errors(value: object) -> List[str]:
     if not isinstance(value, list):
         return ["sources must be a list"]
@@ -231,6 +286,12 @@ def _sources_errors(value: object) -> List[str]:
             continue
         if not _safe_resource(source.get("resource")):
             errors.append(f"source {position}.resource is missing or unsafe")
+        if "author" in source and not _safe_actor(source["author"]):
+            errors.append(f"source {position}.author is unsafe")
+        if "last_modified" in source and parse_timestamp(source["last_modified"]) is None:
+            errors.append(f"source {position}.last_modified must be an offset-aware timestamp")
+        if "usage_window" in source:
+            errors.extend(_usage_window_errors(source["usage_window"], f"source {position}.usage_window"))
     return errors
 
 
@@ -277,6 +338,12 @@ def validate_canonical_provenance(
             errors.append(f"{relative}: provenance fields are unavailable")
             counts["freshness_invalid"] += 1
             continue
+
+        if "usage_window" in metadata:
+            errors.extend(
+                f"{relative}: {error}"
+                for error in _usage_window_errors(metadata["usage_window"], "usage_window")
+            )
 
         status = metadata.get("status")
         if "status" in metadata and (

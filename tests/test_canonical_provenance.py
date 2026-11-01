@@ -4,6 +4,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kb_bootstrap.canonical_provenance import (
+    _safe_actor,
+    _safe_resource,
     parse_timestamp,
     validate_canonical_provenance,
 )
@@ -201,13 +203,14 @@ class CanonicalProvenanceTests(unittest.TestCase):
             ("generated: {}", "generated.by is missing or unsafe"),
             ("generated:\n  by: true", "generated.by is missing or unsafe"),
             ("generated:\n  by: 42", "generated.by is missing or unsafe"),
-            ("generated:\n  by: 2026-09-14", "generated.by is missing or unsafe"),
             ("generated:\n  by: agent/1\n  at: 2026-09-14", "generated.at"),
             ("verified: null", "verified must be a mapping or list"),
             ("verified: [{}]", "verified event 1.by"),
             ("verified:\n  by: human:reviewer", "verified event 1.at"),
             ("sources: null", "sources must be a list"),
             ("sources: [{}]", "source 1.resource"),
+            ("sources: [{resource: public, last_modified: 2026-09-14}]", "source 1.last_modified"),
+            ("usage_window: {from: 2026-09-14T12:00:00Z}", "usage_window.to"),
             ("stale_after: null", "stale_after"),
             ("stale_after: 2026-09-14", "stale_after"),
         )
@@ -254,7 +257,7 @@ class CanonicalProvenanceTests(unittest.TestCase):
             ("sources:\n  - resource: 'http://[bad'", "source 1.resource"),
             ("sources:\n  - resource: 'http://exa：mple.com/private.md'", "source 1.resource"),
             ("sources:\n  - resource: docs//private.md", "source 1.resource"),
-            ("sources:\n  - resource: './docs/private.md'", "source 1.resource"),
+            ("sources:\n  - resource: '../docs/private.md'", "source 1.resource"),
             ("sources:\n  - resource: 'docs/private file.md'", "source 1.resource"),
             ("sources:\n  - resource: docs\\private.md", "source 1.resource"),
         )
@@ -271,6 +274,144 @@ class CanonicalProvenanceTests(unittest.TestCase):
                 self.assertNotIn("C:/", report)
                 self.assertNotIn("private", report)
 
+    def test_adr047_resource_classes_and_blocked_references(self):
+        accepted = (
+            "https://example.com/public",
+            "docs/source_v1.md",
+            "./docs/source_v1.md",
+            "/bundle/docs/source_v1.md",
+            "docs/%41-source.md",
+            "scope:managed collection / research",
+            "scope:" + "é" * 256,
+        )
+        rejected = (
+            "",
+            "/",
+            "//server/share",
+            "/docs//source.md",
+            "docs//source.md",
+            "./../source.md",
+            "docs/%2e%2e/source.md",
+            "docs/%2Fsource.md",
+            "docs/%5csource.md",
+            "docs/%FF.md",
+            "docs/%GG.md",
+            "docs/%2500.md",
+            "docs/%00.md",
+            "docs/a?b",
+            "docs/a#b",
+            "C:/private.md",
+            "ftp://example.com/source",
+            "scope:",
+            "scope: padded ",
+            "scope:bad\nvalue",
+            "scope:" + "a" * 257,
+        )
+        for resource in accepted:
+            with self.subTest(resource=resource):
+                self.assertTrue(_safe_resource(resource))
+        for resource in rejected:
+            with self.subTest(resource=resource):
+                self.assertFalse(_safe_resource(resource))
+
+    def test_actor_compatibility_and_canonical_convention(self):
+        accepted = (
+            "agent", "producer/1.0", "human:reviewer_1", "process:batch+2",
+            "Ada Lovelace", "legacy actor label", "human:",
+        )
+        rejected = (
+            "", "http:actor", "https://example.com/actor", "C:/actor", "token=secret",
+        )
+        for actor in accepted:
+            with self.subTest(actor=actor):
+                self.assertTrue(_safe_actor(actor))
+        for actor in rejected:
+            with self.subTest(actor=actor):
+                self.assertFalse(_safe_actor(actor))
+
+    def test_actor_rule_is_shared_by_generated_verified_and_source_author(self):
+        actors = ("Ada Lovelace", "agent/2", "human:reviewer", "process:sync")
+        for actor in actors:
+            with self.subTest(actor=actor), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                concept(
+                    root,
+                    "concept.md",
+                    "type: Concept\n"
+                    f"generated: {{by: '{actor}'}}\n"
+                    f"verified: [{{by: '{actor}', at: 2026-09-14T00:00:00Z}}]\n"
+                    f"sources: [{{resource: source, author: '{actor}'}}]",
+                )
+                report, valid = validate_canonical_provenance(root)
+                self.assertTrue(valid)
+                self.assertNotIn(actor, report)
+
+    def test_shared_source_windows_and_authors_validate_without_affecting_freshness(self):
+        metadata = (
+            "type: Concept\n"
+            "generated:\n  by: legacy producer\n"
+            "usage_window:\n  from: 2026-09-14T12:00:00+02:00\n"
+            "  to: 2026-09-14T10:00:00Z\n  extension: kept\n"
+            "sources:\n  - resource: /bundle/source.md\n"
+            "    author: human:reviewer\n"
+            "    last_modified: 2026-09-14T14:00:00+04:00\n"
+            "    usage_window:\n      from: 2026-09-14T10:00:00-05:00\n"
+            "      to: 2026-09-14T15:00:00Z\n"
+            "      usage_count: 0\n"
+            "stale_after: 2026-09-14T12:00:00Z\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = concept(root, "concept.md", metadata)
+            original = source.read_bytes()
+            first, valid = validate_canonical_provenance(root, "2026-09-14T11:59:59Z")
+            second, second_valid = validate_canonical_provenance(root, "2026-09-14T11:59:59Z")
+            self.assertTrue(valid and second_valid)
+            self.assertEqual(first, second)
+            self.assertIn("fresh=1", first)
+            self.assertNotIn("source.md", first)
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_last_modified_and_usage_window_invalid_cases_are_sanitized(self):
+        fixtures = (
+            ("usage_window: null", "usage_window must be a mapping"),
+            ("usage_window: {from: 2026-09-14T12:00:00Z}", "usage_window.to"),
+            ("usage_window: {from: null, to: 2026-09-14T12:00:00Z}", "usage_window.from"),
+            ("usage_window: {from: 2026-09-14T12:00:00, to: 2026-09-14T12:00:00Z}", "usage_window.from"),
+            ("usage_window: {from: 2026-09-14T12:00:01Z, to: 2026-09-14T12:00:00Z}", "usage_window bounds are reversed"),
+            ("sources: [{resource: public, usage_window: {from: 2026-09-14T12:00:00Z}}]", "source 1.usage_window.to"),
+            ("sources: [{resource: public, last_modified: 2026-09-14}]", "source 1.last_modified"),
+            ("sources: [{resource: public, author: https://example.com/private}]", "source 1.author"),
+        )
+        for fragment, expected in fixtures:
+            with self.subTest(fragment=fragment), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                concept(root, "concept.md", f"type: Concept\n{fragment}")
+                report, valid = validate_canonical_provenance(root, "2026-09-14T12:00:00Z")
+                self.assertFalse(valid)
+                self.assertIn(expected, report)
+                self.assertNotIn("example.com", report)
+                self.assertNotIn("private", report)
+
+    def test_resource_metadata_is_never_opened_or_networked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            concept(root, "concept.md", "type: Concept\nsources: [{resource: /bundle/not-real, author: Ada Lovelace}]")
+            original_open = Path.open
+            opened_paths = []
+
+            def recording_open(path, *args, **kwargs):
+                opened_paths.append(path)
+                return original_open(path, *args, **kwargs)
+
+            with patch.object(Path, "open", recording_open), patch(
+                "urllib.request.urlopen", side_effect=AssertionError("network used")
+            ):
+                report, valid = validate_canonical_provenance(root)
+            self.assertTrue(valid)
+            self.assertIn("Sources: present=1", report)
+            self.assertEqual(opened_paths, [root / "concept.md"])
+
     def test_safe_relative_resource_passes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -284,6 +425,22 @@ class CanonicalProvenanceTests(unittest.TestCase):
 
             self.assertTrue(valid)
             self.assertIn("Sources: present=1 absent=0 invalid=0", report)
+
+    def test_report_diagnostics_do_not_echo_actor_resource_or_timestamp_canaries(self):
+        canaries = ("ACTOR_CANARY_7x", "RESOURCE_CANARY_8y", "TIME_CANARY_9z")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            concept(
+                root,
+                "concept.md",
+                "type: Concept\n"
+                f"generated: {{by: '{canaries[0]}'}}\n"
+                f"sources: [{{resource: '{canaries[1]}', last_modified: '{canaries[2]}'}}]",
+            )
+            report, valid = validate_canonical_provenance(root)
+            self.assertFalse(valid)
+            for canary in canaries:
+                self.assertNotIn(canary, report)
 
     def test_validation_does_not_use_wall_clock_or_network(self):
         with tempfile.TemporaryDirectory() as directory:

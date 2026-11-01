@@ -60,7 +60,7 @@ Producer-defined fields and unknown types are accepted. Frontmatter scalar value
 
 OKF v0.2 also defines optional provenance, trust, lifecycle, and computation fields such as `sources`, `generated`, `verified`, `stale_after`, and Attested Computation fields. They are accepted as additional metadata but are not semantically validated by this minimal profile.
 
-The [bounded canonical provenance/freshness profile](CANONICAL_PROVENANCE_FRESHNESS_PROFILE.md) validates `generated`, `verified`, `sources`, `status`, and `stale_after` as a separate report section. Other optional trust/computation semantics remain outside this minimal profile.
+The [bounded canonical provenance/freshness profile](CANONICAL_PROVENANCE_FRESHNESS_PROFILE.md) validates `generated`, `verified`, `sources`, `status`, and `stale_after` as a separate report section. Accepted ADR-047 adds lexical resource-reference classes, safe canonical-or-legacy actor labels, optional source `last_modified`, and shared/per-source `usage_window` timestamp validation to that section. These checks do not resolve resources or infer identity, truth, or freshness; `stale_after` remains the sole freshness cutoff. Other optional trust/computation semantics remain outside this minimal profile.
 
 ## Reserved files
 
