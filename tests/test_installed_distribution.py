@@ -245,7 +245,7 @@ class InstalledDistributionTests(unittest.TestCase):
                 pip_stdout = pip_stdout.replace(path, "<local-path>")
                 pip_stderr = pip_stderr.replace(path, "<local-path>")
             self.fail(
-                "Installed sdist has no expected console script; diagnostic only, cause undetermined.\n"
+                f"Installed {kind} has no expected console script; diagnostic only, cause undetermined.\n"
                 f"pip stdout (last 4000 chars): {pip_stdout}\n"
                 f"pip stderr (last 4000 chars): {pip_stderr}\n"
                 f"venv metadata (last 4000 chars): {metadata_output}"
