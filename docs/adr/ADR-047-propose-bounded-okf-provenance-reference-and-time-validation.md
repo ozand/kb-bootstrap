@@ -1,6 +1,6 @@
 # ADR-047: Propose bounded OKF provenance reference and time validation
 
-**Status**: Proposed — pending independent review and owner decision
+**Status**: Proposed
 **Date**: 2026-11-04
 **Authors**: Pi coding agent
 **Supersedes**: None
@@ -10,7 +10,7 @@
 
 Issue #90 requests bounded validation for OKF provenance reference forms, actor conventions, `sources[].last_modified`, and shared/per-source `usage_window` timestamps. The current [ADR-006 profile](../CANONICAL_PROVENANCE_FRESHNESS_PROFILE.md) intentionally rejects percent escapes, leading-slash bundle-root paths, dot segments, and scope descriptors; it does not validate `last_modified` or `usage_window`, and its actor rule is narrower than OKF's producer/version, `human:`, and `process:` convention. The official OKF v0.2 specification defines source-resource classes and usage-window placement, but does not define a syntax for scope descriptors or a filesystem resolution/security implementation. This proposal defines only the deterministic lexical validation needed for #90; it does not turn metadata into authority to access resources.
 
-## Decision proposed
+## Decision
 
 If accepted, extend only the `kb-bootstrap validate` provenance/freshness report. These rules are additive to ADR-006 and apply to recognized provenance fields; all unrecognized frontmatter and nested extension keys remain accepted and untouched as required by ADR-003. Missing optional fields remain valid/unknown. Invalid recognized fields fail the provenance section with existing sanitized file-relative path and field-category diagnostics. No accepted ADR is rewritten.
 
@@ -49,7 +49,7 @@ Apply one bounded convention to `generated.by`, `verified[].by`, and `sources[].
 
 Keep the existing deterministic report format and error categories; do not add a wire format, new counters, or resource/actor/timestamp values. Use existing concept-relative POSIX paths and stable field categories only. Unknown metadata at every level remains accepted and preserved. Validation stays read-only: no migration, repair, normalization write, metadata synthesis, raw capture, inference, network/local resource access, retention change, or canonical graph mutation. ADR-006 remains authoritative except for the specific resource and actor acceptance rules above and the additional `last_modified` / `usage_window` validation rules; all other ADR-006 clauses remain in force.
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Resolve bundle paths or fetch URLs to establish identity/existence** — rejected: violates #90 safety, introduces local/network access, and confuses a logical reference with verified evidence.
 - **Treat every non-URL string as a scope** — rejected: ambiguous, breaks safe rejection of unsupported schemes, and hides path mistakes. Require the explicit `scope:` prefix.
@@ -61,7 +61,7 @@ Keep the existing deterministic report format and error categories; do not add a
 
 Existing valid provenance remains valid; only the listed logical reference forms and recognized optional timestamps gain validation. Malformed recognized `last_modified`/`usage_window` fields that were previously ignored will now fail the separate provenance section. A passing check establishes bounded syntax only, not truth, independence, actor identity, source existence, reachability, trust, or currentness. The change requires focused synthetic fixture tests before runtime implementation; Issue #92 migration guidance is pending/maintained separately and is not delivered by this ADR.
 
-## Proposed test contract
+## Test Contract
 
 - Accept and reject every resource class and unsafe class; exercise percent encoding, one-time decoding, traversal/control/separator rejection, scopes, and preservation of existing valid HTTP(S)/relative values.
 - Accept agent/version, `human:`, and `process:` actor forms; reject malformed/unsafe forms without echoing values.

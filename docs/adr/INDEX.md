@@ -50,4 +50,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-044 | Propose sanitized YAML parser diagnostics for canonical frontmatter | Accepted |
 | ADR-045 | Propose a fixed remediation hint for malformed YAML frontmatter | Accepted |
 | ADR-046 | Propose a read-only scaffold preview | Accepted |
-| ADR-047 | Propose bounded OKF provenance reference and time validation | Proposed — pending independent review and owner decision |
+| ADR-047 | Propose bounded OKF provenance reference and time validation | Proposed |
