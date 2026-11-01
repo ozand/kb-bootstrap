@@ -116,7 +116,9 @@ class FederatedLookupTests(unittest.TestCase):
                 return {}, "timeout"
             return store(lesson("KB-0001", "Available", ["query"])), ""
 
-        with patch.object(MODULE, "_load_with_timeout", side_effect=bounded_load):
+        with patch.object(
+            MODULE, "_load_with_timeout", side_effect=bounded_load
+        ) as loader:
             report, valid = federated_lookup(
                 config(
                     {"name": "project", "type": "local", "path": "slow.json"},
@@ -124,7 +126,28 @@ class FederatedLookupTests(unittest.TestCase):
                 ),
                 "query", Path("."), timeout_seconds=0.02,
             )
-        self.assertTrue(valid)
+        loader_calls = [
+            {"basename": call.args[0].name, "timeout": call.args[1]}
+            for call in loader.call_args_list
+        ]
+        module_path = Path(MODULE.__file__).resolve()
+        checkout_path = Path(__file__).resolve().parents[1]
+        try:
+            module_within_checkout = module_path.relative_to(checkout_path) is not None
+        except ValueError:
+            module_within_checkout = False
+        diagnostic = (
+            f"report={report!r}; loader_calls={loader_calls!r}; "
+            f"module={{name: {MODULE.__name__!r}, file: {module_path.name!r}, "
+            f"within_checkout: {module_within_checkout}}}"
+        )
+        self.assertTrue(valid, diagnostic)
+        self.assertEqual(
+            [call["basename"] for call in loader_calls], ["slow.json", "shared.json"],
+            diagnostic,
+        )
+        self.assertEqual([call["timeout"] for call in loader_calls], [0.02, 0.02], diagnostic)
+        self.assertEqual(loader.call_count, 2, diagnostic)
         self.assertIn("store project (local): timeout", report)
         self.assertIn("[SHARED] KB-0001", report)
         self.assertIn("store writes: no", report)
