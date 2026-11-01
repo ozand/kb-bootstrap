@@ -54,7 +54,7 @@ This accepted contract permits a narrowly described offline producer while prese
 - No timestamp, identity, provenance, fidelity, or content claim is inferred; source bytes remain unchanged and no external access occurs.
 - An end-to-end synthetic test invokes the producer, then the accepted ADR-033 importer, then the existing research checker on a correctly prepared study; it verifies successful integration and collision preservation without Surf, QMD, network, or consumer data. Checker success is structural validation only, not semantic truth or completeness verification.
 
-## Test contract
+## Test Contract
 
 | Claim | Test | Status |
 |---|---|---|
