@@ -111,7 +111,7 @@ class FederatedLookupTests(unittest.TestCase):
         self.assertIn("multiple local stores are ambiguous", report)
 
     def test_timeout_isolated_from_available_store(self):
-        def guard_context(base_dir):
+        def path_observations(base_dir):
             context = []
             for name in ("slow.json", "shared.json"):
                 candidate = base_dir / name
@@ -146,7 +146,7 @@ class FederatedLookupTests(unittest.TestCase):
             return store(lesson("KB-0001", "Available", ["query"])), ""
 
         base_dir = Path(".")
-        pre_call_context = guard_context(base_dir)
+        pre_call_observations = path_observations(base_dir)
         with patch.object(
             MODULE, "_load_with_timeout", side_effect=bounded_load
         ) as loader:
@@ -163,14 +163,15 @@ class FederatedLookupTests(unittest.TestCase):
         ]
         module_path = Path(MODULE.__file__).resolve()
         checkout_path = Path(__file__).resolve().parents[1]
-        post_call_context = guard_context(base_dir) if not valid else None
+        post_call_observations = path_observations(base_dir) if not valid else None
         try:
             module_within_checkout = module_path.relative_to(checkout_path) is not None
         except ValueError:
             module_within_checkout = False
         diagnostic = (
             f"report={report!r}; loader_calls={loader_calls!r}; "
-            f"guard_context={{before: {pre_call_context!r}, after: {post_call_context!r}}}; "
+            f"path_observations={{observation_scope: 'separate_helper_not_guard_instrumentation', "
+            f"pre_call: {pre_call_observations!r}, post_call: {post_call_observations!r}}}; "
             f"module={{name: {MODULE.__name__!r}, file: {module_path.name!r}, "
             f"within_checkout: {module_within_checkout}}}"
         )
