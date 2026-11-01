@@ -53,3 +53,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-047 | Propose bounded OKF provenance reference and time validation | Accepted |
 | ADR-048 | Propose reviewed deferral of Attested Computation validation | Accepted |
 | ADR-051 | Bounded exact fragment continuity observations | Accepted |
+| ADR-052 | Propose an aggregate fragment scan-work budget | Proposed |
