@@ -52,4 +52,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-046 | Propose a read-only scaffold preview | Accepted |
 | ADR-047 | Propose bounded OKF provenance reference and time validation | Accepted |
 | ADR-048 | Propose reviewed deferral of Attested Computation validation | Accepted |
-| ADR-050 | Propose one local text source as an explicit RawCapture | Proposed |
+| ADR-050 | Produce one local text source as an explicit RawCapture | Accepted |

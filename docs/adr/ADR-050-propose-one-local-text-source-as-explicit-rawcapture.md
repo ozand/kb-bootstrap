@@ -1,8 +1,9 @@
-# ADR-050: Propose one local text source as an explicit RawCapture
+# ADR-050: Produce one local text source as an explicit RawCapture
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-06
 **Authors**: Pi coding agent
+**Accepted by**: Coordinator under owner delegation recorded in Issue #223, after independent review529 of exact proposed commit `de25575532a667cd82a7499d346752bb3662d58b` against baseline `7499f3761a8b746ef29ac9c5ef72b421fb53f61b`
 **Supersedes**: None
 **Related**: Issue #125; ADR-024, ADR-027, ADR-029, ADR-030, ADR-033
 
@@ -18,7 +19,7 @@ A caller-supplied local text/Markdown body needs a narrow, offline route into th
 
 ## Decision
 
-If separately accepted, add one standard-library-only packaged script, adjacent to the market-research scripts, that reads one explicitly selected local UTF-8 text/Markdown file and creates one caller-named RawCapture under an explicitly selected existing study's `raw/` directory. The output must satisfy ADR-033's existing RawCapture grammar and 64 MiB bound, so the already accepted importer and research checker can consume it. The producer is not a general Markdown parser or a replacement for Surf.
+Add one standard-library-only packaged script, adjacent to the market-research scripts, that reads one explicitly selected local UTF-8 text/Markdown file and creates one caller-named RawCapture under an explicitly selected existing study's `raw/` directory. The output must satisfy ADR-033's existing RawCapture grammar and 64 MiB bound, so the already accepted importer and research checker can consume it. The producer is not a general Markdown parser or a replacement for Surf. This technical acceptance records the bounded contract only; implementation remains a separate task requiring its own authorization and review.
 
 1. **Explicit inputs and metadata.** The caller supplies an input root and relative source path, existing study root, exact absent destination basename `NNN-<slug>.md`, and every RawCapture field: non-empty one-line `title`, non-empty one-line `url`/source reference, an explicitly entered offset-aware ISO `captured_at`, non-empty one-line `captured_by`, one-line `entity` (which may be empty), and `fidelity` exactly `full`, `partial`, or `blocked`. The accepted RawCapture format requires `captured_at`; there is no `unknown` sentinel in this proposal, so a caller without a defensible timestamp must not invoke the producer. A caller may enter a local reference such as a repository-relative label for `url`; the tool does not validate that it identifies an origin. These are caller assertions copied into the output, not authenticated facts. No current-time, file-mtime, path-name, title, identity, entity, fidelity, completeness, or provenance defaults/inference are allowed. Missing/invalid metadata blocks before publication. The tool creates no ADR-024 envelope, source identity, revision, or corroboration claim.
 2. **Input bytes and fidelity.** Input is one regular, non-symlinked file selected by relative path beneath an explicit existing input root, at most 64 MiB. Read bytes once; decode strictly as UTF-8 for validation, reject invalid UTF-8 and a leading UTF-8 BOM (do not strip it), and never Unicode-normalize, replacement-decode, or rewrite the body. Preserve every body byte, including CRLF, bare CR, LF, and absence/presence of final newline. Output consists of producer-generated RawCapture frontmatter encoded as UTF-8 with fixed LF delimiters, immediately followed by the original body bytes. Thus the body bytes are exact; the whole output is not byte-identical to the input and does not satisfy ADR-024 `exact` representation semantics merely by preserving the body. Reject Unicode category `Cc` characters except horizontal tab (U+0009), LF (U+000A), and CR (U+000D); therefore NUL, DEL and C1 controls block, while Markdown line endings remain byte-preserved. Total emitted file size, including header, must not exceed 64 MiB.
@@ -30,7 +31,7 @@ Before publication, apply the ADR-033 constraints needed for the produced RawCap
 
 ## What this is not
 
-This is not arbitrary Markdown acceptance, a general importer, source-capture envelope, verified source record, URL fetch, adapter/plugin framework, study/report generator, timestamp service, text normalizer, attachment copier, link rewriter, or evidence of truth, authorship, permission, completeness, screenshot provenance, or external-byte fidelity. It does not alter `capture_page.py`, importer behavior, RawCapture schema, or existing accepted ADRs. A limitation of the existing contract remains: RawCapture requires a capture timestamp, and this producer cannot truthfully represent an unknown timestamp. A future choice to add an explicit unknown timestamp form needs a separate contract decision; do not silently invent a time. Acceptance of this proposal alone does not authorize implementation; implementation and the ADR's acceptance require independent review under the delegated #125 architecture/technical acceptance authority.
+This is not arbitrary Markdown acceptance, a general importer, source-capture envelope, verified source record, URL fetch, adapter/plugin framework, study/report generator, timestamp service, text normalizer, attachment copier, link rewriter, or evidence of truth, authorship, permission, completeness, screenshot provenance, or external-byte fidelity. It does not alter `capture_page.py`, importer behavior, RawCapture schema, or existing accepted ADRs. A limitation of the existing contract remains: RawCapture requires a capture timestamp, and this producer cannot truthfully represent an unknown timestamp. A future choice to add an explicit unknown timestamp form needs a separate contract decision; do not silently invent a time. This acceptance does not itself authorize implementation; implementation remains a separate task under the delegated #125 architecture/technical acceptance authority.
 
 ## Alternatives considered
 
@@ -63,7 +64,7 @@ No tests are added by this documentation-only proposal and no runtime behavior i
 
 ## Rollback
 
-Before acceptance, withdraw this proposal without runtime effect. If accepted and later implemented, revert only the producer operation/tests; never delete or rewrite generated RawCapture files. Existing RawCapture/importer contracts remain authoritative unless a separately accepted ADR explicitly supersedes them.
+Before acceptance, this proposal could have been withdrawn without runtime effect. If later implemented, revert only the producer operation/tests; never delete or rewrite generated RawCapture files. Existing RawCapture/importer contracts remain authoritative unless a separately accepted ADR explicitly supersedes them.
 
 ## References
 
