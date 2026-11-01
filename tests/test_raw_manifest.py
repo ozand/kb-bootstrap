@@ -124,7 +124,11 @@ class RawManifestTests(unittest.TestCase):
             actual_open = module.os.open
             hook_calls = [0]
             def swap(path, flags, *args, **kwargs):
-                if Path(path) == source:
+                try:
+                    matches_source = os.path.samefile(path, source)
+                except (OSError, TypeError, ValueError):
+                    matches_source = False
+                if matches_source:
                     hook_calls[0] += 1
                     source.unlink()
                     source.symlink_to(external)
@@ -140,6 +144,7 @@ class RawManifestTests(unittest.TestCase):
                 f"O_BINARY={bool(getattr(os, 'O_BINARY', 0))}, "
                 f"replacement_hook_calls={hook_calls[0]}, report={report!r}"
             )
+            self.assertEqual(hook_calls[0], 1, diagnostic)
             self.assertFalse(valid, diagnostic)
             self.assertIn("RESULT: BLOCKED", report)
             self.assertNotIn(str(external), report)
@@ -155,7 +160,11 @@ class RawManifestTests(unittest.TestCase):
             actual_open = module.os.open
             hook_calls = [0]
             def replace(path, flags, *args, **kwargs):
-                if Path(path) == prior:
+                try:
+                    matches_prior = os.path.samefile(path, prior)
+                except (OSError, TypeError, ValueError):
+                    matches_prior = False
+                if matches_prior:
                     hook_calls[0] += 1
                     prior.write_bytes(prior.read_bytes().replace(b"inside", b"inside"))
                     # Force a distinct inode with otherwise valid, same-sized JSON.
@@ -171,6 +180,7 @@ class RawManifestTests(unittest.TestCase):
                 f"O_BINARY={bool(getattr(os, 'O_BINARY', 0))}, "
                 f"replacement_hook_calls={hook_calls[0]}, report={report!r}"
             )
+            self.assertEqual(hook_calls[0], 1, diagnostic)
             self.assertFalse(valid, diagnostic)
             self.assertIn("RESULT: BLOCKED", report)
             self.assertFalse((root / "next.json").exists())
