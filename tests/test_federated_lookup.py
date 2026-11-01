@@ -111,11 +111,42 @@ class FederatedLookupTests(unittest.TestCase):
         self.assertIn("multiple local stores are ambiguous", report)
 
     def test_timeout_isolated_from_available_store(self):
+        def guard_context(base_dir):
+            context = []
+            for name in ("slow.json", "shared.json"):
+                candidate = base_dir / name
+                try:
+                    resolved_base = base_dir.resolve()
+                    resolved_candidate = candidate.resolve()
+                    try:
+                        relative = resolved_candidate.relative_to(resolved_base)
+                        relative_parts = (name,) if relative.parts == (name,) else ("unexpected-relative",)
+                    except ValueError:
+                        relative_parts = ("not-relative",)
+                    context.append({
+                        "candidate": name,
+                        "resolve_succeeded": True,
+                        "same_root": (resolved_candidate.drive, resolved_candidate.root)
+                        == (resolved_base.drive, resolved_base.root),
+                        "relative_parts": relative_parts,
+                    })
+                except Exception as error:
+                    safe_types = {"OSError", "RuntimeError", "ValueError"}
+                    error_type = type(error).__name__
+                    context.append({
+                        "candidate": name,
+                        "resolve_succeeded": False,
+                        "exception_type": error_type if error_type in safe_types else "other",
+                    })
+            return context
+
         def bounded_load(path, _timeout):
             if path.name == "slow.json":
                 return {}, "timeout"
             return store(lesson("KB-0001", "Available", ["query"])), ""
 
+        base_dir = Path(".")
+        pre_call_context = guard_context(base_dir)
         with patch.object(
             MODULE, "_load_with_timeout", side_effect=bounded_load
         ) as loader:
@@ -124,7 +155,7 @@ class FederatedLookupTests(unittest.TestCase):
                     {"name": "project", "type": "local", "path": "slow.json"},
                     {"name": "workspace", "type": "shared", "path": "shared.json"},
                 ),
-                "query", Path("."), timeout_seconds=0.02,
+                "query", base_dir, timeout_seconds=0.02,
             )
         loader_calls = [
             {"basename": call.args[0].name, "timeout": call.args[1]}
@@ -132,12 +163,14 @@ class FederatedLookupTests(unittest.TestCase):
         ]
         module_path = Path(MODULE.__file__).resolve()
         checkout_path = Path(__file__).resolve().parents[1]
+        post_call_context = guard_context(base_dir) if not valid else None
         try:
             module_within_checkout = module_path.relative_to(checkout_path) is not None
         except ValueError:
             module_within_checkout = False
         diagnostic = (
             f"report={report!r}; loader_calls={loader_calls!r}; "
+            f"guard_context={{before: {pre_call_context!r}, after: {post_call_context!r}}}; "
             f"module={{name: {MODULE.__name__!r}, file: {module_path.name!r}, "
             f"within_checkout: {module_within_checkout}}}"
         )
