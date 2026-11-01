@@ -1,10 +1,12 @@
-# ADR-052: Propose an aggregate fragment scan-work budget
+# ADR-052: Bound aggregate fragment scan work
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-01
 **Authors**: Pi coding agent
 **Supersedes**: ADR-051 (only its aggregate fragment scan-work limit and exhaustion behavior)
 **Related**: Issue #128; ADR-024, ADR-026, ADR-031, ADR-035, ADR-036, ADR-042, ADR-051
+
+Technical acceptance: the coordinator accepts this narrowly scoped decision under the owner's standing delegation recorded in [AGENTS.md](../../AGENTS.md), authorized by Issue #223. Independent review a5e passed proposed source `913be2599f4e2ce0408c2e2666dc1e6a89191f8b` against baseline `7499f3761a8b746ef29ac9c5ef72b421fb53f61b`. This combined PR revision reconciles that separately reviewed proposal with the already accepted ADR-051 lifecycle in one index change; it does not rewrite ADR-051's normative decision. ADR-051 is superseded only for aggregate scan-work budgeting/exhaustion; its other accepted provisions remain in force. Acceptance authorizes no runtime implementation before independent review of this combined exact source.
 
 ## Context
 
@@ -14,7 +16,7 @@ This gap was found by exact PR #266 review finding [4436839789](https://github.c
 
 ## Decision
 
-If accepted, supersede only ADR-051's aggregate scan-work limit/exhaustion clauses with the following bound; all other ADR-051 decisions, API, result shapes, revision rules, privacy/safety guards, and ADR-036/042 compatibility remain unchanged.
+This ADR supersedes only ADR-051's aggregate scan-work limit/exhaustion clauses with the following bound; all other ADR-051 decisions, API, result shapes, revision rules, privacy/safety guards, and ADR-036/042 compatibility remain unchanged.
 
 Bound preparation as well as KMP search. A continuity invocation accepts at most the existing 999 fragment-bearing references. For baseline line extraction, group locators by the exact validated baseline representation snapshot identity and scan each distinct baseline snapshot at most once to locate requested line ranges. Sort that snapshot's at-most-999 bounded line-range descriptors by start line, end line, then ADR-036 report order; stream line boundaries once and extract requested ranges without scanning the full representation per locator or retaining a whole-file line-offset index. Descriptor and active-range memory is bounded by 999 locators and the 64 KiB per-fragment/64 MiB aggregate extracted-byte caps. Cap the sum of distinct baseline snapshot bytes traversed at the existing ADR-031 selected-byte ceiling of **256 MiB**; cap total extracted fragment/pattern bytes at **64 MiB**. The existing 999-reference ceiling and 64 KiB per-fragment ceiling imply a maximum of 65,470,464 extracted bytes, below this aggregate cap. If either cap would be exceeded, return the deterministic blocked result below before producing any observations. The extracted fragments and per-reference metadata are temporary, bounded to those ceilings, and discarded when the call returns.
 
@@ -43,7 +45,7 @@ These are proposed synthetic tests, not implemented tests or runtime guarantees.
 
 ## Rollback
 
-Before acceptance, withdraw this proposal; ADR-051 remains as recorded, with its scan-work gap explicitly unresolved. If accepted, this ADR supersedes only its stated scan budget/exhaustion clauses. No binding, report, snapshot, or consumer data migration/deletion is authorized.
+This decision supersedes only ADR-051's stated scan budget/exhaustion clauses. No binding, report, snapshot, or consumer data migration/deletion is authorized.
 
 ## References
 

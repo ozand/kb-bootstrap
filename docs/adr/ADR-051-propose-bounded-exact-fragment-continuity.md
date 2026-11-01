@@ -1,6 +1,6 @@
 # ADR-051: Bounded exact fragment continuity observations
 
-**Status**: Accepted
+**Status**: Superseded by ADR-052
 **Date**: 2026-11-01
 **Authors**: Pi coding agent
 **Supersedes**: None
