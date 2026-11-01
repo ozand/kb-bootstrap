@@ -1,5 +1,6 @@
 """Verify built distributions preserve tracked templates and run outside the checkout."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -48,6 +49,24 @@ def _run(command, *, cwd, env=None, timeout=COMMAND_TIMEOUT, on_timeout=None, ch
             f"Command failed ({exc.returncode}): {command[0]}\n"
             f"stdout: {exc.stdout[-4000:]}\nstderr: {exc.stderr[-4000:]}"
         ) from exc
+
+
+def _backend_metadata(python):
+    query = (
+        "import importlib.metadata as m, json, pathlib, sys\n"
+        "try:\n"
+        " d=m.distribution('setuptools'); record={'version': d.version, 'origin': str(pathlib.Path(d.locate_file('')).resolve())}\n"
+        "except m.PackageNotFoundError:\n"
+        " record=None\n"
+        "print(json.dumps({'python': sys.executable, 'prefix': sys.prefix, 'setuptools': record}))\n"
+    )
+    try:
+        return json.loads(subprocess.run(
+            [str(python), "-c", query], check=True, capture_output=True,
+            text=True, timeout=COMMAND_TIMEOUT,
+        ).stdout)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        return {"query_error": str(exc)}
 
 
 def _tracked_templates():
@@ -207,15 +226,73 @@ class InstalledDistributionTests(unittest.TestCase):
             lambda: None if preserve_temp else shutil.rmtree(temp_root, ignore_errors=True)
         )
         environment = temp_root / "venv"
-        venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
+        venv.EnvBuilder(with_pip=False, system_site_packages=True).create(environment)
         scripts = environment / ("Scripts" if os.name == "nt" else "bin")
         python = scripts / ("python.exe" if os.name == "nt" else "python")
         cli = scripts / ("kb-bootstrap.exe" if os.name == "nt" else "kb-bootstrap")
-        _run(
+        host_backend = _backend_metadata(sys.executable)
+        venv_backend = _backend_metadata(python)
+        install_result = _run(
             [str(python), "-m", "pip", "install", "--force-reinstall", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)],
             cwd=temp_root,
             on_timeout=lambda: preserve_temp.append(True),
         )
+        if not cli.is_file():
+            metadata_script = (
+                "import importlib.metadata as m, json, pathlib, sys\n"
+                "prefix = pathlib.Path(sys.prefix).resolve()\n"
+                "def origin(path):\n"
+                " p = pathlib.Path(path).resolve()\n"
+                " try: return 'venv:' + p.relative_to(prefix).as_posix()\n"
+                " except ValueError: return 'outside-venv'\n"
+                "matches = []\n"
+                "for dist in m.distributions():\n"
+                " name = dist.metadata.get('Name', '')\n"
+                " if name.lower().replace('_', '-').replace('.', '-') == 'kb-bootstrap':\n"
+                "  matches.append({'version': dist.version, 'origin': origin(dist.locate_file('')), 'entry_points': [{'group': ep.group, 'name': ep.name, 'value': ep.value} for ep in dist.entry_points]})\n"
+                "scripts = pathlib.Path(sys.executable).parent\n"
+                "print(json.dumps({'executable': origin(sys.executable), 'prefix': origin(sys.prefix), 'distributions': matches, 'expected_script_exists': (scripts / ('kb-bootstrap.exe' if sys.platform == 'win32' else 'kb-bootstrap')).is_file(), 'matching_scripts': sorted(p.name for p in scripts.glob('kb*') if p.is_file())}, sort_keys=True))\n"
+            )
+            try:
+                metadata_result = _run(
+                    [str(python), "-c", metadata_script], cwd=temp_root
+                )
+                metadata_output = metadata_result.stdout[-4000:]
+            except AssertionError as exc:
+                metadata_output = f"metadata query failed: {str(exc)[-1000:]}"
+            pip_stdout = install_result.stdout[-4000:]
+            pip_stderr = install_result.stderr[-4000:]
+            for path in (str(temp_root), str(ROOT)):
+                pip_stdout = pip_stdout.replace(path, "<local-path>")
+                pip_stderr = pip_stderr.replace(path, "<local-path>")
+            self.fail(
+                f"Installed {kind} has no expected console script; diagnostic only, cause undetermined.\n"
+                f"build backend host/venv before install: {host_backend} / {venv_backend}\n"
+                f"pip stdout (last 4000 chars): {pip_stdout}\n"
+                f"pip stderr (last 4000 chars): {pip_stderr}\n"
+                f"venv metadata (last 4000 chars): {metadata_output}"
+            )
+        metadata_script = (
+            "import importlib.metadata as m, json, pathlib, sys\n"
+            "prefix = pathlib.Path(sys.prefix).resolve()\n"
+            "def origin(path):\n"
+            " p = pathlib.Path(path).resolve()\n"
+            " try: return 'venv:' + p.relative_to(prefix).as_posix()\n"
+            " except ValueError: return 'outside-venv'\n"
+            "matches = [d for d in m.distributions() if d.metadata.get('Name', '').lower().replace('_', '-').replace('.', '-') == 'kb-bootstrap' and origin(d.locate_file('')).startswith('venv:')]\n"
+            "print(json.dumps({'executable': origin(sys.executable), 'prefix': origin(sys.prefix), 'distributions': [{'version': d.version, 'origin': origin(d.locate_file('')), 'entry_points': [{'group': ep.group, 'name': ep.name, 'value': ep.value} for ep in d.entry_points]} for d in matches], 'expected_script_exists': (pathlib.Path(sys.executable).parent / ('kb-bootstrap.exe' if sys.platform == 'win32' else 'kb-bootstrap')).is_file()}, sort_keys=True))\n"
+        )
+        metadata_output = _run([str(python), "-c", metadata_script], cwd=temp_root).stdout.strip()
+        metadata = json.loads(metadata_output)
+        self.assertEqual(metadata["prefix"], "venv:.")
+        self.assertTrue(metadata["executable"].startswith("venv:"), metadata_output)
+        distributions = metadata["distributions"]
+        self.assertEqual(len(distributions), 1, f"backend host/venv: {host_backend} / {venv_backend}; metadata: {metadata_output}")
+        distribution = distributions[0]
+        self.assertEqual(distribution["version"], "0.4.0", f"backend host/venv: {host_backend} / {venv_backend}")
+        self.assertTrue(distribution["origin"].startswith("venv:"), f"backend host/venv: {host_backend} / {venv_backend}; metadata: {metadata_output}")
+        self.assertEqual(distribution["entry_points"], [{"group": "console_scripts", "name": "kb-bootstrap", "value": "kb_bootstrap.cli:main"}])
+        self.assertTrue(metadata["expected_script_exists"], f"backend host/venv: {host_backend} / {venv_backend}; metadata: {metadata_output}")
         outside = temp_root / "outside-source"
         outside.mkdir()
         target = outside / "synthetic-project"

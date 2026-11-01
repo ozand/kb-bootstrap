@@ -31,6 +31,17 @@ from .gliner_inspect import inspect_gliner_environment
 from .gliner_checkpoint import verify_checkpoint
 from .agents_governance import update_agents_file
 from .scaffold_repeat import preflight as scaffold_preflight
+
+
+def _print_init_path_message(message: str, stream=None) -> None:
+    """Print human-facing init paths safely without changing the filesystem path."""
+    stream = sys.stdout if stream is None else stream
+    encoding = stream.encoding or "utf-8"
+    try:
+        message.encode(encoding)
+    except UnicodeEncodeError:
+        message = message.encode(encoding, errors="backslashreplace").decode(encoding)
+    print(message, file=stream)
 from . import __version__
 
 def create_dirs(base_path: Path, dirs: list):
@@ -634,7 +645,7 @@ def main():
         print(guard_report)
         return 0
     target = Path(os.path.abspath(os.fspath(target)))
-    print(f"Initializing {args.type} Knowledge Base in {target}...")
+    _print_init_path_message(f"Initializing {args.type} Knowledge Base in {target}...")
     try:
         # Create the always-available read-only and wiki skill directories.
         create_dirs(target, [
@@ -731,7 +742,7 @@ def main():
             print("Enabled project-local lessons: kb/lessons/, lesson-stores.json")
             installed_skills += ", plus kb-capture"
 
-        print(f"Success! Agent skills {installed_skills} installed to {target / '.agents/skills/'}")
+        _print_init_path_message(f"Success! Agent skills {installed_skills} installed to {target / '.agents/skills/'}")
     except (OSError, UnicodeError):
         print("RESULT: BLOCKED (first initialization incomplete; owned files may remain; inspect managed paths before retry)")
         return 1

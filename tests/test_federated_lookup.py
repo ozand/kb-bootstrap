@@ -111,23 +111,92 @@ class FederatedLookupTests(unittest.TestCase):
         self.assertIn("multiple local stores are ambiguous", report)
 
     def test_timeout_isolated_from_available_store(self):
+        def path_observations(base_dir):
+            context = []
+            for name in ("slow.json", "shared.json"):
+                candidate = base_dir / name
+                try:
+                    resolved_base = base_dir.resolve()
+                    resolved_candidate = candidate.resolve()
+                    try:
+                        relative = resolved_candidate.relative_to(resolved_base)
+                        relative_parts = (name,) if relative.parts == (name,) else ("not-relative",)
+                    except ValueError:
+                        relative_parts = ("not-relative",)
+                    context.append({
+                        "candidate": name,
+                        "base_exists": resolved_base.exists(),
+                        "candidate_exists": resolved_candidate.exists(),
+                        "resolve_succeeded": True,
+                        "same_root": (resolved_candidate.drive, resolved_candidate.root)
+                        == (resolved_base.drive, resolved_base.root),
+                        "relative_parts": relative_parts,
+                    })
+                except Exception as error:
+                    safe_types = {"OSError", "RuntimeError", "ValueError"}
+                    error_type = type(error).__name__
+                    context.append({
+                        "candidate": name,
+                        "resolve_succeeded": False,
+                        "exception_type": error_type if error_type in safe_types else "other",
+                    })
+            return context
+
         def bounded_load(path, _timeout):
             if path.name == "slow.json":
                 return {}, "timeout"
             return store(lesson("KB-0001", "Available", ["query"])), ""
 
-        with patch.object(MODULE, "_load_with_timeout", side_effect=bounded_load):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        base_dir = Path(directory.name).resolve()
+        self.write_store(base_dir, "slow.json", store(lesson("PROJECT-0001", "Slow", ["query"])))
+        self.write_store(base_dir, "shared.json", store(lesson("KB-0001", "Shared", ["query"])))
+        before_bytes = {name: (base_dir / name).read_bytes() for name in ("slow.json", "shared.json")}
+        before_entries = sorted(path.name for path in base_dir.iterdir())
+        pre_call_observations = path_observations(base_dir)
+        with patch.object(
+            MODULE, "_load_with_timeout", side_effect=bounded_load
+        ) as loader:
             report, valid = federated_lookup(
                 config(
                     {"name": "project", "type": "local", "path": "slow.json"},
                     {"name": "workspace", "type": "shared", "path": "shared.json"},
                 ),
-                "query", Path("."), timeout_seconds=0.02,
+                "query", base_dir, timeout_seconds=0.02,
             )
-        self.assertTrue(valid)
+        loader_calls = [
+            {"basename": call.args[0].name, "timeout": call.args[1]}
+            for call in loader.call_args_list
+        ]
+        module_path = Path(MODULE.__file__).resolve()
+        checkout_path = Path(__file__).resolve().parents[1]
+        post_call_observations = path_observations(base_dir) if not valid else None
+        after_bytes = {name: (base_dir / name).read_bytes() for name in ("slow.json", "shared.json")}
+        after_entries = sorted(path.name for path in base_dir.iterdir())
+        try:
+            module_within_checkout = module_path.relative_to(checkout_path) is not None
+        except ValueError:
+            module_within_checkout = False
+        diagnostic = (
+            f"report={report!r}; loader_calls={loader_calls!r}; "
+            f"path_observations={{observation_scope: 'separate_helper_not_guard_instrumentation', "
+            f"pre_call: {pre_call_observations!r}, post_call: {post_call_observations!r}}}; "
+            f"module={{name: {MODULE.__name__!r}, file: {module_path.name!r}, "
+            f"within_checkout: {module_within_checkout}}}"
+        )
+        self.assertTrue(valid, diagnostic)
+        self.assertEqual(
+            [call["basename"] for call in loader_calls], ["slow.json", "shared.json"],
+            diagnostic,
+        )
+        self.assertEqual([call["timeout"] for call in loader_calls], [0.02, 0.02], diagnostic)
+        self.assertEqual(loader.call_count, 2, diagnostic)
         self.assertIn("store project (local): timeout", report)
         self.assertIn("[SHARED] KB-0001", report)
         self.assertIn("store writes: no", report)
+        self.assertEqual(after_bytes, before_bytes)
+        self.assertEqual(after_entries, before_entries)
 
     def test_path_traversal_and_absolute_paths_block(self):
         for path in ("../private.json", "C:/private.json"):

@@ -8,10 +8,29 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kb_bootstrap.cli import main
+from kb_bootstrap.cli import main, _print_init_path_message
 
 
 class CliTests(unittest.TestCase):
+    def test_init_path_message_preserves_encodable_output_and_escapes_cp1252(self):
+        import io
+
+        cp1252 = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        _print_init_path_message("Initializing in C:/café", cp1252)
+        cp1252.flush()
+        self.assertEqual(cp1252.buffer.getvalue(), ("Initializing in C:/café" + os.linesep).encode("cp1252"))
+
+        utf8 = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        message = "Initializing in C:/東京"
+        _print_init_path_message(message, utf8)
+        utf8.flush()
+        self.assertEqual(utf8.buffer.getvalue(), (message + os.linesep).encode("utf-8"))
+
+        cp1252_escape = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        _print_init_path_message("Initializing in C:/東京", cp1252_escape)
+        cp1252_escape.flush()
+        self.assertEqual(cp1252_escape.buffer.getvalue(), ("Initializing in C:/\\u6771\\u4eac" + os.linesep).encode("cp1252"))
+
     def run_cli(self, *args):
         with patch.object(sys, "argv", ["kb-bootstrap", *args]):
             return main()

@@ -310,21 +310,31 @@ class ScaffoldRepeatTests(unittest.TestCase):
     def test_reparse_lesson_artifact_blocks_before_registry_read(self):
         from kb_bootstrap.project_lesson_enablement import inspect_project_lessons
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / "consumer"
+            root = Path(tmp).resolve() / "consumer"
             self.assertIsNone(self.run_cli("--target", str(root), "--with-project-lessons"))
             module = __import__("kb_bootstrap.project_lesson_enablement", fromlist=["os"])
             real_lstat = module.os.lstat
+            lesson_root = root / "kb/lessons"
+            hook_hits = 0
+            matched_paths = []
+
             def reparse_lstat(path):
+                nonlocal hook_hits
                 details = real_lstat(path)
-                if Path(path) == root / "kb/lessons":
+                if Path(path) == lesson_root:
+                    hook_hits += 1
+                    matched_paths.append(Path(path))
                     from types import SimpleNamespace
                     details = SimpleNamespace(**{name: getattr(details, name) for name in dir(details)
                                                  if name.startswith("st_")})
                     details.st_file_attributes = 0x400
                 return details
+
             with patch.object(module.os, "lstat", side_effect=reparse_lstat), \
                  patch("kb_bootstrap.project_lesson_enablement.validate_project_registry", side_effect=AssertionError("must not read")):
                 state, _ = inspect_project_lessons(root, self.package, require_initialized=False)
+            self.assertGreaterEqual(hook_hits, 1, "reparse metadata injection hook did not match")
+            self.assertTrue(all(path == lesson_root for path in matched_paths))
             self.assertEqual(state, "blocked")
 
     def test_lesson_diagnostic_does_not_echo_malicious_id(self):
