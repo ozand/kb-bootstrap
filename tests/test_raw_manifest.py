@@ -122,8 +122,10 @@ class RawManifestTests(unittest.TestCase):
             external = Path(outside) / "private"
             external.write_bytes(b"outside")
             actual_open = module.os.open
+            hook_calls = [0]
             def swap(path, flags, *args, **kwargs):
                 if Path(path) == source:
+                    hook_calls[0] += 1
                     source.unlink()
                     source.symlink_to(external)
                 return actual_open(path, flags, *args, **kwargs)
@@ -132,7 +134,13 @@ class RawManifestTests(unittest.TestCase):
                     report, valid = module.write_raw_manifest(root, "kb/raw", "out.json")
             except (OSError, NotImplementedError):
                 self.skipTest("symlink creation unavailable")
-            self.assertFalse(valid)
+            diagnostic = (
+                f"synthetic replacement diagnostic: os.name={os.name!r}, "
+                f"O_NOFOLLOW={bool(getattr(os, 'O_NOFOLLOW', 0))}, "
+                f"O_BINARY={bool(getattr(os, 'O_BINARY', 0))}, "
+                f"replacement_hook_calls={hook_calls[0]}, report={report!r}"
+            )
+            self.assertFalse(valid, diagnostic)
             self.assertIn("RESULT: BLOCKED", report)
             self.assertNotIn(str(external), report)
             self.assertFalse((root / "out.json").exists())
@@ -145,8 +153,10 @@ class RawManifestTests(unittest.TestCase):
             self.assertTrue(valid)
             prior = root / "prior.json"
             actual_open = module.os.open
+            hook_calls = [0]
             def replace(path, flags, *args, **kwargs):
                 if Path(path) == prior:
+                    hook_calls[0] += 1
                     prior.write_bytes(prior.read_bytes().replace(b"inside", b"inside"))
                     # Force a distinct inode with otherwise valid, same-sized JSON.
                     moved = root / "old-prior"
@@ -155,7 +165,13 @@ class RawManifestTests(unittest.TestCase):
                 return actual_open(path, flags, *args, **kwargs)
             with patch.object(module.os, "open", side_effect=replace):
                 report, valid = module.write_raw_manifest(root, "kb/raw", "next.json", "prior.json")
-            self.assertFalse(valid)
+            diagnostic = (
+                f"synthetic replacement diagnostic: os.name={os.name!r}, "
+                f"O_NOFOLLOW={bool(getattr(os, 'O_NOFOLLOW', 0))}, "
+                f"O_BINARY={bool(getattr(os, 'O_BINARY', 0))}, "
+                f"replacement_hook_calls={hook_calls[0]}, report={report!r}"
+            )
+            self.assertFalse(valid, diagnostic)
             self.assertIn("RESULT: BLOCKED", report)
             self.assertFalse((root / "next.json").exists())
 
