@@ -120,13 +120,13 @@ class FederatedLookupTests(unittest.TestCase):
                     resolved_candidate = candidate.resolve()
                     try:
                         relative = resolved_candidate.relative_to(resolved_base)
-                        relative_parts = (name,) if relative.parts == (name,) else ("unexpected-relative",)
+                        relative_parts = (name,) if relative.parts == (name,) else ("not-relative",)
                     except ValueError:
                         relative_parts = ("not-relative",)
                     context.append({
-                        "candidate": str(candidate),
-                        "resolved_base": str(resolved_base),
-                        "resolved_candidate": str(resolved_candidate),
+                        "candidate": name,
+                        "base_exists": resolved_base.exists(),
+                        "candidate_exists": resolved_candidate.exists(),
                         "resolve_succeeded": True,
                         "same_root": (resolved_candidate.drive, resolved_candidate.root)
                         == (resolved_base.drive, resolved_base.root),
