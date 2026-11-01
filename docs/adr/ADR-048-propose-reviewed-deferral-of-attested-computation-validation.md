@@ -1,6 +1,6 @@
 # ADR-048: Propose reviewed deferral of Attested Computation validation
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-05
 **Authors**: Pi coding agent
 **Supersedes**: None
