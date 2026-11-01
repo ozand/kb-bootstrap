@@ -124,7 +124,9 @@ class FederatedLookupTests(unittest.TestCase):
                     except ValueError:
                         relative_parts = ("not-relative",)
                     context.append({
-                        "candidate": name,
+                        "candidate": str(candidate),
+                        "resolved_base": str(resolved_base),
+                        "resolved_candidate": str(resolved_candidate),
                         "resolve_succeeded": True,
                         "same_root": (resolved_candidate.drive, resolved_candidate.root)
                         == (resolved_base.drive, resolved_base.root),
@@ -145,7 +147,13 @@ class FederatedLookupTests(unittest.TestCase):
                 return {}, "timeout"
             return store(lesson("KB-0001", "Available", ["query"])), ""
 
-        base_dir = Path(".")
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        base_dir = Path(directory.name).resolve()
+        self.write_store(base_dir, "slow.json", store(lesson("PROJECT-0001", "Slow", ["query"])))
+        self.write_store(base_dir, "shared.json", store(lesson("KB-0001", "Shared", ["query"])))
+        before_bytes = {name: (base_dir / name).read_bytes() for name in ("slow.json", "shared.json")}
+        before_entries = sorted(path.name for path in base_dir.iterdir())
         pre_call_observations = path_observations(base_dir)
         with patch.object(
             MODULE, "_load_with_timeout", side_effect=bounded_load
@@ -164,6 +172,8 @@ class FederatedLookupTests(unittest.TestCase):
         module_path = Path(MODULE.__file__).resolve()
         checkout_path = Path(__file__).resolve().parents[1]
         post_call_observations = path_observations(base_dir) if not valid else None
+        after_bytes = {name: (base_dir / name).read_bytes() for name in ("slow.json", "shared.json")}
+        after_entries = sorted(path.name for path in base_dir.iterdir())
         try:
             module_within_checkout = module_path.relative_to(checkout_path) is not None
         except ValueError:
@@ -185,6 +195,8 @@ class FederatedLookupTests(unittest.TestCase):
         self.assertIn("store project (local): timeout", report)
         self.assertIn("[SHARED] KB-0001", report)
         self.assertIn("store writes: no", report)
+        self.assertEqual(after_bytes, before_bytes)
+        self.assertEqual(after_entries, before_entries)
 
     def test_path_traversal_and_absolute_paths_block(self):
         for path in ("../private.json", "C:/private.json"):
