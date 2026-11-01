@@ -1,10 +1,12 @@
-# ADR-051: Propose bounded exact fragment continuity observations
+# ADR-051: Bounded exact fragment continuity observations
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-01
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #128; ADR-024, ADR-026, ADR-031, ADR-035, ADR-036, ADR-040, ADR-042
+
+Technical acceptance: the coordinator accepts this narrowly scoped architecture decision under the owner's standing delegation recorded in [AGENTS.md](../../AGENTS.md), authorized by Issue #223. Independent exact-head review 698 passed source commit `91b55c0c525ff5e6454981de0004797855ed5a22` against baseline `7499f3761a8b746ef29ac9c5ef72b421fb53f61b`. This status applies only to the reviewed ADR-051 decision text. It authorizes no implementation before a separate independent review of the acceptance delta and no issue closure, rollout, or consumer operation.
 
 ## Context
 
