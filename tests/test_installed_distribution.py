@@ -211,11 +211,45 @@ class InstalledDistributionTests(unittest.TestCase):
         scripts = environment / ("Scripts" if os.name == "nt" else "bin")
         python = scripts / ("python.exe" if os.name == "nt" else "python")
         cli = scripts / ("kb-bootstrap.exe" if os.name == "nt" else "kb-bootstrap")
-        _run(
+        install_result = _run(
             [str(python), "-m", "pip", "install", "--force-reinstall", "--no-deps", "--no-index", "--no-build-isolation", str(artifact)],
             cwd=temp_root,
             on_timeout=lambda: preserve_temp.append(True),
         )
+        if not cli.is_file():
+            metadata_script = (
+                "import importlib.metadata as m, json, pathlib, sys\n"
+                "prefix = pathlib.Path(sys.prefix).resolve()\n"
+                "def origin(path):\n"
+                " p = pathlib.Path(path).resolve()\n"
+                " try: return 'venv:' + p.relative_to(prefix).as_posix()\n"
+                " except ValueError: return 'outside-venv'\n"
+                "matches = []\n"
+                "for dist in m.distributions():\n"
+                " name = dist.metadata.get('Name', '')\n"
+                " if name.lower().replace('_', '-').replace('.', '-') == 'kb-bootstrap':\n"
+                "  matches.append({'version': dist.version, 'origin': origin(dist.locate_file('')), 'entry_points': [{'group': ep.group, 'name': ep.name, 'value': ep.value} for ep in dist.entry_points]})\n"
+                "scripts = pathlib.Path(sys.executable).parent\n"
+                "print(json.dumps({'executable': origin(sys.executable), 'prefix': origin(sys.prefix), 'distributions': matches, 'expected_script_exists': (scripts / ('kb-bootstrap.exe' if sys.platform == 'win32' else 'kb-bootstrap')).is_file(), 'matching_scripts': sorted(p.name for p in scripts.glob('kb*') if p.is_file())}, sort_keys=True))\n"
+            )
+            try:
+                metadata_result = _run(
+                    [str(python), "-c", metadata_script], cwd=temp_root
+                )
+                metadata_output = metadata_result.stdout[-4000:]
+            except AssertionError as exc:
+                metadata_output = f"metadata query failed: {str(exc)[-1000:]}"
+            pip_stdout = install_result.stdout[-4000:]
+            pip_stderr = install_result.stderr[-4000:]
+            for path in (str(temp_root), str(ROOT)):
+                pip_stdout = pip_stdout.replace(path, "<local-path>")
+                pip_stderr = pip_stderr.replace(path, "<local-path>")
+            self.fail(
+                "Installed sdist has no expected console script; diagnostic only, cause undetermined.\n"
+                f"pip stdout (last 4000 chars): {pip_stdout}\n"
+                f"pip stderr (last 4000 chars): {pip_stderr}\n"
+                f"venv metadata (last 4000 chars): {metadata_output}"
+            )
         outside = temp_root / "outside-source"
         outside.mkdir()
         target = outside / "synthetic-project"
