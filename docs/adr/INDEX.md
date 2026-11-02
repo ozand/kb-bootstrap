@@ -55,4 +55,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-050 | Produce one local text source as an explicit RawCapture | Accepted |
 | ADR-051 | Bounded exact fragment continuity observations | Superseded by ADR-052 |
 | ADR-052 | Bound aggregate fragment scan work | Accepted |
-| ADR-053 | Search one explicitly selected configured lesson store as bounded Markdown | Proposed |
+| ADR-053 | Search one explicitly selected configured lesson store as bounded Markdown | Accepted |

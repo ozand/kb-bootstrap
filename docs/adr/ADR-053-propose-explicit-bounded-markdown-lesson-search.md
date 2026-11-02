@@ -1,10 +1,12 @@
 # ADR-053: Search one explicitly selected configured lesson store as bounded Markdown
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-06
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #268; Issue #127; ADR-017, ADR-018, ADR-026; `docs/LESSON_ROUTING_POLICY.md`; `docs/LESSON_LOOKUP_BUNDLE.md`
+
+Technical acceptance: authorized under owner delegation. Independent review `independent9b57` returned PASS for exact proposed revision `ddc1f995aad93a790577bd2034537bbfc52b8520`. This acceptance changes lifecycle status only; it does not implement the command or authorize publication.
 
 ## Context
 
