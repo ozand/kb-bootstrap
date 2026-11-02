@@ -38,10 +38,12 @@ def _safe(p):
   except OSError: return False
   if stat.S_ISLNK(s.st_mode) or getattr(s,"st_file_attributes",0)&REPARSE: return False
  return True
-def _read(p,cap,b):
+def _read(p,cap,b,markdown=False):
  if not _safe(p): raise ValueError()
  s=os.lstat(p)
- if s.st_size>cap: raise ValueError()
+ if s.st_size>cap:
+  if markdown: raise OverflowError("file_bytes")
+  raise ValueError()
  if not stat.S_ISREG(s.st_mode) or b[0]+s.st_size>16*1024*1024: raise OverflowError()
  with open(p,"rb") as f: raw=f.read(cap+1)
  b[0]+=len(raw)
@@ -121,8 +123,8 @@ def search_lessons(query,project_root,store,limit=10):
    if not m or m.group(1)!=mapped[name]: raise ValueError()
   results=[]; folded=query.casefold(); partial=None
   for i,name in enumerate(names):
-   try: data=_read(lessons/name,1048576,budget)
-   except OverflowError: partial="source_bytes"; break
+   try: data=_read(lessons/name,1048576,budget,markdown=True)
+   except OverflowError as exc: partial=str(exc) or "source_bytes"; break
    chunks=data.split(b"\n")
    if not chunks or chunks[0].removesuffix(b"\r")!=b"---": raise ValueError()
    header_parts=[]; header_bytes=0; end=None

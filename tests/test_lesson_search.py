@@ -157,15 +157,16 @@ class LessonSearchTests(unittest.TestCase):
         report, code = search_lessons("q" * 513, self.root, "local")
         self.assertEqual((report["status"], code), ("UNAVAILABLE", 1))
 
-    def test_per_file_actual_read_cap_boundary_and_over(self):
-        import kb_bootstrap.lesson_search as module
-        path = self.root / "bounded.bin"
-        budget = [0]
-        path.write_bytes(b"x" * (1024 * 1024))
-        self.assertEqual(len(module._read(path, 1024 * 1024, budget)), 1024 * 1024)
-        path.write_bytes(b"x" * (1024 * 1024 + 1))
-        with self.assertRaises(ValueError):
-            module._read(path, 1024 * 1024, [0])
+    def test_oversized_markdown_returns_partial_not_unavailable(self):
+        lesson = self.lessons / "APP-0001-timeout.md"
+        prefix = b"---" + bytes([10]) + b"id: APP-0001" + bytes([10]) + b"---" + bytes([10])
+        lesson.write_bytes(prefix + b"x" * (1024 * 1024 - len(prefix)))
+        report, code = search_lessons("missing", self.root, "local")
+        self.assertEqual((report["status"], report["limiting_budget"], code), ("COMPLETE", None, 0))
+        with lesson.open("ab") as stream:
+            stream.write(b"x")
+        report, code = search_lessons("missing", self.root, "local")
+        self.assertEqual((report["status"], report["limiting_budget"], code), ("PARTIAL", "file_bytes", 3))
 
     def test_result_and_excerpt_limits(self):
         lessons = self.lessons
@@ -381,11 +382,16 @@ class LessonSearchTests(unittest.TestCase):
         idx.write_text("count: 0\\nlessons: []\\n", encoding="utf-8")
         self.assertEqual(search_lessons("timeout", self.root, "shared")[0]["status"], "UNAVAILABLE")
 
-    def test_frontmatter_line_limit_and_actual_source_byte_partial(self):
+    def test_frontmatter_line_limit_256_and_257(self):
         lesson = self.lessons / "APP-0001-timeout.md"
-        lines = [b"---", b"id: APP-0001"] + [b"pad: x"] * 255 + [b"---", b"timeout"]
-        lesson.write_bytes(bytes([10]).join(lines) + bytes([10]))
-        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
+        for header_lines, expected in ((255, "COMPLETE"), (256, "COMPLETE"), (257, "UNAVAILABLE")):
+            metadata = [b"id: APP-0001"] + [f"pad{i}: x".encode() for i in range(header_lines - 3)]
+            content = b"---" + bytes([10]) + bytes([10]).join(metadata) + bytes([10]) + b"---" + bytes([10]) + b"timeout" + bytes([10])
+            actual_header_lines = len(content.split(bytes([10]))) - 2
+            self.assertEqual(actual_header_lines, header_lines)
+            lesson.write_bytes(content)
+            report, _ = search_lessons("timeout", self.root, "local")
+            self.assertEqual(report["status"], expected)
 
     def test_repeated_actual_file_reads_are_all_counted(self):
         source = self.root / "counted.bin"
