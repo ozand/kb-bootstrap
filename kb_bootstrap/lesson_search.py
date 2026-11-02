@@ -48,18 +48,26 @@ def _read(p,cap,b):
  return raw
 def _bad(): return {"status":"UNAVAILABLE","complete":False,"results":[],"limiting_budget":None,"reason":"unavailable"}
 def search_lessons(query,project_root,store,limit=10):
- if not isinstance(query,str) or not query or len(query.encode("utf-8"))>512 or any(unicodedata.category(c)=="Cc" for c in query) or not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=100 or store not in ("local","shared"): return _bad(),1
- root=Path(os.path.abspath(project_root)); cfg=root/"lesson-stores.json"; budget=[0]
+ try: query_bytes=len(query.encode("utf-8")) if isinstance(query,str) else 0
+ except UnicodeEncodeError: return _bad(),1
+ if not isinstance(query,str) or not query or query_bytes>512 or any(unicodedata.category(c)=="Cc" for c in query) or not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=100 or store not in ("local","shared"): return _bad(),1
+ raw_root=Path(project_root)
+ if ".." in raw_root.parts: return _bad(),1
+ root=raw_root if raw_root.is_absolute() else Path.cwd()/raw_root
+ cfg=root/"lesson-stores.json"; budget=[0]
  try:
   if not _safe(root) or not stat.S_ISDIR(os.lstat(root).st_mode): raise ValueError()
   conf=json.loads(_read(cfg,65536,budget).decode(),object_pairs_hook=_pairs)
   if not isinstance(conf,dict) or conf.get("version")!=1: raise ValueError()
   entry=conf.get(store)
+  if store=="local" and store not in conf:
+   return {"status":"BLOCKED","complete":False,"results":[],"limiting_budget":None,"reason":"store_not_configured"},1
   if not isinstance(entry,dict) or not isinstance(entry.get("path"),str): raise ValueError()
   raw=entry["path"]
   if "\\" in raw or "\x00" in raw: raise ValueError()
   raw_path=Path(raw)
   if ".." in raw_path.parts: raise ValueError()
+  if store=="local" and raw_path.is_absolute(): raise ValueError()
   base=raw_path if raw_path.is_absolute() else cfg.parent/raw_path
   if not _safe(base) or not stat.S_ISDIR(os.lstat(base).st_mode): raise ValueError()
   base=Path(os.path.abspath(base))
@@ -74,9 +82,10 @@ def search_lessons(query,project_root,store,limit=10):
   idx=yaml.load(_read(index,1048576,budget).decode(),Loader=Loader)
   if not isinstance(idx,dict) or not isinstance(idx.get("lessons"),list) or len(idx["lessons"])>1000: raise ValueError()
   with os.scandir(lessons) as it:
-   names=[]
+   names=[]; directory_entries=0
    for e in it:
-    if len(names)>=10000: raise OverflowError()
+    directory_entries+=1
+    if directory_entries>10000: raise OverflowError()
     if e.name.lower().endswith(".md") and not (store=="local" and e.name=="SCHEMA.md"): names.append(e.name)
   names.sort()
   if len(names)>1000: raise OverflowError()
@@ -110,21 +119,29 @@ def search_lessons(query,project_root,store,limit=10):
    if not m or m.group(1)!=mapped[name]: raise ValueError()
   results=[]; folded=query.casefold(); partial=None
   for i,name in enumerate(names):
-   try: data=_read(lessons/name,1048576,budget); lines=data.decode("utf-8").splitlines()
+   try: data=_read(lessons/name,1048576,budget)
    except OverflowError: partial="source_bytes"; break
-   raw_lines=data.splitlines(keepends=True)
-   if not raw_lines or raw_lines[0].rstrip(b"\r\n")!=b"---": raise ValueError()
-   header_bytes=len(raw_lines[0]); end=None
-   if header_bytes>8192: raise ValueError()
-   for n,line in enumerate(raw_lines[1:],1):
+   chunks=data.split(b"\n")
+   if not chunks or chunks[0].removesuffix(b"\r")!=b"---": raise ValueError()
+   header_parts=[]; header_bytes=0; end=None
+   for n,part in enumerate(chunks,1):
+    line=part+b"\n" if n<len(chunks) else part
+    if line.endswith(b"\r\n"): content=line[:-2]
+    elif line.endswith(b"\n"): content=line[:-1]
+    else: content=line
+    if n>256 or header_bytes+len(line)>8192: raise ValueError()
     header_bytes+=len(line)
-    if n+1>256 or header_bytes>8192: raise ValueError()
-    if line.rstrip(b"\r\n")==b"---": end=n; break
+    if n==1: continue
+    if content==b"---": end=n; break
+    header_parts.append(content)
    if end is None: raise ValueError()
-   lines=data.decode("utf-8").splitlines()
-   meta=yaml.load("\n".join(lines[1:end]),Loader=Loader)
+   header=b"\n".join(header_parts).decode("utf-8")
+   meta=yaml.load(header,Loader=Loader)
    if not isinstance(meta,dict) or meta.get("id")!=mapped[name]: raise ValueError()
-   hit=next((line for line in lines[end+1:] if folded in line.casefold()),None)
+   body=b"\n".join(chunks[end:]).decode("utf-8")
+   if body.startswith("\r"): body=body[1:]
+   body_lines=body.splitlines()
+   hit=next((line for line in body_lines if folded in line.casefold()),None)
    if hit is not None:
     raw=hit.encode("utf-8")[:512]
     while raw:

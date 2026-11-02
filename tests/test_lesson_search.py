@@ -96,6 +96,48 @@ class LessonSearchTests(unittest.TestCase):
             self.assertEqual(report["status"], "COMPLETE" if header_bytes <= 8192 else "UNAVAILABLE")
             self.assertEqual(code, 0 if header_bytes <= 8192 else 1)
 
+    def test_unicode_line_separators_never_expose_frontmatter_canary(self):
+        lesson = self.lessons / "APP-0001-timeout.md"
+        for newline in ("\\n", "\\r\\n"):
+            for separator in ("\\u2028", "\\u2029", "\\x85"):
+                header = f"---{newline}id: APP-0001{separator}error_signatures: CANARY{newline}---{newline}timeout body{newline}"
+                lesson.write_bytes(header.encode("utf-8"))
+                report, _ = search_lessons("timeout", self.root, "local")
+                self.assertEqual(report["status"], "UNAVAILABLE")
+                self.assertNotIn("CANARY", json.dumps(report))
+
+    def test_nonmarkdown_inventory_entries_count_toward_directory_limit(self):
+        from unittest.mock import patch
+        import kb_bootstrap.lesson_search as module
+        class Entries:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def __iter__(self):
+                for i in range(10001): yield type("Entry", (), {"name": f"file{i}.txt"})()
+        with patch.object(module.os, "scandir", return_value=Entries()):
+            report, code = search_lessons("timeout", self.root, "local")
+        self.assertEqual((report["status"], code, report["limiting_budget"]), ("PARTIAL", 3, "source_bytes"))
+
+    def test_query_utf8_byte_limit_boundary(self):
+        report, code = search_lessons("q" * 512, self.root, "local")
+        self.assertEqual((report["status"], code), ("COMPLETE", 0))
+        report, code = search_lessons("q" * 513, self.root, "local")
+        self.assertEqual((report["status"], code), ("UNAVAILABLE", 1))
+
+    def test_per_file_actual_read_cap_boundary_and_over(self):
+        import kb_bootstrap.lesson_search as module
+        path = self.root / "bounded.bin"
+        budget = [0]
+        path.write_bytes(b"x" * (1024 * 1024))
+        self.assertEqual(len(module._read(path, 1024 * 1024, budget)), 1024 * 1024)
+        path.write_bytes(b"x" * (1024 * 1024 + 1))
+        with self.assertRaises(OverflowError):
+            module._read(path, 1024 * 1024, [0])
+
+    def test_surrogate_query_is_sanitized(self):
+        report, code = search_lessons(chr(0xD800), self.root, "local")
+        self.assertEqual((report["status"], code), ("UNAVAILABLE", 1))
+
     def test_multibyte_frontmatter_over_byte_limit_rejected(self):
         lesson = self.lessons / "APP-0001-timeout.md"
         lf = bytes([10])
