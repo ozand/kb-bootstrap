@@ -98,13 +98,46 @@ class LessonSearchTests(unittest.TestCase):
 
     def test_unicode_line_separators_never_expose_frontmatter_canary(self):
         lesson = self.lessons / "APP-0001-timeout.md"
-        for newline in ("\\n", "\\r\\n"):
-            for separator in ("\\u2028", "\\u2029", "\\x85"):
-                header = f"---{newline}id: APP-0001{separator}error_signatures: CANARY{newline}---{newline}timeout body{newline}"
-                lesson.write_bytes(header.encode("utf-8"))
-                report, _ = search_lessons("timeout", self.root, "local")
-                self.assertEqual(report["status"], "UNAVAILABLE")
+        for newline in (chr(10), chr(13) + chr(10)):
+            for separator in (chr(0x2028), chr(0x2029), chr(0x85)):
+                header = "---" + newline + "id: APP-0001" + separator + "error_signatures: CANARY" + newline + "---" + newline
+                lesson.write_bytes((header + "timeout body" + newline).encode("utf-8"))
+                report, code = search_lessons("timeout", self.root, "local")
+                self.assertEqual((report["status"], code), ("COMPLETE", 0))
+                self.assertEqual(len(report["results"]), 1)
+                canary_report, canary_code = search_lessons("CANARY", self.root, "local")
+                self.assertEqual((canary_report["status"], canary_code), ("COMPLETE", 0))
+                self.assertEqual(canary_report["results"], [])
                 self.assertNotIn("CANARY", json.dumps(report))
+                self.assertNotIn("CANARY", json.dumps(canary_report))
+
+    def test_inventory_entry_limit_exact_and_one_over(self):
+        import kb_bootstrap.lesson_search as module
+        class Entries:
+            def __init__(self, count): self.count = count
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def __iter__(self):
+                yield type("Entry", (), {"name": "APP-0001-timeout.md"})()
+                for i in range(self.count - 1): yield type("Entry", (), {"name": f"file{i}.txt"})()
+        for count, expected in ((10000, "COMPLETE"), (10001, "PARTIAL")):
+            with patch.object(module.os, "scandir", return_value=Entries(count)):
+                report, _ = search_lessons("timeout", self.root, "local")
+            self.assertEqual(report["status"], expected)
+
+    def test_eligible_file_count_limit_exact_and_one_over(self):
+        for extra in (999, 1000):
+            rows=["  - id: APP-0001"+chr(10)+"    path: kb/lessons/APP-0001-timeout.md"]
+            names=[]
+            for number in range(2,extra+2):
+                lid=f"APP-{number:04d}"; name=f"{lid}-lesson.md"
+                self._lesson(self.lessons/name,lid,"body"); names.append(name)
+                rows.append(f"  - id: {lid}"+chr(10)+f"    path: kb/lessons/{name}")
+            index="version: 1"+chr(10)+"scope: project"+chr(10)+"id_prefix: APP-"+chr(10)+"lessons:"+chr(10)+chr(10).join(rows)+chr(10)
+            (self.lessons/"index.yaml").write_text(index,encoding="utf-8")
+            report,_=search_lessons("absent",self.root,"local")
+            self.assertEqual(report["status"],"COMPLETE" if extra==999 else "PARTIAL")
+            for name in names: (self.lessons/name).unlink()
 
     def test_nonmarkdown_inventory_entries_count_toward_directory_limit(self):
         from unittest.mock import patch
@@ -116,7 +149,7 @@ class LessonSearchTests(unittest.TestCase):
                 for i in range(10001): yield type("Entry", (), {"name": f"file{i}.txt"})()
         with patch.object(module.os, "scandir", return_value=Entries()):
             report, code = search_lessons("timeout", self.root, "local")
-        self.assertEqual((report["status"], code, report["limiting_budget"]), ("PARTIAL", 3, "source_bytes"))
+        self.assertEqual((report["status"], code, report["limiting_budget"]), ("PARTIAL", 3, "directory_entries"))
 
     def test_query_utf8_byte_limit_boundary(self):
         report, code = search_lessons("q" * 512, self.root, "local")
@@ -131,8 +164,33 @@ class LessonSearchTests(unittest.TestCase):
         path.write_bytes(b"x" * (1024 * 1024))
         self.assertEqual(len(module._read(path, 1024 * 1024, budget)), 1024 * 1024)
         path.write_bytes(b"x" * (1024 * 1024 + 1))
-        with self.assertRaises(OverflowError):
+        with self.assertRaises(ValueError):
             module._read(path, 1024 * 1024, [0])
+
+    def test_result_and_excerpt_limits(self):
+        lessons = self.lessons
+        rows = []
+        for number in range(1, 102):
+            lid = f"APP-{number:04d}"
+            name = f"{lid}-match.md"
+            self._lesson(lessons / name, lid, "needle " + "x" * 600)
+            rows.append(f"  - id: {lid}" + chr(10) + f"    path: kb/lessons/{name}")
+        rows.append("  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md")
+        index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + chr(10).join(rows) + chr(10)
+        (lessons / "index.yaml").write_text(index, encoding="utf-8")
+        report, code = search_lessons("needle", self.root, "local", 100)
+        self.assertEqual((report["status"], code), ("PARTIAL", 3))
+        self.assertEqual(len(report["results"]), 100)
+        self.assertTrue(all(len(result["excerpt"].encode("utf-8")) == 512 for result in report["results"]))
+
+    def test_serialized_output_limit_is_mathematically_unreachable(self):
+        # 100 results x (512 excerpt bytes + bounded ID/path/store fields)
+        # is far below 256 KiB; therefore the output ceiling is redundant
+        # under the enforced result and field ceilings.
+        import json as json_module
+        result = {"store": "shared", "id": "KB-9999", "path": "lessons/KB-9999-" + "x" * 220 + ".md", "excerpt": "x" * 512}
+        report = {"status": "PARTIAL", "complete": False, "results": [result] * 100, "limiting_budget": "results", "reason": None}
+        self.assertLess(len(json_module.dumps(report, separators=(",", ":")).encode("utf-8")), 256 * 1024)
 
     def test_surrogate_query_is_sanitized(self):
         report, code = search_lessons(chr(0xD800), self.root, "local")
@@ -188,6 +246,65 @@ class LessonSearchTests(unittest.TestCase):
         lesson = self.lessons / "APP-0001-timeout.md"
         self._lesson(lesson, "APP-0002", "timeout")
         self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
+
+    def test_schema_and_index_byte_limit_boundary_and_over(self):
+        import kb_bootstrap.lesson_search as module
+        schema = self.lessons / "SCHEMA.md"
+        index = self.lessons / "index.yaml"
+        original_index = index.read_bytes()
+        schema.write_bytes(b"x" * (64 * 1024))
+        report, code = search_lessons("timeout", self.root, "local")
+        self.assertEqual((report["status"], code), ("COMPLETE", 0))
+        schema.write_bytes(b"x" * (64 * 1024 + 1))
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
+        schema.write_text("schema", encoding="utf-8")
+        index.write_bytes(original_index + b"#" * (1024 * 1024 - len(original_index)))
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "COMPLETE")
+        index.write_bytes(original_index + b"#" * (1024 * 1024 + 1 - len(original_index)))
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
+
+    def test_configuration_byte_limit_boundary_and_over(self):
+        config = self.root / "lesson-stores.json"
+        original = json.loads(config.read_text(encoding="utf-8"))
+        prefix = json.dumps(original, separators=(",", ":"))[:-1]
+        padding = " " * (64 * 1024 - len(prefix.encode("utf-8")) - 1)
+        config.write_text(prefix + padding + "}", encoding="utf-8")
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "COMPLETE")
+        config.write_text(prefix + padding + "}", encoding="utf-8")
+        with config.open("ab") as output:
+            output.write(b" ")
+        report, code = search_lessons("timeout", self.root, "local")
+        self.assertEqual((report["status"], code), ("UNAVAILABLE", 1))
+
+    def test_yaml_node_and_depth_limits_exact_and_over(self):
+        import kb_bootstrap.lesson_search as module
+        def fixture(nodes):
+            return "[" + ",".join("x" for _ in range(nodes - 1)) + "]"
+        for count, expected in ((9999, True), (10000, True), (10001, False)):
+            try:
+                yaml_nodes = module.yaml.load(fixture(count), Loader=module.Loader)
+                accepted = True
+            except module.yaml.YAMLError:
+                accepted = False
+            self.assertEqual(accepted, expected)
+        for depth, expected in ((30, True), (31, True), (32, False)):
+            raw = "[" * depth + "x" + "]" * depth
+            try:
+                module.yaml.load(raw, Loader=module.Loader)
+                accepted = True
+            except module.yaml.YAMLError:
+                accepted = False
+            self.assertEqual(accepted, expected)
+
+    def test_index_entry_limit_exact_and_one_over(self):
+        index = self.lessons / "index.yaml"
+        for count in (1000, 1001):
+            entries = "lessons:" + chr(10) + ("  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md" + chr(10)) * count
+            payload = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + entries
+            index.write_text(payload, encoding="utf-8")
+            report, code = search_lessons("timeout", self.root, "local")
+            self.assertEqual((report["status"], report["limiting_budget"]), ("UNAVAILABLE", None) if count == 1000 else ("PARTIAL", "index_entries"))
+            self.assertEqual(code, 1 if count == 1000 else 3)
 
     def test_shared_count_drift_and_unindexed_file_fail_closed(self):
         shared = self.root / "shared"

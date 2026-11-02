@@ -41,7 +41,8 @@ def _safe(p):
 def _read(p,cap,b):
  if not _safe(p): raise ValueError()
  s=os.lstat(p)
- if not stat.S_ISREG(s.st_mode) or s.st_size>cap or b[0]+s.st_size>16*1024*1024: raise OverflowError()
+ if s.st_size>cap: raise ValueError()
+ if not stat.S_ISREG(s.st_mode) or b[0]+s.st_size>16*1024*1024: raise OverflowError()
  with open(p,"rb") as f: raw=f.read(cap+1)
  b[0]+=len(raw)
  if len(raw)>cap or b[0]>16*1024*1024: raise OverflowError()
@@ -80,15 +81,16 @@ def search_lessons(query,project_root,store,limit=10):
   else: lessons=base/"lessons"; result_prefix="lessons/"; index=base/"index.yaml"; pattern=SHARED
   if not _safe(lessons) or not stat.S_ISDIR(os.lstat(lessons).st_mode): raise ValueError()
   idx=yaml.load(_read(index,1048576,budget).decode(),Loader=Loader)
-  if not isinstance(idx,dict) or not isinstance(idx.get("lessons"),list) or len(idx["lessons"])>1000: raise ValueError()
+  if not isinstance(idx,dict) or not isinstance(idx.get("lessons"),list): raise ValueError()
+  if len(idx["lessons"])>1000: raise OverflowError("index_entries")
   with os.scandir(lessons) as it:
    names=[]; directory_entries=0
    for e in it:
     directory_entries+=1
-    if directory_entries>10000: raise OverflowError()
+    if directory_entries>10000: raise OverflowError("directory_entries")
     if e.name.lower().endswith(".md") and not (store=="local" and e.name=="SCHEMA.md"): names.append(e.name)
   names.sort()
-  if len(names)>1000: raise OverflowError()
+  if len(names)>1000: raise OverflowError("eligible_files")
   mapped={}
   if store=="local":
    if idx.get("version")!=1 or idx.get("scope")!="project": raise ValueError()
@@ -153,5 +155,5 @@ def search_lessons(query,project_root,store,limit=10):
   while len(json.dumps(report,ensure_ascii=False,separators=(",",":")).encode())+1>262144 and results:
    results.pop(); partial="output_bytes"; report.update(status="PARTIAL",complete=False,limiting_budget=partial)
   return report,3 if partial else 0
- except OverflowError: return {"status":"PARTIAL","complete":False,"results":[],"limiting_budget":"source_bytes","reason":None},3
+ except OverflowError as exc: return {"status":"PARTIAL","complete":False,"results":[],"limiting_budget":str(exc) or "source_bytes","reason":None},3
  except (OSError,UnicodeError,ValueError,TypeError,yaml.YAMLError,RecursionError): return _bad(),1
