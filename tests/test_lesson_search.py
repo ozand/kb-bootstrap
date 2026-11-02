@@ -305,10 +305,16 @@ class LessonSearchTests(unittest.TestCase):
             self.assertEqual(accepted, expected)
 
     def test_duplicate_ids_across_paths_rejected_project_and_shared(self):
-        project = self.lessons / "APP-0002-other.md"
-        self._lesson(project, "APP-0002", "body")
-        project_index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md" + chr(10) + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0002-other.md" + chr(10)
+        project = self.lessons / "APP-0001-other.md"
+        self._lesson(project, "APP-0001", "other body")
+        single_index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md" + chr(10)
+        (self.lessons / "index.yaml").write_text(single_index, encoding="utf-8")
+        project.unlink()
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "COMPLETE")
+        self._lesson(project, "APP-0001", "other body")
+        project_index = single_index + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-other.md" + chr(10)
         (self.lessons / "index.yaml").write_text(project_index, encoding="utf-8")
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
         self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
         shared = self.root / "shared"; directory = shared / "lessons"; directory.mkdir(parents=True)
         self._lesson(directory / "KB-0001-one.md", "KB-0001", "one")
