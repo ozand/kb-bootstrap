@@ -44,21 +44,25 @@ Use lookup for a current error or unexpected behavior to find an applicable,
 previously recorded fix; do not apply a lesson whose symptom or context does not
 match the current problem.
 
-1. Treat `local` as available only when its configured directory, `SCHEMA.md`, and
-   `index.yaml` all exist; otherwise report the local source as unavailable without
-   printing its path.
-2. If local is available, search its `index.yaml` first. A successful search with
-   no applicable match is a no-match result, not an operational error.
-3. If there is no local match and `shared` is explicitly configured as read-only,
-   search its `index.yaml` second.
-4. If a read, parse, or search operation fails, report that source as unavailable
-   due to a local lookup error, distinct from a successful no-match. If the shared
-   store is missing or unavailable, report that sanitized source as unavailable and
-   finish the local result; do not perform hidden discovery or write.
-5. If configuration is malformed or ambiguous, stop and report a blocking,
-   sanitized configuration error.
-6. For an applicable match, read the referenced lesson and apply its
-   `## Resolution` and `## Prevention` sections.
+Use `kb-bootstrap search-lessons` for Markdown stores; `lesson-lookup` remains an
+explicit JSON export-bundle command and does not search configured directories.
+
+1. Search one explicitly configured store at a time, local first, using its
+   `index.yaml` first: `kb-bootstrap search-lessons "<query>" --project-root . --store local`.
+2. A local match ends lookup. Search explicitly configured shared only after a
+   successful search with a complete `COMPLETE` result and no matches (a
+   no-match result, not an operational error):
+   `kb-bootstrap search-lessons "<query>" --project-root . --store shared`.
+   Shared search requires `read_only: true`.
+3. `PARTIAL`, `UNAVAILABLE`, or blocked local outcomes due to a local lookup error
+   do not establish no-match; report them distinctly and never fall back to shared.
+   Shared unavailable/partial likewise is not a complete no-match.
+4. If local is not configured, shared-only routing is permitted only when its path
+   is explicitly configured and read-only. Do not discover another store.
+5. For a match, use its store-relative path and ID to inspect the lesson; results
+   contain a bounded body excerpt and never expose frontmatter.
+6. For an applicable match, read the lesson and apply its `## Resolution` and
+   `## Prevention` sections.
 
 Report provenance as `local` or `shared` plus the lesson ID. Do not expose private
 absolute paths or lesson payloads in receipts. Lookup never writes, synchronizes,
