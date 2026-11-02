@@ -14,11 +14,11 @@ Issue #268 identifies a gap: generated lesson lookup guidance names configured s
 
 The routing policy requires explicit deterministic configuration, local-before-shared lookup, shared read-only status, sanitized unavailable outcomes, and no background discovery or writes. Generated `lesson-stores.json` currently demonstrates `local.path`; the JSON lookup bundle is a different contract. Directory search must not reinterpret that bundle, infer a store, or relax canonical retrieval. The primary use is local CLI guidance from generated `kb-lookup`; selection and source identity must remain visible to the caller without exposing absolute paths or unbounded lesson content.
 
-This is a design proposal only. It is not an accepted contract, implementation, security guarantee, or evidence from any consumer corpus. The research checkpoint is retained on Issue #268. No private consumer store was accessed.
+This is an accepted design contract, not yet an implementation, security guarantee, or evidence from any consumer corpus. The research checkpoint is retained on Issue #268. No private consumer store was accessed.
 
 ## Decision
 
-If accepted, add a separately named opt-in command, `kb-bootstrap search-lessons <query> --project-root <root> --store <name> [--limit N]`. It searches exactly one explicitly named entry in `lesson-stores.json`; the selector does not cause enumeration or fallback. Generated `kb-lookup` guidance orchestrates configured local-first/shared-second lookup as described below. A caller may invoke one store explicitly without implying the other is selected.
+Add a separately named opt-in command, `kb-bootstrap search-lessons <query> --project-root <root> --store <name> [--limit N]`. It searches exactly one explicitly named entry in `lesson-stores.json`; the selector does not cause enumeration or fallback. Generated `kb-lookup` guidance orchestrates configured local-first/shared-second lookup as described below. A caller may invoke one store explicitly without implying the other is selected.
 
 Require a valid version-1 object and a unique, valid selected `local` or `shared` entry. `local.path` is interpreted relative to the directory containing `lesson-stores.json` and must resolve within the explicit project root. Existing routing examples do not define a distinct base for relative shared paths; this proposal explicitly defines a relative `shared.path` against the same configuration directory, while an absolute shared path is used only when that exact path is configured. Shared search is permitted only when `read_only: true`. No home, environment, sibling, Git-remote, or conventional-root discovery is allowed. This is an explicit path-resolution choice for the proposed command, not a claim that prior guidance already specified the base. A project-local store is complete only when its configured directory, `SCHEMA.md`, and `index.yaml` are present, regular, bounded, readable, and safe, as required by generated `kb-lookup`. A shared registry is complete when its configured registry root, `index.yaml`, and `lessons/` directory are present and safe, matching `lesson_registry.py`; do not require shared `SCHEMA.md`. Missing/malformed/ambiguous config, missing contract files, invalid or inconsistent index data, or an unavailable selected store returns a sanitized unavailable/blocked result, never a no-match. Do not expose paths, parser/OS diagnostics, or lesson text in blocked diagnostics.
 
@@ -34,7 +34,7 @@ The generated `kb-lookup` flow must use the new command on local first. Search s
 
 This is a separate path from `lesson-lookup`, which continues to consume an explicit JSON export bundle. The command performs no QMD invocation, collection/index lookup or mutation, network access, model/inference work, capture, writes, migration, promotion, synchronization, or background discovery. No new dependency is proposed. ADR-017 `search-local` and its canonical `SKIP_DIRS` remain unchanged.
 
-This proposal chooses explicit single-store command selection and complete-result fallback semantics; the accepted contract must retain the distinct project/shared index schemas, exclude all frontmatter from content search/output, and reject index-incomplete stores rather than silently widening eligible files.
+This accepted contract requires explicit single-store command selection and complete-result fallback semantics; implementation must retain the distinct project/shared index schemas, exclude all frontmatter from content search/output, and reject index-incomplete stores rather than silently widening eligible files.
 
 ## Alternatives Considered
 
@@ -74,7 +74,7 @@ Rejected because it adds index state, optional tooling/model/network surfaces, a
 
 ## Test Contract
 
-| Claim if accepted and implemented | Synthetic test | Currently |
+| Claim of this accepted contract if implemented | Synthetic test | Currently |
 |---|---|---|
 | Only the explicitly selected configured store is searched; local/shared config errors and shared read-only requirements fail closed | `tests/test_lesson_search.py::test_explicit_store_selection_and_configuration_fail_closed` | not yet written |
 | Project/shared index schemas enforce their existing ID, path, frontmatter, count (shared only), and complete direct-file correspondence invariants without undocumented required fields or an unsupported shared version requirement | `tests/test_lesson_search.py::test_project_and_shared_registry_contracts` | not yet written |
@@ -93,7 +93,7 @@ Use synthetic invocation-owned fixtures only. Include separate project/shared fi
 
 ## Rollback
 
-If accepted and implemented, remove only the additive command and its generated guidance/tests. No index, persisted state, or consumer data migration is introduced; canonical search and JSON bundle lookup remain available unchanged.
+If a future implementation is reverted, remove only the additive command and its generated guidance/tests. No index, persisted state, or consumer data migration is introduced; canonical search and JSON bundle lookup remain available unchanged.
 
 ## References
 
