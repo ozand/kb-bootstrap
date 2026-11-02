@@ -126,7 +126,9 @@ def search_lessons(query,project_root,store,limit=10):
    try: data=_read(lessons/name,1048576,budget,markdown=True)
    except OverflowError as exc: partial=str(exc) or "source_bytes"; break
    chunks=data.split(b"\n")
-   if not chunks or chunks[0].removesuffix(b"\r")!=b"---": raise ValueError()
+   if not chunks: raise ValueError()
+   opening=chunks[0][:-1] if chunks[0].endswith(b"\r") else chunks[0]
+   if opening!=b"---": raise ValueError()
    header_parts=[]; header_bytes=0; end=None
    for n,part in enumerate(chunks,1):
     line=part+b"\n" if n<len(chunks) else part
