@@ -169,28 +169,35 @@ class LessonSearchTests(unittest.TestCase):
 
     def test_result_and_excerpt_limits(self):
         lessons = self.lessons
-        rows = []
-        for number in range(1, 102):
+        rows = ["  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md"]
+        for number in range(2, 102):
             lid = f"APP-{number:04d}"
             name = f"{lid}-match.md"
             self._lesson(lessons / name, lid, "needle " + "x" * 600)
             rows.append(f"  - id: {lid}" + chr(10) + f"    path: kb/lessons/{name}")
-        rows.append("  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md")
         index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + chr(10).join(rows) + chr(10)
         (lessons / "index.yaml").write_text(index, encoding="utf-8")
         report, code = search_lessons("needle", self.root, "local", 100)
-        self.assertEqual((report["status"], code), ("PARTIAL", 3))
+        self.assertEqual((report["status"], code), ("COMPLETE", 0))
         self.assertEqual(len(report["results"]), 100)
         self.assertTrue(all(len(result["excerpt"].encode("utf-8")) == 512 for result in report["results"]))
 
-    def test_serialized_output_limit_is_mathematically_unreachable(self):
-        # 100 results x (512 excerpt bytes + bounded ID/path/store fields)
-        # is far below 256 KiB; therefore the output ceiling is redundant
-        # under the enforced result and field ceilings.
-        import json as json_module
-        result = {"store": "shared", "id": "KB-9999", "path": "lessons/KB-9999-" + "x" * 220 + ".md", "excerpt": "x" * 512}
-        report = {"status": "PARTIAL", "complete": False, "results": [result] * 100, "limiting_budget": "results", "reason": None}
-        self.assertLess(len(json_module.dumps(report, separators=(",", ":")).encode("utf-8")), 256 * 1024)
+    def test_output_limit_control_escaping_returns_bounded_partial(self):
+        lessons = self.lessons
+        rows = ["  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md"]
+        body_line = "needle" + chr(0) * 506
+        for number in range(2, 102):
+            lid = f"APP-{number:04d}"; name = f"{lid}-controls.md"
+            lesson_text = "---" + chr(10) + f"id: {lid}" + chr(10) + "---" + chr(10) + body_line + chr(10)
+            (lessons / name).write_bytes(lesson_text.encode("utf-8"))
+            rows.append(f"  - id: {lid}" + chr(10) + f"    path: kb/lessons/{name}")
+        index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + chr(10).join(rows) + chr(10)
+        (lessons / "index.yaml").write_text(index, encoding="utf-8")
+        report, code = search_lessons("needle", self.root, "local", 100)
+        encoded = json.dumps(report, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.assertEqual((report["status"], report["limiting_budget"], code), ("PARTIAL", "output_bytes", 3))
+        self.assertLessEqual(len(encoded) + 1, 256 * 1024)
+        self.assertGreater(len(encoded) + 1, 250 * 1024)
 
     def test_surrogate_query_is_sanitized(self):
         report, code = search_lessons(chr(0xD800), self.root, "local")
@@ -296,6 +303,32 @@ class LessonSearchTests(unittest.TestCase):
                 accepted = False
             self.assertEqual(accepted, expected)
 
+    def test_duplicate_ids_across_paths_rejected_project_and_shared(self):
+        project = self.lessons / "APP-0002-other.md"
+        self._lesson(project, "APP-0002", "body")
+        project_index = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0001-timeout.md" + chr(10) + "  - id: APP-0001" + chr(10) + "    path: kb/lessons/APP-0002-other.md" + chr(10)
+        (self.lessons / "index.yaml").write_text(project_index, encoding="utf-8")
+        self.assertEqual(search_lessons("timeout", self.root, "local")[0]["status"], "UNAVAILABLE")
+        shared = self.root / "shared"; directory = shared / "lessons"; directory.mkdir(parents=True)
+        self._lesson(directory / "KB-0001-one.md", "KB-0001", "one")
+        self._lesson(directory / "KB-0001-two.md", "KB-0001", "two")
+        (shared / "index.yaml").write_text("count: 2" + chr(10) + "lessons:" + chr(10) + "  - id: KB-0001" + chr(10) + "    file: lessons/KB-0001-one.md" + chr(10) + "  - id: KB-0001" + chr(10) + "    file: lessons/KB-0001-two.md" + chr(10), encoding="utf-8")
+        self.assertEqual(search_lessons("one", self.root, "shared")[0]["status"], "UNAVAILABLE")
+
+    def test_project_eligible_file_limit_exact_and_one_over(self):
+        for count in (1000, 1001):
+            rows=[]; created=[]
+            for number in range(1,count+1):
+                lid=f"APP-{number:04d}"; name=f"{lid}-bulk.md"
+                if number==1: name="APP-0001-timeout.md"
+                else: self._lesson(self.lessons/name,lid,"body"); created.append(name)
+                rows.append(f"  - id: {lid}"+chr(10)+f"    path: kb/lessons/{name}")
+            idx="version: 1"+chr(10)+"scope: project"+chr(10)+"id_prefix: APP-"+chr(10)+"lessons:"+chr(10)+chr(10).join(rows)+chr(10)
+            (self.lessons/"index.yaml").write_text(idx,encoding="utf-8")
+            report,code=search_lessons("absent",self.root,"local")
+            self.assertEqual((report["status"],code),("COMPLETE",0) if count==1000 else ("PARTIAL",3))
+            for name in created: (self.lessons/name).unlink()
+
     def test_index_entry_limit_exact_and_one_over(self):
         index = self.lessons / "index.yaml"
         for count in (1000, 1001):
@@ -305,6 +338,40 @@ class LessonSearchTests(unittest.TestCase):
             report, code = search_lessons("timeout", self.root, "local")
             self.assertEqual((report["status"], report["limiting_budget"]), ("UNAVAILABLE", None) if count == 1000 else ("PARTIAL", "index_entries"))
             self.assertEqual(code, 1 if count == 1000 else 3)
+
+    def test_aggregate_actual_read_budget_end_to_end_boundary_and_over(self):
+        import kb_bootstrap.lesson_search as module
+        directory = self.lessons
+        names = ["APP-0001-timeout.md"]
+        for number in range(2, 18):
+            name = f"APP-{number:04d}-bulk.md"
+            names.append(name)
+        rows = [f"  - id: APP-{i:04d}" + chr(10) + f"    path: kb/lessons/{name}" for i, name in enumerate(names, 1)]
+        index_text = "version: 1" + chr(10) + "scope: project" + chr(10) + "id_prefix: APP-" + chr(10) + "lessons:" + chr(10) + chr(10).join(rows) + chr(10)
+        (directory / "index.yaml").write_text(index_text, encoding="utf-8")
+        schema = directory / "SCHEMA.md"; schema.write_text("s", encoding="utf-8")
+        config = self.root / "lesson-stores.json"; config.write_text(json.dumps({"version": 1, "local": {"path": "kb/lessons"}}), encoding="utf-8")
+        fixed_bytes = config.stat().st_size + schema.stat().st_size + (directory / "index.yaml").stat().st_size
+        fixed_body = b"---" + bytes([10]) + b"id: APP-0001" + bytes([10]) + b"---" + bytes([10])
+        total_body_budget = 16 * 1024 * 1024 - fixed_bytes
+        sizes = [len(fixed_body)]
+        remaining = total_body_budget - sizes[0]
+        for _ in names[1:]:
+            size = min(1024 * 1024, remaining)
+            sizes.append(size)
+            remaining -= size
+        self.assertEqual(remaining, 0)
+        for name, size in zip(names, sizes):
+            lesson_id = name[:8]
+            content = b"---" + bytes([10]) + b"id: " + lesson_id.encode() + bytes([10]) + b"---" + bytes([10])
+            content += b"x" * (size - len(content))
+            (directory / name).write_bytes(content)
+        report, code = search_lessons("absent", self.root, "local")
+        self.assertEqual((report["status"], code), ("COMPLETE", 0))
+        with (directory / names[-1]).open("ab") as output:
+            output.write(b"x")
+        report, code = search_lessons("absent", self.root, "local")
+        self.assertEqual((report["status"], code, report["limiting_budget"]), ("PARTIAL", 3, "source_bytes"))
 
     def test_shared_count_drift_and_unindexed_file_fail_closed(self):
         shared = self.root / "shared"

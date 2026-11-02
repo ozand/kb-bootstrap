@@ -91,7 +91,7 @@ def search_lessons(query,project_root,store,limit=10):
     if e.name.lower().endswith(".md") and not (store=="local" and e.name=="SCHEMA.md"): names.append(e.name)
   names.sort()
   if len(names)>1000: raise OverflowError("eligible_files")
-  mapped={}
+  mapped={}; indexed_ids=set()
   if store=="local":
    if idx.get("version")!=1 or idx.get("scope")!="project": raise ValueError()
    prefix=idx.get("id_prefix")
@@ -103,16 +103,16 @@ def search_lessons(query,project_root,store,limit=10):
     name=p.name; m=pattern.fullmatch(name)
     if not m or m.group(1)!=lid or name not in names: raise ValueError()
     if base.relative_to(root).as_posix()+"/"+name!=p.as_posix(): raise ValueError()
-    if name in mapped: raise ValueError()
-    mapped[name]=lid
+    if name in mapped or lid in indexed_ids: raise ValueError()
+    mapped[name]=lid; indexed_ids.add(lid)
   else:
    for row in idx["lessons"]:
     if not isinstance(row,dict): raise ValueError()
     lid,path=row.get("id"),row.get("file")
     if not isinstance(path,str) or not path.startswith("lessons/") or path.count("/")!=1: raise ValueError()
     name=path[8:]; m=pattern.fullmatch(name)
-    if not isinstance(lid,str) or not re.fullmatch(r"KB-\d{4}",lid) or not m or m.group(1)!=lid or name not in names or name in mapped: raise ValueError()
-    mapped[name]=lid
+    if not isinstance(lid,str) or not re.fullmatch(r"KB-\d{4}",lid) or not m or m.group(1)!=lid or name not in names or name in mapped or lid in indexed_ids: raise ValueError()
+    mapped[name]=lid; indexed_ids.add(lid)
    count=idx.get("count")
    if not isinstance(count,int) or isinstance(count,bool) or count!=len(idx["lessons"]): raise ValueError()
   if len(mapped)!=len(names) or set(mapped)!=set(names): raise ValueError()
@@ -152,8 +152,12 @@ def search_lessons(query,project_root,store,limit=10):
     results.append({"store":store,"id":mapped[name],"path":result_prefix+name,"excerpt":excerpt})
     if len(results)>=limit and i+1<len(names): partial="results"; break
   report={"status":"PARTIAL" if partial else "COMPLETE","complete":not bool(partial),"results":results,"limiting_budget":partial,"reason":None}
-  while len(json.dumps(report,ensure_ascii=False,separators=(",",":")).encode())+1>262144 and results:
-   results.pop(); partial="output_bytes"; report.update(status="PARTIAL",complete=False,limiting_budget=partial)
+  output_bytes=len(json.dumps(report,ensure_ascii=False,separators=(",",":")).encode())+1
+  if output_bytes>262144:
+   partial="output_bytes"
+   while output_bytes>262144 and results:
+    results.pop(); report.update(status="PARTIAL",complete=False,limiting_budget=partial)
+    output_bytes=len(json.dumps(report,ensure_ascii=False,separators=(",",":")).encode())+1
   return report,3 if partial else 0
  except OverflowError as exc: return {"status":"PARTIAL","complete":False,"results":[],"limiting_budget":str(exc) or "source_bytes","reason":None},3
  except (OSError,UnicodeError,ValueError,TypeError,yaml.YAMLError,RecursionError): return _bad(),1
