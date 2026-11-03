@@ -405,10 +405,10 @@ class EvidenceBindingTests(unittest.TestCase):
             if data == payload:
                 digest_lengths.append(len(data))
             return original_sha256(data, *args, **kwargs)
-        def counted_ranges(data, references, extracted_total=0):
+        def counted_ranges(data, references, extracted_total=0, **kwargs):
             if data == payload:
                 baseline_ranges.append(len(references))
-            return original_ranges(data, references, extracted_total)
+            return original_ranges(data, references, extracted_total, **kwargs)
         original_matcher = evidence_binding._kmp_offsets
         def counted_matcher(text, pattern):
             matcher_calls.append(len(text))
@@ -431,6 +431,17 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(blocked["fragment_continuity"], {
             "status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"
         })
+
+    def test_fragment_continuity_invalid_range_preserves_resolver_block(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
+        self._write_binding()
+        standalone = self.resolve()
+        self.assertEqual(standalone, {"status": "BLOCKED", "reason": "invalid_binding"})
+        with patch.object(evidence_binding, "_kmp_offsets", side_effect=AssertionError("invalid range must not search")):
+            combined = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(combined["resolver_report"], standalone)
+        self.assertEqual(combined["fragment_continuity"], {"status": "BLOCKED", "reason": "resolver_blocked"})
 
     def test_fragment_continuity_duplicate_matches_and_permission_denial(self):
         ref = self.binding["bindings"][0]["evidence"][0]
