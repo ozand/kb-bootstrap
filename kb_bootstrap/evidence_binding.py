@@ -350,12 +350,6 @@ def resolve_evidence_binding(
     invalid = _validate_binding(binding)
     if invalid:
         return _blocked(invalid)
-    if fragment_context is not None:
-        evidence_count = 0
-        for item in binding["bindings"]:
-            evidence_count += len(item["evidence"])
-            if evidence_count + 1 > MAX_REPORT_ITEMS:
-                return _blocked("resource_limit_exceeded")
     knowledge = binding["knowledge"]
     if knowledge["path"] != knowledge_path:
         return _blocked("invalid_binding")
@@ -432,6 +426,12 @@ def resolve_evidence_binding(
             expected_digest = selected_expectations.get(f"{side}:{path}")
             if expected_digest is not None and observed.get(path) != expected_digest:
                 raise ValueError("expected input revision mismatch")
+    if fragment_context is not None:
+        evidence_count = 0
+        for item in binding["bindings"]:
+            evidence_count += len(item["evidence"])
+            if evidence_count + 1 > MAX_REPORT_ITEMS:
+                return _blocked("resource_limit_exceeded")
     baseline_index, current_index = _index(baseline), _index(current)
     if fragment_context is not None:
         grouped_ranges = {}

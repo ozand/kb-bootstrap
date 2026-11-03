@@ -614,6 +614,42 @@ class EvidenceBindingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "^expected input revision mismatch$"):
             self.resolve(expected_revisions={"knowledge": "0" * 64})
 
+    def test_combined_report_limit_preserves_stale_revision_priority(self):
+        references = []
+        selected_paths = []
+        for index in range(100):
+            path = "evidence.md" if index == 0 else f"evidence-{index:03}.md"
+            payload = self.base_bytes if index == 0 else f"Evidence {index}.\n".encode()
+            if index:
+                (self.base_project / self.base_corpus / path).write_bytes(payload)
+                self._write_one_envelope_source(self.base_meta, f"source-{index:03}", f"rep-{index:03}", path, payload, append=True)
+            references.append({
+                "source_id": "source-base" if index == 0 else f"source-{index:03}",
+                "representation_id": "rep-base" if index == 0 else f"rep-{index:03}",
+                "observed_sha256": sha(payload),
+            })
+            selected_paths.append(path)
+        self.binding["bindings"] = [
+            {"binding_id": f"binding-{group}", "evidence": [dict(reference) for reference in references]}
+            for group in range(10)
+        ]
+        self._write_binding()
+        stale_revisions = (
+            {"binding": "0" * 64},
+            {"knowledge": "0" * 64},
+            {"baseline_metadata": "0" * 64},
+            {"selected_files": {"baseline:evidence-001.md": "0" * 64}},
+        )
+        for expected in stale_revisions:
+            with self.subTest(expected=expected):
+                args = self._fragment_args()
+                args["baseline_selected_paths"] = selected_paths
+                args["expected_revisions"] = expected
+                with self.assertRaisesRegex(ValueError, "^expected input revision mismatch$"):
+                    evidence_binding.resolve_evidence_binding(**args)
+                with self.assertRaisesRegex(ValueError, "^expected input revision mismatch$"):
+                    evidence_binding.resolve_evidence_binding_with_fragment_continuity(**args)
+
     def test_metadata_revision_mismatch_precedes_envelope_validation(self):
         self.base_meta.write_text("invalid yaml: [", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "^expected input revision mismatch$"):
