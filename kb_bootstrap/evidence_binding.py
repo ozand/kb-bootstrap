@@ -198,7 +198,7 @@ def _read_selected(root: Path, relative: str, limit: int) -> Tuple[Optional[byte
         return None, "unsafe_or_inaccessible_path"
 
 
-def _envelope(project_root, metadata_path, corpus_root, selected_paths, snapshots=None):
+def _envelope(project_root, metadata_path, corpus_root, selected_paths, snapshots=None, snapshot_digests=None):
     project = _safe_root(project_root)
     if project is None:
         return None, None, "unsafe_or_inaccessible_path"
@@ -220,11 +220,15 @@ def _envelope(project_root, metadata_path, corpus_root, selected_paths, snapshot
            for path in selected_paths):
         return None, None, "unsafe_or_inaccessible_path"
     selected_snapshot = {} if snapshots is not None else None
+    selected_digests = {} if snapshot_digests is not None else None
     valid, errors, record = _validate_source_capture(
-        metadata_path, project, corpus_relative, selected_paths, snapshot_out=selected_snapshot
+        metadata_path, project, corpus_relative, selected_paths, snapshot_out=selected_snapshot,
+        snapshot_digests_out=selected_digests
     )
     if valid and snapshots is not None:
         snapshots.update(selected_snapshot)
+    if valid and snapshot_digests is not None:
+        snapshot_digests.update(selected_digests)
     if not valid or record is None:
         return None, None, "invalid_or_incomplete_envelope"
     return record, corpus, ""
@@ -346,6 +350,12 @@ def resolve_evidence_binding(
     invalid = _validate_binding(binding)
     if invalid:
         return _blocked(invalid)
+    if fragment_context is not None:
+        evidence_count = 0
+        for item in binding["bindings"]:
+            evidence_count += len(item["evidence"])
+            if evidence_count + 1 > MAX_REPORT_ITEMS:
+                return _blocked("resource_limit_exceeded")
     knowledge = binding["knowledge"]
     if knowledge["path"] != knowledge_path:
         return _blocked("invalid_binding")
@@ -385,18 +395,22 @@ def resolve_evidence_binding(
 
     baseline_snapshots = {} if fragment_context is not None else None
     current_snapshots = {} if fragment_context is not None else None
+    baseline_digests = {} if fragment_context is not None else None
+    current_digests = {} if fragment_context is not None else None
     baseline, baseline_corpus, reason = _envelope(
         baseline_project_root, baseline_metadata_path, baseline_corpus_root, baseline_selected_paths,
-        baseline_snapshots
+        baseline_snapshots, baseline_digests
     )
     if reason:
         return _blocked(reason)
     current, current_corpus, reason = _envelope(
         current_project_root, current_metadata_path, current_corpus_root, current_selected_paths,
-        current_snapshots
+        current_snapshots, current_digests
     )
-    if fragment_context is not None and reason == "":
-        fragment_context.update(baseline=baseline_snapshots, current=current_snapshots, baseline_record=baseline, current_record=current)
+    if fragment_context is not None:
+        fragment_context.update(baseline=baseline_snapshots, current=current_snapshots,
+                                baseline_digests=baseline_digests, current_digests=current_digests,
+                                baseline_record=baseline, current_record=current)
     if reason:
         return _blocked(reason)
     assert baseline is not None and current is not None and baseline_corpus is not None and current_corpus is not None
@@ -430,13 +444,8 @@ def resolve_evidence_binding(
             if (rep is None or rep["retention"] != "retained"
                     or rep["revision"]["digest"] != ref["observed_sha256"]):
                 return _blocked("baseline_identity_mismatch")
-            if ref.get("fragment") is not None:
-                fragment_bytes = (baseline_snapshots.get(rep["raw_path"])
-                                  if baseline_snapshots is not None else None)
-                if (fragment_bytes is None and fragment_context is None):
-                    fragment_bytes, fragment_error = _read_selected(baseline_corpus, rep["raw_path"], MAX_FILE_BYTES)
-                else:
-                    fragment_error = "" if fragment_bytes is not None else "unsafe_or_inaccessible_path"
+            if ref.get("fragment") is not None and fragment_context is None:
+                fragment_bytes, fragment_error = _read_selected(baseline_corpus, rep["raw_path"], MAX_FILE_BYTES)
                 if (fragment_error or fragment_bytes is None
                         or hashlib.sha256(fragment_bytes).hexdigest() != rep["revision"]["digest"]):
                     return _blocked("baseline_identity_mismatch")
@@ -539,6 +548,9 @@ def _fragment_ranges(data: bytes, references, extracted_total: int = 0):
             first, last, identity = pending
             ending.setdefault(last, []).append((identity, line_start))
             pending = next(ordered, None)
+        nonexistent_trailing_line = line_start == len(data) and (not data or data.endswith(b"\n"))
+        if nonexistent_trailing_line and (ending.get(line_number) or (pending is not None and pending[0] == line_number)):
+            raise ValueError("invalid_fragment")
         for identity, start in ending.pop(line_number, ()):
             size = content_end - start
             if size > MAX_FRAGMENT_BYTES or size > MAX_FRAGMENT_TOTAL_BYTES - range_total:
@@ -641,6 +653,8 @@ def resolve_evidence_binding_with_fragment_continuity(
                 by_identity[key] = ref
     if not by_identity:
         return {"resolver_report": report, "fragment_continuity": {"status": "NOT_APPLICABLE", "observations": []}}
+    if len(by_identity) > MAX_REPORT_ITEMS - 1:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
     snapshots = context.get("baseline")
     current_snapshots = context.get("current")
     base_record, cur_record = context.get("baseline_record"), context.get("current_record")
@@ -654,25 +668,35 @@ def resolve_evidence_binding_with_fragment_continuity(
         if rep is None or rep["raw_path"] not in snapshots:
             return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "baseline_identity_mismatch"}}
         data = snapshots[rep["raw_path"]]
-        if not _fragment_valid(ref["fragment"], data):
-            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "invalid_fragment"}}
         frag = ref["fragment"]
         line_groups.setdefault(rep["raw_path"], []).append((frag["start_line"], frag["end_line"], key))
         refs.append((key, ref, rep, data))
-    extracted = {}
     baseline_work = 0
-    extracted_total = 0
+    validated_digests = context.get("baseline_digests", {})
+    group_digests = {}
+    for _, ref, rep, _ in refs:
+        group_digests.setdefault(rep["raw_path"], rep["revision"]["digest"])
+    group_ranges = []
     for path, ranges in line_groups.items():
         data = snapshots[path]
+        if validated_digests.get(path) != group_digests[path]:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "baseline_identity_mismatch"}}
         if len(data) > MAX_SELECTED_TOTAL - baseline_work:
             return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
         baseline_work += len(data)
         try:
-            extracted_group = _fragment_ranges(data, ranges, extracted_total=extracted_total)
+            extracted_group = _fragment_ranges(data, ranges)
         except OverflowError:
             return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
-        extracted.update(extracted_group)
-        extracted_total += sum(len(value[0]) for value in extracted_group.values())
+        except ValueError:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "invalid_fragment"}}
+        group_ranges.append((path, extracted_group))
+    total_extracted = sum(len(span) for _, spans in group_ranges for span, _ in spans.values())
+    if total_extracted > MAX_FRAGMENT_TOTAL_BYTES:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+    extracted = {}
+    for _, spans in group_ranges:
+        extracted.update(spans)
     work = _checked_scan_add(0, baseline_work, MAX_FRAGMENT_SCAN_WORK)
     if work > MAX_FRAGMENT_SCAN_WORK:
         return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"}}

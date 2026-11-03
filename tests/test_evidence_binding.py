@@ -365,15 +365,72 @@ class EvidenceBindingTests(unittest.TestCase):
         self._write_binding()
         from kb_bootstrap import source_capture_validation
         original = source_capture_validation._read_regular
-        counts = {}
+        calls = []
+        expected_root = (self.base_project / self.base_corpus).resolve()
         def counted(root, relative, limit):
-            key = (str(root), relative)
-            counts[key] = counts.get(key, 0) + 1
+            key = (Path(root).resolve(), Path(relative).as_posix())
+            calls.append(key)
             return original(root, relative, limit)
         with patch.object(source_capture_validation, "_read_regular", side_effect=counted):
             result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
         self.assertEqual(result["fragment_continuity"]["status"], "COMPLETE")
-        self.assertEqual(counts[(str(self.base_project / self.base_corpus), "evidence.md")], 1)
+        matching_reads = [key for key in calls if key == (expected_root, "evidence.md")]
+        self.assertEqual(len(matching_reads), 1)
+        self.assertTrue(calls)
+
+    def test_fragment_continuity_repeated_locators_prepare_each_snapshot_once(self):
+        payload = b"".join(f"{index:04d}".encode("ascii") + b"x" * 1019 + b"\n" for index in range(2048))
+        (self.base_project / self.base_corpus / "evidence.md").write_bytes(payload)
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(payload)
+        self._write_envelope(self.base_meta, "source-base", "rep-base", payload)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", payload)
+        first = self.binding["bindings"][0]["evidence"][0]
+        first["observed_sha256"] = sha(payload)
+        first["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        bindings = [self.binding["bindings"][0]]
+        for index in range(1, 20):
+            ref = dict(first)
+            ref["fragment"] = dict(first["fragment"])
+            bindings.append({"binding_id": f"binding-{index + 1}", "evidence": [ref]})
+        self.binding["bindings"] = bindings
+        self._write_binding()
+
+        from kb_bootstrap import source_capture_validation
+        original_sha256 = source_capture_validation.hashlib.sha256
+        original_ranges = evidence_binding._fragment_ranges
+        digest_lengths = []
+        baseline_ranges = []
+        matcher_calls = []
+        def counted_sha256(data=b"", *args, **kwargs):
+            if data == payload:
+                digest_lengths.append(len(data))
+            return original_sha256(data, *args, **kwargs)
+        def counted_ranges(data, references, extracted_total=0):
+            if data == payload:
+                baseline_ranges.append(len(references))
+            return original_ranges(data, references, extracted_total)
+        original_matcher = evidence_binding._kmp_offsets
+        def counted_matcher(text, pattern):
+            matcher_calls.append(len(text))
+            return original_matcher(text, pattern)
+        with patch.object(source_capture_validation.hashlib, "sha256", side_effect=counted_sha256), \
+                patch.object(evidence_binding, "_fragment_ranges", side_effect=counted_ranges), \
+                patch.object(evidence_binding, "_kmp_offsets", side_effect=counted_matcher):
+            result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["resolver_report"]["status"], "COMPLETE")
+        self.assertEqual(result["fragment_continuity"]["status"], "COMPLETE")
+        self.assertEqual(len(result["fragment_continuity"]["observations"]), 20)
+        self.assertEqual(digest_lengths.count(len(payload)), 2)
+        self.assertEqual(baseline_ranges, [20])
+        self.assertEqual(len(matcher_calls), 20)
+
+        with patch.object(evidence_binding, "MAX_FRAGMENT_SCAN_WORK", 1), patch.object(
+                evidence_binding, "_kmp_offsets", side_effect=AssertionError("preflight must block before KMP")):
+            blocked = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(blocked["resolver_report"]["status"], "COMPLETE")
+        self.assertEqual(blocked["fragment_continuity"], {
+            "status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"
+        })
 
     def test_fragment_continuity_duplicate_matches_and_permission_denial(self):
         ref = self.binding["bindings"][0]["evidence"][0]
