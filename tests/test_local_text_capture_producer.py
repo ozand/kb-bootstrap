@@ -37,8 +37,9 @@ class LocalTextCaptureProducerTests(unittest.TestCase):
                              entity='yaml: [inert]', fidelity="partial")
 
     def produce(self, name="001-local.md", **overrides):
-        return producer.produce_capture(self.study, self.inputs, "text.md", name,
-                                        **(self.metadata | overrides))
+        metadata = dict(self.metadata)
+        metadata.update(overrides)
+        return producer.produce_capture(self.study, self.inputs, "text.md", name, **metadata)
 
     def test_body_bytes_preserved_for_newline_variants(self):
         for i, body in enumerate((b"a\n", b"a\r\n", b"a\r", b"a"), 1):
