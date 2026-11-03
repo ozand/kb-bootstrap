@@ -15,6 +15,7 @@ from .qmd_validator import validate_qmd_collections
 from .qmd_names import project_slug
 from .qmd_search import search_qmd
 from .local_retrieval import search_local, read_local
+from .lesson_search import search_lessons
 from .qmd_adapter import search_qmd_bounded
 from .repository_doctor import inspect_repository
 from .completion_validator import validate_completion
@@ -296,6 +297,13 @@ def main():
     search_local_parser.add_argument("query")
     search_local_parser.add_argument("--dir", required=True, help="Explicit canonical root")
     search_local_parser.add_argument("--limit", type=int, default=10)
+    lesson_search_parser = subparsers.add_parser(
+        "search-lessons", help="Search one explicitly configured lesson Markdown store"
+    )
+    lesson_search_parser.add_argument("query")
+    lesson_search_parser.add_argument("--project-root", required=True)
+    lesson_search_parser.add_argument("--store", required=True, choices=["local", "shared"])
+    lesson_search_parser.add_argument("--limit", type=int, default=10)
     read_local_parser = subparsers.add_parser(
         "read-local", help="Read a bounded canonical Markdown file without QMD"
     )
@@ -582,6 +590,11 @@ def main():
         report, is_valid = enable_project_lessons(args.enable_target, pkg_dir)
         print(report)
         return 0 if is_valid else 1
+
+    if args.command == "search-lessons":
+        report, code = search_lessons(args.query, args.project_root, args.store, args.limit)
+        _print_local_json(report)
+        return code
 
     if args.command == "lesson-lookup":
         config_path = Path(args.config).resolve()

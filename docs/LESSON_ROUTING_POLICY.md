@@ -98,3 +98,22 @@ Examples include a missing `capture_store`, an unknown selected store, multiple 
 - `kb-lookup` implements read-only local-first/shared-second lookup and blocks when no deterministic store configuration exists.
 
 The skills retain operational checks specific to their capability. This document is the normative ownership and routing policy. Manual promotion and demotion between scopes follow the separate [reviewed promotion and demotion workflow](LESSON_PROMOTION_WORKFLOW.md), always require explicit review, and are never inferred from lookup or capture.
+
+## Bounded Markdown lookup
+
+Use the separate `search-lessons` command to search exactly one named configured
+store. It reads only indexed Markdown in that store and returns bounded body-line
+excerpts; YAML frontmatter is excluded. For example:
+
+```bash
+kb-bootstrap search-lessons "timeout" --project-root . --store local
+kb-bootstrap search-lessons "timeout" --project-root . --store shared
+```
+
+The second invocation is appropriate only when the shared store is explicitly
+configured read-only. Generated `kb-lookup` searches local first and invokes shared
+only after a complete local no-match. `PARTIAL`, unavailable, or blocked local
+results are not no-match and stop fallback. This command is separate from
+`lesson-lookup`, which continues to consume an explicit JSON export bundle. Neither
+command discovers stores; `search-local` remains canonical-only. See
+[ADR-053](adr/ADR-053-propose-explicit-bounded-markdown-lesson-search.md).
