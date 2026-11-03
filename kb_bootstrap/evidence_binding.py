@@ -768,7 +768,7 @@ def resolve_evidence_binding_with_fragment_continuity(
     if baseline_work > MAX_SELECTED_TOTAL:
         return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
     # All extraction and aggregate costs are proven before making owned pattern bytes.
-    searches = [(key, ref, fragment_view.tobytes(), offset, target, current_data)
+    searches = [(key, ref, bytes(fragment_view), offset, target, current_data)
                 for key, ref, fragment_view, offset, target, current_data in searches]
     observations = []
     for key, ref, fragment, offset, target, current_data in searches:

@@ -432,6 +432,26 @@ class EvidenceBindingTests(unittest.TestCase):
             "status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"
         })
 
+    def test_fragment_continuity_empty_fragment_is_unassessable(self):
+        payload = b"\nEvidence after blank line.\n"
+        (self.base_project / self.base_corpus / "evidence.md").write_bytes(payload)
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(payload)
+        self._write_envelope(self.base_meta, "source-base", "rep-base", payload)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", payload)
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["observed_sha256"] = sha(payload)
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self._write_binding()
+        standalone = self.resolve()
+        self.assertEqual(standalone["status"], "COMPLETE")
+        with patch.object(evidence_binding, "_kmp_offsets", side_effect=AssertionError("empty fragments must not search")):
+            combined = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(combined["resolver_report"], standalone)
+        self.assertEqual(combined["fragment_continuity"]["status"], "COMPLETE")
+        observation = combined["fragment_continuity"]["observations"][0]
+        self.assertEqual(observation["outcome"], "unassessable_empty_fragment")
+        self.assertEqual(observation["current_offsets"], [])
+
     def test_fragment_continuity_invalid_range_preserves_resolver_block(self):
         ref = self.binding["bindings"][0]["evidence"][0]
         ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
