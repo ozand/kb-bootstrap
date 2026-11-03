@@ -58,6 +58,7 @@ class MarketResearchScaffoldTests(unittest.TestCase):
             skill = root / ".agents/skills/market-research"
             self.assertTrue((skill / "SKILL.md").is_file())
             self.assertTrue((skill / "scripts/capture_page.py").is_file())
+            self.assertTrue((skill / "scripts/produce_local_capture.py").is_file())
             self.assertTrue((skill / "scripts/extract_markdown.js").is_file())
             self.assertTrue((skill / "assets/brief-template.md").is_file())
             report_template = (skill / "assets/report-template.md").read_text(encoding="utf-8")
