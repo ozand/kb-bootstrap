@@ -204,7 +204,8 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
 
 def _validate_source_capture(metadata_path: str | Path, project_root: str | Path,
                              corpus_root: str | Path, selected_paths: Iterable[str],
-                             manifest_path: str | Path | None = None) -> Tuple[bool, Tuple[str, ...], Optional[Dict[str, Any]]]:
+                             manifest_path: str | Path | None = None,
+                             *, snapshot_out: Optional[Dict[str, bytes]] = None) -> Tuple[bool, Tuple[str, ...], Optional[Dict[str, Any]]]:
     """Internal variant returning the parsed record validated from this snapshot."""
     if not isinstance(metadata_path, (str, Path)) or not isinstance(project_root, (str, Path)) or not isinstance(corpus_root, (str, Path)):
         return False, ("metadata, project, and corpus paths are invalid",), None
@@ -272,6 +273,8 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
         except UnicodeError:
             return False, ("selected file is not UTF-8 text",), None
         selected[path] = data
+    if snapshot_out is not None:
+        snapshot_out.update(selected)
     if manifest_path is not None:
         if not isinstance(manifest_path, (str, Path)):
             return False, ("manifest path is invalid",), None

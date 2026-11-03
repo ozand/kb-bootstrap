@@ -279,6 +279,150 @@ class EvidenceBindingTests(unittest.TestCase):
         else:
             metadata.write_text("schema: kb-bootstrap.source-capture\nversion: 1\nsources:\n" + source, encoding="utf-8")
 
+    def _fragment_args(self):
+        return dict(
+            project_root=self.binding_root, binding_path="binding.json", knowledge_path="topic.md",
+            baseline_metadata_path="capture.yaml", baseline_project_root=self.base_project,
+            baseline_corpus_root=self.base_corpus, baseline_selected_paths=["evidence.md"],
+            current_metadata_path="capture.yaml", current_project_root=self.current_project,
+            current_corpus_root=self.current_corpus, current_selected_paths=["evidence.md"],
+            authorize_validation_read=lambda: True, authorize_processing_and_report=lambda: True,
+        )
+
+    def test_fragment_range_extracts_multiline_and_crlf_bytes(self):
+        payload = b"one\r\ntwo\r\nthree"
+        extracted = evidence_binding._fragment_ranges(payload, [(1, 2, "a"), (2, 3, "b")])
+        self.assertEqual(bytes(extracted["a"][0]), b"one\r\ntwo")
+        self.assertEqual(extracted["a"][1], 0)
+        self.assertEqual(bytes(extracted["b"][0]), b"two\r\nthree")
+        self.assertEqual(extracted["b"][1], 5)
+
+    def test_fragment_scan_budget_addition_saturates_without_wraparound(self):
+        cap = evidence_binding.MAX_FRAGMENT_SCAN_WORK
+        self.assertEqual(evidence_binding._checked_scan_add(cap, 0, cap), cap)
+        self.assertEqual(evidence_binding._checked_scan_add(cap, 1, cap), cap + 1)
+        self.assertEqual(evidence_binding._checked_scan_add(cap + 1, 0, cap), cap + 1)
+
+    def test_fragment_range_budget_preflights_before_materializing_slices(self):
+        payload = b"x" * 40000
+        ranges = [(1, 1, "first"), (1, 1, "repeat-a"), (1, 1, "repeat-b")]
+        with patch.object(evidence_binding, "MAX_FRAGMENT_TOTAL_BYTES", 100000), patch(
+                "builtins.memoryview", side_effect=AssertionError("slice must not be materialized")):
+            with self.assertRaises(OverflowError):
+                evidence_binding._fragment_ranges(payload, ranges)
+        oversized = b"z" * (evidence_binding.MAX_FRAGMENT_BYTES + 1)
+        with patch("builtins.memoryview", side_effect=AssertionError("oversized slice must not be materialized")):
+            with self.assertRaises(OverflowError):
+                evidence_binding._fragment_ranges(oversized, [(1, 1, "oversized")])
+
+    def test_fragment_continuity_not_applicable_and_current_missing(self):
+        result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["fragment_continuity"], {"status": "NOT_APPLICABLE", "observations": []})
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        ref["current"] = {"source_id": "absent", "representation_id": "absent"}
+        self._write_binding()
+        result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["fragment_continuity"]["observations"][0]["outcome"], "unassessable_current_missing")
+
+    def test_fragment_continuity_exact_and_overlapping_matches(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self._write_binding()
+        result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["resolver_report"], self.resolve())
+        observation = result["fragment_continuity"]["observations"][0]
+        self.assertEqual(observation["outcome"], "exact_at_baseline_offset")
+        self.assertEqual(observation["current_offsets"], [0])
+        self.assertEqual(evidence_binding._kmp_offsets(b"aaaa", b"aa"), [0, 1, 2])
+
+    def test_fragment_continuity_moved_missing_and_no_mapping(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self.current_bytes = b"prefix\n" + self.base_bytes
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(self.current_bytes)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        moved = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(moved["fragment_continuity"]["observations"][0]["outcome"], "unique_moved_match")
+        self.current_bytes = b"different\n"
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(self.current_bytes)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        absent = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(absent["fragment_continuity"]["observations"][0]["outcome"], "no_exact_match")
+        ref.pop("current")
+        self._write_binding()
+        no_mapping = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(no_mapping["fragment_continuity"]["observations"][0]["outcome"], "unassessable_no_mapping")
+
+    def test_fragment_continuity_baseline_snapshot_read_once(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        second = dict(ref)
+        second["fragment"] = dict(ref["fragment"])
+        self.binding["bindings"].append({"binding_id": "binding-2", "evidence": [second]})
+        self._write_binding()
+        from kb_bootstrap import source_capture_validation
+        original = source_capture_validation._read_regular
+        counts = {}
+        def counted(root, relative, limit):
+            key = (str(root), relative)
+            counts[key] = counts.get(key, 0) + 1
+            return original(root, relative, limit)
+        with patch.object(source_capture_validation, "_read_regular", side_effect=counted):
+            result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["fragment_continuity"]["status"], "COMPLETE")
+        self.assertEqual(counts[(str(self.base_project / self.base_corpus), "evidence.md")], 1)
+
+    def test_fragment_continuity_duplicate_matches_and_permission_denial(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self.current_bytes = self.base_bytes + self.base_bytes
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(self.current_bytes)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        observation = result["fragment_continuity"]["observations"][0]
+        self.assertEqual(observation["outcome"], "ambiguous_exact_matches")
+        self.assertEqual(observation["current_offsets"], [0, len(self.base_bytes)])
+        denied = self._fragment_args()
+        denied["authorize_validation_read"] = lambda: False
+        with patch("kb_bootstrap.raw_manifest.os.open", side_effect=AssertionError("denied operation must not read")):
+            with self.assertRaises(PermissionError):
+                evidence_binding.resolve_evidence_binding_with_fragment_continuity(**denied)
+
+    def test_fragment_continuity_budget_exact_cap_and_match_limit_are_atomic(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self._write_binding()
+        current_size = len(self.current_bytes)
+        pattern_size = len(evidence_binding._fragment_ranges(self.base_bytes, [(1, 1, "ref")])["ref"][0])
+        work = len(self.base_bytes) + pattern_size + current_size + pattern_size
+        with patch.object(evidence_binding, "MAX_FRAGMENT_SCAN_WORK", work):
+            complete = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(complete["fragment_continuity"]["status"], "COMPLETE")
+        with patch.object(evidence_binding, "MAX_FRAGMENT_SCAN_WORK", work - 1):
+            overflow = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(overflow["fragment_continuity"], {"status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"})
+        self.current_bytes = self.base_bytes * 101
+        (self.current_project / self.current_corpus / "evidence.md").write_bytes(self.current_bytes)
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        too_many = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(too_many["fragment_continuity"], {"status": "BLOCKED", "reason": "match_limit_exceeded"})
+        self.assertNotIn("observations", too_many["fragment_continuity"])
+
+    def test_fragment_continuity_budget_blocks_before_matcher(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 1}
+        self._write_binding()
+        with patch.object(evidence_binding, "MAX_FRAGMENT_SCAN_WORK", 1), patch.object(
+                evidence_binding, "_kmp_offsets", side_effect=AssertionError("matcher must not run")):
+            result = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(result["fragment_continuity"], {"status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"})
+        self.assertEqual(result["resolver_report"]["status"], "COMPLETE")
+
     def test_fragment_line_bounds_are_enforced_by_resolver(self):
         ref = self.binding["bindings"][0]["evidence"][0]
         ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
