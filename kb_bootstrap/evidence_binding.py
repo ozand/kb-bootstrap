@@ -754,12 +754,12 @@ def resolve_evidence_binding_with_fragment_continuity(
         fragment_view, offset = extracted[key]
         if len(fragment_view) > MAX_FRAGMENT_BYTES:
             return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
-        if not fragment_view:
-            searches.append((key, ref, b"", offset, None, None))
-            continue
         mapping = ref.get("current")
         target = None if mapping is None else _validated_rep(cur_index, mapping["source_id"], mapping["representation_id"])
         current_data = None if target is None else current_snapshots.get(target["raw_path"])
+        if not fragment_view:
+            searches.append((key, ref, b"", offset, target, current_data))
+            continue
         cost = len(fragment_view) * (1 if current_data is None else 2) + (0 if current_data is None else len(current_data))
         work = _checked_scan_add(work, cost, MAX_FRAGMENT_SCAN_WORK)
         if work > MAX_FRAGMENT_SCAN_WORK:

@@ -451,6 +451,21 @@ class EvidenceBindingTests(unittest.TestCase):
         observation = combined["fragment_continuity"]["observations"][0]
         self.assertEqual(observation["outcome"], "unassessable_empty_fragment")
         self.assertEqual(observation["current_offsets"], [])
+        self.assertEqual(observation["current"], {
+            "source_id": "source-current",
+            "representation_id": "rep-current",
+            "observed_sha256": sha(payload),
+        })
+
+        ref.pop("current")
+        self._write_binding()
+        with patch.object(evidence_binding, "_kmp_offsets", side_effect=AssertionError("empty fragments must not search")):
+            unmapped = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(unmapped["fragment_continuity"]["status"], "COMPLETE")
+        unmapped_observation = unmapped["fragment_continuity"]["observations"][0]
+        self.assertEqual(unmapped_observation["outcome"], "unassessable_empty_fragment")
+        self.assertIsNone(unmapped_observation["current"])
+        self.assertEqual(unmapped_observation["current_offsets"], [])
 
     def test_fragment_continuity_invalid_range_preserves_resolver_block(self):
         ref = self.binding["bindings"][0]["evidence"][0]
