@@ -72,6 +72,23 @@ class EvidenceReviewTests(unittest.TestCase):
     def test_graph_validated_with_complete_report(self):
         with self.assertRaises(ValueError): self.compose(report([ref("a","unchanged")]),graph=[{"id":"bad","kind":"reprint","upstream_ids":["absent"]}])
 
+    def test_composed_fragment_continuity_entry_point_preserves_reports(self):
+        from test_evidence_binding import EvidenceBindingTests
+        from kb_bootstrap.evidence_binding import resolve_evidence_binding_with_fragment_continuity
+        fixture=EvidenceBindingTests(); fixture.setUp()
+        try:
+            fixture.binding["bindings"][0]["evidence"][0]["fragment"] = {"representation_id":"rep-base","start_line":1,"end_line":1}
+            fixture._write_binding()
+            result=resolve_evidence_binding_with_fragment_continuity(**fixture._fragment_args())
+            expected=fixture.resolve()
+            self.assertEqual(result["resolver_report"],expected)
+            graph=[{"id":"root","kind":"independent","upstream_ids":[]}]
+            composed=self.compose(result["resolver_report"],graph=graph)
+            self.assertEqual(composed["resolver_report"],expected)
+            self.assertEqual(composed["worklist"][0]["reference"],expected["references"][0])
+            self.assertEqual(result["fragment_continuity"]["status"],"COMPLETE")
+        finally: fixture.doCleanups()
+
     def test_real_resolver_composition_with_duplicate_binding(self):
         from test_evidence_binding import EvidenceBindingTests
         fixture=EvidenceBindingTests(); fixture.setUp()

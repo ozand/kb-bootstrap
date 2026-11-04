@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import contextvars
 import os
 import re
 import stat
@@ -29,6 +30,12 @@ MAX_REPORT_ITEMS = 1000
 MAX_REPORT_BYTES = 8 * 1024 * 1024
 MAX_SELECTED_TOTAL = 256 * 1024 * 1024
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_FRAGMENT_CONTEXT = contextvars.ContextVar("evidence_fragment_context", default=None)
+
+MAX_FRAGMENT_BYTES = 64 * 1024
+MAX_FRAGMENT_TOTAL_BYTES = 64 * 1024 * 1024
+MAX_FRAGMENT_SCAN_WORK = 512 * 1024 * 1024
+MAX_FRAGMENT_OFFSETS = 100
 
 
 class PermissionError(Exception):
@@ -191,7 +198,7 @@ def _read_selected(root: Path, relative: str, limit: int) -> Tuple[Optional[byte
         return None, "unsafe_or_inaccessible_path"
 
 
-def _envelope(project_root, metadata_path, corpus_root, selected_paths):
+def _envelope(project_root, metadata_path, corpus_root, selected_paths, snapshots=None, snapshot_digests=None):
     project = _safe_root(project_root)
     if project is None:
         return None, None, "unsafe_or_inaccessible_path"
@@ -212,9 +219,16 @@ def _envelope(project_root, metadata_path, corpus_root, selected_paths):
     if any(_traverses_reparse_point(corpus / Path(path)) or _traverses_symlink(corpus / Path(path))
            for path in selected_paths):
         return None, None, "unsafe_or_inaccessible_path"
+    selected_snapshot = {} if snapshots is not None else None
+    selected_digests = {} if snapshot_digests is not None else None
     valid, errors, record = _validate_source_capture(
-        metadata_path, project, corpus_relative, selected_paths
+        metadata_path, project, corpus_relative, selected_paths, snapshot_out=selected_snapshot,
+        snapshot_digests_out=selected_digests
     )
+    if valid and snapshots is not None:
+        snapshots.update(selected_snapshot)
+    if valid and snapshot_digests is not None:
+        snapshot_digests.update(selected_digests)
     if not valid or record is None:
         return None, None, "invalid_or_incomplete_envelope"
     return record, corpus, ""
@@ -288,6 +302,7 @@ def resolve_evidence_binding(
                 or any(not isinstance(key, str) or not isinstance(value, str) or not DIGEST.fullmatch(value)
                        for key, value in file_expectations.items())):
             raise ValueError("expected revision request is invalid")
+    fragment_context = _FRAGMENT_CONTEXT.get()
     _permission(authorize_validation_read, "evidence validation read denied")
     _permission(authorize_processing_and_report, "evidence processing/report denied")
     if not isinstance(knowledge_path, str) or relative_markdown(knowledge_path) is None:
@@ -321,6 +336,8 @@ def resolve_evidence_binding(
     if error:
         return _blocked(error)
     assert binding_bytes is not None
+    if fragment_context is not None:
+        fragment_context["binding_bytes"] = binding_bytes
     try:
         binding = json.loads(binding_bytes.decode("utf-8"), object_pairs_hook=_pairs)
     except (UnicodeError, ValueError, json.JSONDecodeError, RecursionError):
@@ -340,6 +357,8 @@ def resolve_evidence_binding(
     if error:
         return _blocked(error)
     assert knowledge_bytes is not None
+    if fragment_context is not None:
+        fragment_context["knowledge_bytes"] = knowledge_bytes
     try:
         knowledge_bytes.decode("utf-8")
     except UnicodeError:
@@ -368,13 +387,20 @@ def resolve_evidence_binding(
             if read_error or metadata_data is None or hashlib.sha256(metadata_data).hexdigest() != expected_value:
                 raise ValueError("expected input revision mismatch")
 
+    baseline_snapshots = {} if fragment_context is not None else None
+    current_snapshots = {} if fragment_context is not None else None
+    grouped_invalid_fragments = set() if fragment_context is not None else None
+    baseline_digests = {} if fragment_context is not None else None
+    current_digests = {} if fragment_context is not None else None
     baseline, baseline_corpus, reason = _envelope(
-        baseline_project_root, baseline_metadata_path, baseline_corpus_root, baseline_selected_paths
+        baseline_project_root, baseline_metadata_path, baseline_corpus_root, baseline_selected_paths,
+        baseline_snapshots, baseline_digests
     )
     if reason:
         return _blocked(reason)
     current, current_corpus, reason = _envelope(
-        current_project_root, current_metadata_path, current_corpus_root, current_selected_paths
+        current_project_root, current_metadata_path, current_corpus_root, current_selected_paths,
+        current_snapshots, current_digests
     )
     if reason:
         return _blocked(reason)
@@ -401,6 +427,58 @@ def resolve_evidence_binding(
             if expected_digest is not None and observed.get(path) != expected_digest:
                 raise ValueError("expected input revision mismatch")
     baseline_index, current_index = _index(baseline), _index(current)
+    if fragment_context is not None:
+        grouped_ranges = {}
+        grouped_digests = {}
+        grouped_positions = {}
+        row_failures = {}
+        for binding_index, binding_item in enumerate(binding["bindings"]):
+            for evidence_index, ref in enumerate(binding_item["evidence"]):
+                fragment = ref.get("fragment")
+                rep = _validated_rep(baseline_index, ref["source_id"], ref["representation_id"])
+                if (rep is None or rep["retention"] != "retained"
+                        or rep["revision"]["digest"] != ref["observed_sha256"]):
+                    row_failures[(binding_index, evidence_index)] = "baseline_identity_mismatch"
+                    continue
+                mapping = ref.get("current")
+                if mapping is not None:
+                    target = _validated_rep(current_index, mapping["source_id"], mapping["representation_id"])
+                    if target is not None and target["retention"] != "retained":
+                        row_failures[(binding_index, evidence_index)] = "invalid_binding"
+                if fragment is None:
+                    continue
+                path = rep["raw_path"]
+                data = baseline_snapshots.get(path)
+                if data is None or baseline_digests.get(path) != rep["revision"]["digest"]:
+                    row_failures.setdefault((binding_index, evidence_index), "baseline_identity_mismatch")
+                    continue
+                identity = (binding_item["binding_id"], ref["source_id"], ref["representation_id"], ref["observed_sha256"])
+                grouped_positions[identity] = (binding_index, evidence_index)
+                grouped_ranges.setdefault(path, []).append((fragment["start_line"], fragment["end_line"], identity))
+                grouped_digests.setdefault(path, rep["revision"]["digest"])
+        grouped_extractions = {}
+        for path, ranges in grouped_ranges.items():
+            if grouped_digests[path] != baseline_digests.get(path):
+                for binding_index, evidence_index, _ in ranges:
+                    row_failures.setdefault((binding_index, evidence_index), "baseline_identity_mismatch")
+                continue
+            invalid_rows = set()
+            extracted = _fragment_ranges(
+                baseline_snapshots[path], ranges, enforce_limits=False, invalid_out=invalid_rows
+            )
+            for identity in invalid_rows:
+                row_failures.setdefault(grouped_positions[identity], "invalid_binding")
+            grouped_extractions[path] = extracted
+        if row_failures:
+            first_failure = min(row_failures)
+            return _blocked(row_failures[first_failure])
+        if sum(len(item["evidence"]) for item in binding["bindings"]) + 1 > MAX_REPORT_ITEMS:
+            return _blocked("resource_limit_exceeded")
+        fragment_context.update(baseline=baseline_snapshots, current=current_snapshots,
+                                baseline_digests=baseline_digests, current_digests=current_digests,
+                                baseline_extractions=grouped_extractions,
+                                baseline_record=baseline, current_record=current,
+                                invalid_fragments=set())
 
     # Validate all binding correspondences and fragment bounds before deriving any report.
     for binding_item in binding["bindings"]:
@@ -409,10 +487,8 @@ def resolve_evidence_binding(
             if (rep is None or rep["retention"] != "retained"
                     or rep["revision"]["digest"] != ref["observed_sha256"]):
                 return _blocked("baseline_identity_mismatch")
-            if ref.get("fragment") is not None:
-                fragment_bytes, fragment_error = _read_selected(
-                    baseline_corpus, rep["raw_path"], MAX_FILE_BYTES
-                )
+            if ref.get("fragment") is not None and fragment_context is None:
+                fragment_bytes, fragment_error = _read_selected(baseline_corpus, rep["raw_path"], MAX_FILE_BYTES)
                 if (fragment_error or fragment_bytes is None
                         or hashlib.sha256(fragment_bytes).hexdigest() != rep["revision"]["digest"]):
                     return _blocked("baseline_identity_mismatch")
@@ -492,3 +568,248 @@ def resolve_evidence_binding(
     if len(serialized) > MAX_REPORT_BYTES:
         return _blocked("serialization_limit_exceeded")
     return report
+
+
+
+def _fragment_ranges(data: bytes, references, extracted_total: int = 0, *, enforce_limits: bool = True,
+                     invalid_out: Optional[set] = None):
+    """Preflight ranges in one line-boundary scan, optionally deferring range errors."""
+    ordered = iter(sorted(references, key=lambda item: (item[0], item[1], item[2])))
+    pending = next(ordered, None)
+    ending = {}
+    descriptors = {}
+    completed = set()
+    range_total = extracted_total
+    line_number = 1
+    line_start = 0
+    position = 0
+    while True:
+        newline = data.find(b"\n", position)
+        terminated = newline >= 0
+        line_end = newline if terminated else len(data)
+        content_end = line_end - 1 if terminated and line_end > line_start and data[line_end - 1] == 13 else line_end
+        while pending is not None and pending[0] == line_number:
+            first, last, identity = pending
+            ending.setdefault(last, []).append((identity, line_start))
+            pending = next(ordered, None)
+        nonexistent_trailing_line = line_start == len(data) and (not data or data.endswith(b"\n"))
+        if nonexistent_trailing_line:
+            trailing = ending.pop(line_number, ())
+            starts = []
+            while pending is not None and pending[0] == line_number:
+                starts.append(pending[2])
+                pending = next(ordered, None)
+            if trailing or starts:
+                if invalid_out is None:
+                    raise ValueError("invalid_fragment")
+                invalid_out.update(identity for identity, _ in trailing)
+                invalid_out.update(starts)
+        for identity, start in ending.pop(line_number, ()):
+            size = content_end - start
+            if enforce_limits and (size > MAX_FRAGMENT_BYTES or size > MAX_FRAGMENT_TOTAL_BYTES - range_total):
+                raise OverflowError("resource_limit_exceeded")
+            range_total += size
+            descriptors[identity] = (start, content_end)
+            completed.add(identity)
+        if pending is not None and pending[0] < line_number:
+            if invalid_out is None:
+                raise ValueError("invalid_fragment")
+            invalid_out.add(pending[2])
+            pending = next(ordered, None)
+        if pending is None and not ending:
+            break
+        if not terminated:
+            break
+        line_start = newline + 1
+        position = line_start
+        line_number += 1
+    if pending is not None or ending or len(completed) + (len(invalid_out) if invalid_out is not None else 0) != len(references):
+        if invalid_out is None:
+            raise ValueError("invalid_fragment")
+        if pending is not None:
+            invalid_out.add(pending[2])
+        for expired in ending.values():
+            invalid_out.update(identity for identity, _ in expired)
+        invalid_out.update(identity for _, _, identity in references if identity not in completed and identity not in invalid_out)
+    return {identity: (memoryview(data)[start:end], start)
+            for identity, (start, end) in descriptors.items()}
+
+
+def _checked_scan_add(total: int, amount: int, cap: int) -> int:
+    """Add bounded scan work, returning cap+1 as the exhaustion sentinel."""
+    if total > cap or amount > cap - total:
+        return cap + 1
+    return total + amount
+
+def _kmp_offsets(text: bytes, pattern: bytes):
+    """Return up to 101 overlapping exact byte offsets using linear-time KMP."""
+    prefix = [0] * len(pattern)
+    matched = 0
+    for index in range(1, len(pattern)):
+        while matched and pattern[index] != pattern[matched]:
+            matched = prefix[matched - 1]
+        if pattern[index] == pattern[matched]:
+            matched += 1
+        prefix[index] = matched
+    offsets = []
+    matched = 0
+    for index, byte in enumerate(text):
+        while matched and byte != pattern[matched]:
+            matched = prefix[matched - 1]
+        if byte == pattern[matched]:
+            matched += 1
+        if matched == len(pattern):
+            offsets.append(index - len(pattern) + 1)
+            if len(offsets) > MAX_FRAGMENT_OFFSETS:
+                return offsets
+            matched = prefix[matched - 1]
+    return offsets
+
+
+def resolve_evidence_binding_with_fragment_continuity(
+    *,
+    project_root: str | Path,
+    binding_path: str | Path,
+    knowledge_path: str,
+    baseline_metadata_path: str | Path,
+    baseline_project_root: str | Path,
+    baseline_corpus_root: str | Path,
+    baseline_selected_paths: Iterable[str],
+    current_metadata_path: str | Path,
+    current_project_root: str | Path,
+    current_corpus_root: str | Path,
+    current_selected_paths: Iterable[str],
+    expected_revisions: Optional[Dict[str, Any]] = None,
+    authorize_validation_read: Callable[[], bool] = lambda: False,
+    authorize_processing_and_report: Callable[[], bool] = lambda: False,
+) -> dict:
+    """Resolve once, adding bounded exact-byte observations for selected fragments."""
+    context = {}
+    token = _FRAGMENT_CONTEXT.set(context)
+    try:
+        report = resolve_evidence_binding(
+            project_root=project_root, binding_path=binding_path, knowledge_path=knowledge_path,
+            baseline_metadata_path=baseline_metadata_path, baseline_project_root=baseline_project_root,
+            baseline_corpus_root=baseline_corpus_root, baseline_selected_paths=baseline_selected_paths,
+            current_metadata_path=current_metadata_path, current_project_root=current_project_root,
+            current_corpus_root=current_corpus_root, current_selected_paths=current_selected_paths,
+            expected_revisions=expected_revisions, authorize_validation_read=authorize_validation_read,
+            authorize_processing_and_report=authorize_processing_and_report,
+        )
+    finally:
+        _FRAGMENT_CONTEXT.reset(token)
+    if report.get("status") != "COMPLETE":
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resolver_blocked"}}
+    binding_bytes = context.get("binding_bytes")
+    if binding_bytes is None:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "snapshot_unavailable"}}
+    try:
+        binding = json.loads(binding_bytes.decode("utf-8"), object_pairs_hook=_pairs)
+    except (UnicodeError, ValueError, json.JSONDecodeError, RecursionError):
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "snapshot_unavailable"}}
+    by_identity = {}
+    for item in binding["bindings"]:
+        for ref in item["evidence"]:
+            if "fragment" in ref:
+                key = (item["binding_id"], ref["source_id"], ref["representation_id"], ref["observed_sha256"])
+                by_identity[key] = ref
+    if not by_identity:
+        return {"resolver_report": report, "fragment_continuity": {"status": "NOT_APPLICABLE", "observations": []}}
+    if len(by_identity) > MAX_REPORT_ITEMS - 1:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+    snapshots = context.get("baseline")
+    current_snapshots = context.get("current")
+    base_record, cur_record = context.get("baseline_record"), context.get("current_record")
+    if snapshots is None or current_snapshots is None or base_record is None or cur_record is None:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "snapshot_unavailable"}}
+    base_index, cur_index = _index(base_record), _index(cur_record)
+    refs = []
+    line_groups = {}
+    for key, ref in by_identity.items():
+        rep = _validated_rep(base_index, ref["source_id"], ref["representation_id"])
+        if rep is None or rep["raw_path"] not in snapshots:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "baseline_identity_mismatch"}}
+        data = snapshots[rep["raw_path"]]
+        frag = ref["fragment"]
+        line_groups.setdefault(rep["raw_path"], []).append((frag["start_line"], frag["end_line"], key))
+        refs.append((key, ref, rep, data))
+    baseline_work = 0
+    validated_digests = context.get("baseline_digests", {})
+    group_digests = {}
+    for _, ref, rep, _ in refs:
+        group_digests.setdefault(rep["raw_path"], rep["revision"]["digest"])
+    group_ranges = []
+    baseline_extractions = context.get("baseline_extractions", {})
+    for path, ranges in line_groups.items():
+        data = snapshots[path]
+        if validated_digests.get(path) != group_digests[path]:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "baseline_identity_mismatch"}}
+        if len(data) > MAX_SELECTED_TOTAL - baseline_work:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+        baseline_work += len(data)
+        extracted_group = baseline_extractions.get(path)
+        if extracted_group is None:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "snapshot_unavailable"}}
+        group_ranges.append((path, extracted_group))
+    if context.get("invalid_fragments"):
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "invalid_fragment"}}
+    total_extracted = sum(len(span) for _, spans in group_ranges for span, _ in spans.values())
+    if total_extracted > MAX_FRAGMENT_TOTAL_BYTES:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+    extracted = {}
+    for _, spans in group_ranges:
+        extracted.update(spans)
+    work = _checked_scan_add(0, baseline_work, MAX_FRAGMENT_SCAN_WORK)
+    if work > MAX_FRAGMENT_SCAN_WORK:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"}}
+    searches = []
+    for key, ref, rep, data in refs:
+        fragment_view, offset = extracted[key]
+        if len(fragment_view) > MAX_FRAGMENT_BYTES:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+        mapping = ref.get("current")
+        target = None if mapping is None else _validated_rep(cur_index, mapping["source_id"], mapping["representation_id"])
+        current_data = None if target is None else current_snapshots.get(target["raw_path"])
+        if not fragment_view:
+            searches.append((key, ref, b"", offset, target, current_data))
+            continue
+        cost = len(fragment_view) * (1 if current_data is None else 2) + (0 if current_data is None else len(current_data))
+        work = _checked_scan_add(work, cost, MAX_FRAGMENT_SCAN_WORK)
+        if work > MAX_FRAGMENT_SCAN_WORK:
+            return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "aggregate_scan_budget_exceeded"}}
+        searches.append((key, ref, fragment_view, offset, target, current_data))
+    if baseline_work > MAX_SELECTED_TOTAL:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "resource_limit_exceeded"}}
+    # All extraction and aggregate costs are proven before making owned pattern bytes.
+    searches = [(key, ref, bytes(fragment_view), offset, target, current_data)
+                for key, ref, fragment_view, offset, target, current_data in searches]
+    observations = []
+    for key, ref, fragment, offset, target, current_data in searches:
+        mapping = ref.get("current")
+        if not fragment:
+            outcome, offsets = "unassessable_empty_fragment", []
+        elif mapping is None:
+            outcome, offsets = "unassessable_no_mapping", []
+        elif target is None or current_data is None:
+            outcome, offsets = "unassessable_current_missing", []
+        else:
+            matches = _kmp_offsets(current_data, fragment)
+            if len(matches) > MAX_FRAGMENT_OFFSETS:
+                return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "match_limit_exceeded"}}
+            offsets = matches
+            outcome = ("no_exact_match" if not matches else "exact_at_baseline_offset" if len(matches) == 1 and matches[0] == offset else "unique_moved_match" if len(matches) == 1 else "ambiguous_exact_matches")
+        current = None if mapping is None else {"source_id": mapping["source_id"], "representation_id": mapping["representation_id"]}
+        if target is not None and current_data is not None:
+            current["observed_sha256"] = target["revision"]["digest"]
+        observations.append({"binding_id": key[0], "source_id": key[1], "representation_id": key[2],
+                             "observed_sha256": ref["observed_sha256"], "fragment": ref["fragment"],
+                             "current": current, "outcome": outcome, "baseline_offset": offset,
+                             "current_offsets": offsets})
+    observations_by_identity = {(item["binding_id"], item["source_id"], item["representation_id"], item["observed_sha256"]): item for item in observations}
+    ordered_observations = [observations_by_identity[(row["binding_id"], row["source_id"], row["representation_id"], row["observed_sha256"])]
+                            for row in report["references"]
+                            if (row["binding_id"], row["source_id"], row["representation_id"], row["observed_sha256"]) in observations_by_identity]
+    result = {"status": "COMPLETE", "observations": ordered_observations}
+    if len(json.dumps(result, separators=(",", ":")).encode("utf-8")) > MAX_REPORT_BYTES:
+        return {"resolver_report": report, "fragment_continuity": {"status": "BLOCKED", "reason": "serialization_limit_exceeded"}}
+    return {"resolver_report": report, "fragment_continuity": result}
