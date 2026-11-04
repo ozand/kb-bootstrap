@@ -89,6 +89,58 @@ class EvidenceReviewTests(unittest.TestCase):
             self.assertEqual(result["fragment_continuity"]["status"],"COMPLETE")
         finally: fixture.doCleanups()
 
+    def test_fragment_bytes_do_not_preserve_support_or_discover_contradiction(self):
+        from test_evidence_binding import EvidenceBindingTests
+        from kb_bootstrap.evidence_binding import resolve_evidence_binding_with_fragment_continuity
+        fixture=EvidenceBindingTests(); fixture.setUp()
+        try:
+            reference=fixture.binding["bindings"][0]["evidence"][0]
+            reference["fragment"]={"representation_id":"rep-base","start_line":1,"end_line":1}
+            fixture._write_binding()
+            changed=b"Conditions withdrawn.\n"+fixture.base_bytes
+            (fixture.current_project/"corpus/evidence.md").write_bytes(changed)
+            fixture._write_envelope(fixture.current_meta,"source-current","rep-current",changed)
+            contradiction=b"The cited claim is false.\n"
+            (fixture.current_project/"corpus/contradiction.md").write_bytes(contradiction)
+            # Directory presence alone does not create another resolver row.
+            unselected=resolve_evidence_binding_with_fragment_continuity(**fixture._fragment_args())
+            self.assertEqual(len(unselected["resolver_report"]["references"]),1)
+
+            # Caller explicitly binds and selects the contradictory source.
+            (fixture.base_project/"corpus/contradiction.md").write_bytes(contradiction)
+            fixture._write_one_envelope_source(fixture.base_meta,"source-contradiction-base",
+                                               "rep-contradiction-base","contradiction.md",contradiction,append=True)
+            fixture._write_one_envelope_source(fixture.current_meta,"source-contradiction-current",
+                                               "rep-contradiction-current","contradiction.md",contradiction,append=True)
+            fixture.binding["bindings"].append({"binding_id":"binding-contradiction","evidence":[{
+                "source_id":"source-contradiction-base","representation_id":"rep-contradiction-base",
+                "observed_sha256":__import__("hashlib").sha256(contradiction).hexdigest(),
+                "current":{"source_id":"source-contradiction-current","representation_id":"rep-contradiction-current"},
+            }]})
+            fixture._write_binding()
+            args=fixture._fragment_args()
+            args["baseline_selected_paths"]=["evidence.md","contradiction.md"]
+            args["current_selected_paths"]=["evidence.md","contradiction.md"]
+            combined=resolve_evidence_binding_with_fragment_continuity(**args)
+            self.assertEqual(combined["resolver_report"]["status"],"COMPLETE")
+            self.assertEqual(len(combined["resolver_report"]["references"]),2)
+            first,second=combined["resolver_report"]["references"]
+            self.assertEqual(first["state"],"changed")
+            self.assertEqual(second["state"],"unchanged")
+            observation=combined["fragment_continuity"]["observations"][0]
+            self.assertEqual(observation["outcome"],"unique_moved_match")
+            self.assertEqual(observation["current_offsets"],[len(b"Conditions withdrawn.\n")])
+            self.assertEqual(changed[observation["current_offsets"][0]:][:len(fixture.base_bytes)],fixture.base_bytes)
+
+            graph=[{"id":"root","kind":"independent","upstream_ids":[]}]
+            composed=self.compose(combined["resolver_report"],graph=graph)
+            self.assertEqual([row["review_required"] for row in composed["worklist"]],[True,False])
+            self.assertEqual(composed["resolver_report"],combined["resolver_report"])
+            self.assertEqual((fixture.current_project/"corpus/contradiction.md").read_bytes(),contradiction)
+            # The byte match and unchanged contradiction file are observations only;
+            # neither resolver nor composer declares semantic support/correctness.
+        finally: fixture.doCleanups()
+
     def test_real_resolver_composition_with_duplicate_binding(self):
         from test_evidence_binding import EvidenceBindingTests
         fixture=EvidenceBindingTests(); fixture.setUp()
