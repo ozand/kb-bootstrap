@@ -614,6 +614,58 @@ class EvidenceBindingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "^expected input revision mismatch$"):
             self.resolve(expected_revisions={"knowledge": "0" * 64})
 
+    def test_combined_error_priority_preserves_input_order(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
+        bad_identity = {
+            "source_id": "source-missing", "representation_id": "rep-missing", "observed_sha256": "0" * 64,
+        }
+        self.binding["bindings"][0]["evidence"] = [dict(ref), bad_identity]
+        self._write_binding()
+        standalone_first = self.resolve()
+        self.assertEqual(standalone_first, {"status": "BLOCKED", "reason": "invalid_binding"})
+        combined_first = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(combined_first["resolver_report"], standalone_first)
+        self.assertEqual(combined_first["fragment_continuity"], {"status": "BLOCKED", "reason": "resolver_blocked"})
+
+        self.binding["bindings"][0]["evidence"] = [dict(bad_identity), dict(ref)]
+        self._write_binding()
+        standalone_identity_first = self.resolve()
+        self.assertEqual(standalone_identity_first, {"status": "BLOCKED", "reason": "baseline_identity_mismatch"})
+        combined_identity_first = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**self._fragment_args())
+        self.assertEqual(combined_identity_first["resolver_report"], standalone_identity_first)
+        self.assertEqual(combined_identity_first["fragment_continuity"], {"status": "BLOCKED", "reason": "resolver_blocked"})
+
+    def test_combined_invalid_identity_precedes_report_limit(self):
+        references = []
+        selected_paths = []
+        for index in range(100):
+            path = "evidence.md" if index == 0 else f"evidence-{index:03}.md"
+            payload = self.base_bytes if index == 0 else f"Evidence {index}.\n".encode()
+            if index:
+                (self.base_project / self.base_corpus / path).write_bytes(payload)
+                self._write_one_envelope_source(self.base_meta, f"source-{index:03}", f"rep-{index:03}", path, payload, append=True)
+            references.append({
+                "source_id": "source-base" if index == 0 else f"source-{index:03}",
+                "representation_id": "rep-base" if index == 0 else f"rep-{index:03}",
+                "observed_sha256": sha(payload),
+            })
+            selected_paths.append(path)
+        references[0].update(source_id="source-missing", representation_id="rep-missing", observed_sha256="0" * 64)
+        self.binding["bindings"] = [
+            {"binding_id": f"binding-{group}", "evidence": [dict(reference) for reference in references]}
+            for group in range(10)
+        ]
+        self._write_binding()
+        args = self._fragment_args()
+        args["baseline_selected_paths"] = selected_paths
+        standalone = evidence_binding.resolve_evidence_binding(**args)
+        self.assertEqual(standalone, {"status": "BLOCKED", "reason": "baseline_identity_mismatch"})
+        with patch.object(evidence_binding, "_kmp_offsets", side_effect=AssertionError("invalid identity must not search")):
+            combined = evidence_binding.resolve_evidence_binding_with_fragment_continuity(**args)
+        self.assertEqual(combined["resolver_report"], standalone)
+        self.assertEqual(combined["fragment_continuity"], {"status": "BLOCKED", "reason": "resolver_blocked"})
+
     def test_combined_report_limit_preserves_stale_revision_priority(self):
         references = []
         selected_paths = []

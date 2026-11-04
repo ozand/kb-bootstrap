@@ -426,46 +426,59 @@ def resolve_evidence_binding(
             expected_digest = selected_expectations.get(f"{side}:{path}")
             if expected_digest is not None and observed.get(path) != expected_digest:
                 raise ValueError("expected input revision mismatch")
-    if fragment_context is not None:
-        evidence_count = 0
-        for item in binding["bindings"]:
-            evidence_count += len(item["evidence"])
-            if evidence_count + 1 > MAX_REPORT_ITEMS:
-                return _blocked("resource_limit_exceeded")
     baseline_index, current_index = _index(baseline), _index(current)
     if fragment_context is not None:
         grouped_ranges = {}
         grouped_digests = {}
-        for binding_item in binding["bindings"]:
-            for ref in binding_item["evidence"]:
+        grouped_positions = {}
+        row_failures = {}
+        for binding_index, binding_item in enumerate(binding["bindings"]):
+            for evidence_index, ref in enumerate(binding_item["evidence"]):
                 fragment = ref.get("fragment")
+                rep = _validated_rep(baseline_index, ref["source_id"], ref["representation_id"])
+                if (rep is None or rep["retention"] != "retained"
+                        or rep["revision"]["digest"] != ref["observed_sha256"]):
+                    row_failures[(binding_index, evidence_index)] = "baseline_identity_mismatch"
+                    continue
+                mapping = ref.get("current")
+                if mapping is not None:
+                    target = _validated_rep(current_index, mapping["source_id"], mapping["representation_id"])
+                    if target is not None and target["retention"] != "retained":
+                        row_failures[(binding_index, evidence_index)] = "invalid_binding"
                 if fragment is None:
                     continue
-                rep = _validated_rep(baseline_index, ref["source_id"], ref["representation_id"])
-                if rep is None or rep["retention"] != "retained" or rep["revision"]["digest"] != ref["observed_sha256"]:
-                    return _blocked("baseline_identity_mismatch")
                 path = rep["raw_path"]
                 data = baseline_snapshots.get(path)
                 if data is None or baseline_digests.get(path) != rep["revision"]["digest"]:
-                    return _blocked("baseline_identity_mismatch")
+                    row_failures.setdefault((binding_index, evidence_index), "baseline_identity_mismatch")
+                    continue
                 identity = (binding_item["binding_id"], ref["source_id"], ref["representation_id"], ref["observed_sha256"])
+                grouped_positions[identity] = (binding_index, evidence_index)
                 grouped_ranges.setdefault(path, []).append((fragment["start_line"], fragment["end_line"], identity))
                 grouped_digests.setdefault(path, rep["revision"]["digest"])
         grouped_extractions = {}
         for path, ranges in grouped_ranges.items():
             if grouped_digests[path] != baseline_digests.get(path):
-                return _blocked("baseline_identity_mismatch")
-            grouped_extractions[path] = _fragment_ranges(
-                baseline_snapshots[path], ranges, enforce_limits=False,
-                invalid_out=grouped_invalid_fragments
+                for binding_index, evidence_index, _ in ranges:
+                    row_failures.setdefault((binding_index, evidence_index), "baseline_identity_mismatch")
+                continue
+            invalid_rows = set()
+            extracted = _fragment_ranges(
+                baseline_snapshots[path], ranges, enforce_limits=False, invalid_out=invalid_rows
             )
-        if grouped_invalid_fragments:
-            return _blocked("invalid_binding")
+            for identity in invalid_rows:
+                row_failures.setdefault(grouped_positions[identity], "invalid_binding")
+            grouped_extractions[path] = extracted
+        if row_failures:
+            first_failure = min(row_failures)
+            return _blocked(row_failures[first_failure])
+        if sum(len(item["evidence"]) for item in binding["bindings"]) + 1 > MAX_REPORT_ITEMS:
+            return _blocked("resource_limit_exceeded")
         fragment_context.update(baseline=baseline_snapshots, current=current_snapshots,
                                 baseline_digests=baseline_digests, current_digests=current_digests,
                                 baseline_extractions=grouped_extractions,
                                 baseline_record=baseline, current_record=current,
-                                invalid_fragments=grouped_invalid_fragments)
+                                invalid_fragments=set())
 
     # Validate all binding correspondences and fragment bounds before deriving any report.
     for binding_item in binding["bindings"]:
