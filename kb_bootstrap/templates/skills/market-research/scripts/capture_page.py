@@ -126,6 +126,7 @@ def save_image(src: str, base: Path, window_id: str,
                study_dir: Path | None = None, created: list[Path] | None = None,
                method_out: list[str] | None = None) -> Path | None:
     """Save an image and optionally report which capture branch produced its bytes."""
+    dest = None
     try:
         req = urllib.request.Request(src, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=20) as resp:  # public http(s) image
@@ -144,7 +145,7 @@ def save_image(src: str, base: Path, window_id: str,
     except FileExistsError:
         raise
     except OSError:
-        if created is not None and dest in created:
+        if dest is not None and created is not None and dest in created:
             raise
     except ValueError:
         pass
@@ -182,7 +183,7 @@ def save_image(src: str, base: Path, window_id: str,
             raise
         return None
     except OSError:
-        if created is not None and dest in created:
+        if dest is not None and created is not None and dest in created:
             raise
         return None
     except RuntimeError:

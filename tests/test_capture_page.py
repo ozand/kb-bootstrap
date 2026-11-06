@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -387,3 +388,105 @@ class CapturePageExclusiveTests(unittest.TestCase):
             self.assertTrue(text.startswith("---\ntype: RawCapture\n"))
             self.assertIn("# Example page", text)
             self.assertIn("saved ", output)
+
+    def test_urlopen_and_response_read_oserrors_use_screenshot_manifest(self):
+        for failure in (OSError("urlopen failure"), OSError("response read failure")):
+            with self.subTest(failure=str(failure)), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.study(root)
+                image = {"src": "https://example.test/image.png", "width": 800}
+                page = self.page(images=[image])
+                payload = bytes((137, 80, 78, 71)) + b"x" * 2500
+
+                class BrokenResponse:
+                    def __enter__(self):
+                        return self
+                    def __exit__(self, *args):
+                        return False
+                    def read(self, size):
+                        raise failure
+
+                def screenshot(*args):
+                    if "--output" in args:
+                        Path(args[args.index("--output") + 1]).write_bytes(b"synthetic screenshot")
+                    return ""
+
+                args = ["capture_page.py", str(root), "https://example.test/page",
+                        "--window-id", "123456", "--images", "1"]
+                urlopen = patch.object(capture_page.urllib.request, "urlopen",
+                                       side_effect=failure) if str(failure).startswith("urlopen") else \
+                          patch.object(capture_page.urllib.request, "urlopen",
+                                       return_value=BrokenResponse())
+                with urlopen, patch.object(capture_page.time, "sleep"), \
+                     patch.object(capture_page, "surf", side_effect=screenshot), \
+                     patch.object(capture_page.sys, "argv", args), \
+                     patch.object(capture_page, "open_page", return_value="123456"), \
+                     patch.object(capture_page, "extract", return_value=page), \
+                     patch("sys.stdout", new_callable=io.StringIO) as output:
+                    result = capture_page.main()
+                self.assertEqual(result, 0, output.getvalue())
+                self.assertEqual((root / "raw/img/001-1.png").read_bytes(),
+                                 b"synthetic screenshot")
+                manifest = json.loads((root / "raw/001-example-page.images.json").read_text())
+                self.assertEqual(manifest["images"][0]["method"], "surf_screenshot_fallback")
+
+    def test_image_exclusive_write_failure_after_create_is_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            payload = bytes((137, 80, 78, 71)) + b"x" * 2500
+            image = {"src": "https://example.test/image.png", "width": 800}
+            original_fdopen = capture_page.os.fdopen
+
+            class FailingStream:
+                def __init__(self, stream):
+                    self.stream = stream
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    self.stream.close()
+                    raise OSError("synthetic close failure")
+                def write(self, data):
+                    self.stream.write(data[:5])
+                    raise OSError("synthetic write failure")
+
+            original_save = capture_page.save_image
+            with patch.object(capture_page.os, "fdopen",
+                              side_effect=lambda *args, **kwargs:
+                              FailingStream(original_fdopen(*args, **kwargs))), \
+                 patch.object(capture_page.urllib.request, "urlopen",
+                              return_value=io.BytesIO(payload)):
+                result, output = self.run_main(root, self.page(images=[image]), images=1,
+                                               save_func=original_save)
+            self.assertEqual(result, 3)
+            self.assertIn("PARTIAL", output)
+            target = root / "raw/img/001-1.png"
+            self.assertEqual(target.read_bytes(), payload[:5])
+            self.assertFalse((root / "raw/001-example-page.images.json").exists())
+
+    def test_markdown_exclusive_write_failure_after_create_is_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            original_fdopen = capture_page.os.fdopen
+
+            class FailingStream:
+                def __init__(self, stream):
+                    self.stream = stream
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    self.stream.close()
+                    raise OSError("synthetic close failure")
+                def write(self, data):
+                    self.stream.write(data[:5])
+                    raise OSError("synthetic write failure")
+
+            with patch.object(capture_page.os, "fdopen",
+                              side_effect=lambda *args, **kwargs:
+                              FailingStream(original_fdopen(*args, **kwargs))):
+                result, output = self.run_main(root, self.page())
+            self.assertEqual(result, 3)
+            self.assertIn("PARTIAL", output)
+            target = root / "raw/001-example-page.md"
+            self.assertEqual(target.read_bytes(), b"---\nt")
