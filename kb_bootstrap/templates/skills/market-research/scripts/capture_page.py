@@ -234,7 +234,7 @@ def main() -> int:
     created_images: list[Path] = []
     wanted = [i for i in page["images"] if i["width"] >= a.min_width][: max(a.images, 0)]
     manifest = raw_dir / f"{stem}.images.json"
-    if wanted and (manifest.exists() or manifest.is_symlink()):
+    if manifest.exists() or manifest.is_symlink():
         print("BLOCKED: image manifest already exists")
         return 3
     for k, img in enumerate(wanted, 1):

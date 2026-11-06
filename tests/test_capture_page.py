@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPT = Path("kb_bootstrap/templates/skills/market-research/scripts/capture_page.py").resolve()
 SPEC = importlib.util.spec_from_file_location("capture_page", SCRIPT)
@@ -463,6 +463,37 @@ class CapturePageExclusiveTests(unittest.TestCase):
             target = root / "raw/img/001-1.png"
             self.assertEqual(target.read_bytes(), payload[:5])
             self.assertFalse((root / "raw/001-example-page.images.json").exists())
+
+    def test_existing_manifest_blocks_capture_without_selected_images(self):
+        cases = (
+            ("images-disabled", [{"src": "https://example.test/image.png", "width": 800}], 0,
+             "Example page", "example-page"),
+            ("below-min-width", [{"src": "https://example.test/image.png", "width": 400}], 1,
+             "Example page", "example-page"),
+            ("challenge-clears-images", [{"src": "https://example.test/image.png", "width": 800}], 1,
+             "Checking your browser", "checking-your-browser"),
+        )
+        for name, images, requested, title, slug in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.study(root)
+                manifest = root / f"raw/001-{slug}.images.json"
+                manifest.write_bytes(b"existing sidecar")
+                page = self.page(images=images)
+                page["title"] = title
+                save_image = Mock(side_effect=AssertionError("image save was not expected"))
+                urlopen = Mock(side_effect=AssertionError("network access was not expected"))
+                with patch.object(capture_page, "next_number", return_value=1), \
+                     patch.object(capture_page.urllib.request, "urlopen", urlopen):
+                    result, output = self.run_main(root, page, images=requested,
+                                                   save_func=save_image)
+                self.assertEqual(result, 3)
+                self.assertIn("BLOCKED", output)
+                self.assertEqual(manifest.read_bytes(), b"existing sidecar")
+                self.assertFalse((root / f"raw/001-{slug}.md").exists())
+                self.assertEqual(list((root / "raw/img").iterdir()), [])
+                save_image.assert_not_called()
+                urlopen.assert_not_called()
 
     def test_markdown_exclusive_write_failure_after_create_is_partial(self):
         with tempfile.TemporaryDirectory() as directory:
