@@ -1,10 +1,12 @@
 # ADR-054: Record image capture method in an optional companion manifest
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-07
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #125; ADR-029, ADR-033, ADR-050
+
+Technical acceptance: authorized under the owner's standing delegation recorded in `AGENTS.md` and Issue #223. Independent review `independentab249` returned PASS for exact proposed revision `ac14613b57a1effa9aea3f6f1bef01e23fbfad3a`. This acceptance changes lifecycle status only; it does not implement the producer/manifest or authorize publication. The accepted decision is not implemented; its normative contract below is unchanged from the reviewed proposal.
 
 ## Context
 
