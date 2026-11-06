@@ -82,7 +82,8 @@ def next_number(raw_dir: Path) -> int:
     return max(nums, default=0) + 1
 
 
-def _exclusive_write(path: Path, data: bytes, study_dir: Path) -> None:
+def _exclusive_write(path: Path, data: bytes, study_dir: Path,
+                     on_created=None) -> None:
     """Create one contained output without replacing an existing path."""
     root = study_dir.absolute()
     target = path.absolute()
@@ -109,6 +110,8 @@ def _exclusive_write(path: Path, data: bytes, study_dir: Path) -> None:
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         descriptor = os.open(str(target), flags, 0o666)
+        if on_created is not None:
+            on_created(path)
     except FileExistsError:
         raise
     with os.fdopen(descriptor, "wb") as stream:
@@ -133,15 +136,17 @@ def save_image(src: str, base: Path, window_id: str,
             if study_dir is None:
                 dest.write_bytes(data)
             else:
-                _exclusive_write(dest, data, study_dir)
-                if created is not None:
-                    created.append(dest)
+                _exclusive_write(dest, data, study_dir,
+                                 created.append if created is not None else None)
             if method_out is not None:
                 method_out.append("downloaded_response")
             return dest
     except FileExistsError:
         raise
-    except (OSError, ValueError):
+    except OSError:
+        if created is not None and dest in created:
+            raise
+    except ValueError:
         pass
     dest = base.with_suffix(".png")  # too big, unknown type or blocked: screenshot it
     try:
@@ -162,9 +167,8 @@ def save_image(src: str, base: Path, window_id: str,
             surf("--window-id", window_id, "screenshot", "--output", str(staged))
             if not staged.is_file() or staged.is_symlink():
                 return None
-            _exclusive_write(dest, staged.read_bytes(), study_dir)
-            if created is not None:
-                created.append(dest)
+            _exclusive_write(dest, staged.read_bytes(), study_dir,
+                             created.append if created is not None else None)
             if method_out is not None:
                 method_out.append("surf_screenshot_fallback")
             return dest
@@ -177,7 +181,11 @@ def save_image(src: str, base: Path, window_id: str,
         if study_dir is not None:
             raise
         return None
-    except (RuntimeError, OSError):
+    except OSError:
+        if created is not None and dest in created:
+            raise
+        return None
+    except RuntimeError:
         return None
 
 
@@ -259,10 +267,12 @@ def main() -> int:
         "---",
     ])
     out = raw_dir / f"{stem}.md"
+    created_outputs: list[Path] = list(created_images)
     try:
-        _exclusive_write(out, f"{front}\n\n# {title}\n\n{md}\n".encode("utf-8"), a.research_dir)
+        _exclusive_write(out, f"{front}\n\n# {title}\n\n{md}\n".encode("utf-8"),
+                         a.research_dir, created_outputs.append)
     except (FileExistsError, OSError, ValueError):
-        created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
+        created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_outputs]
         if created_paths:
             print("PARTIAL: markdown output blocked; created files preserved: " + ", ".join(created_paths))
         else:
@@ -281,10 +291,9 @@ def main() -> int:
         }
         data = (json.dumps(manifest_value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
         try:
-            _exclusive_write(manifest, data, a.research_dir)
+            _exclusive_write(manifest, data, a.research_dir, created_outputs.append)
         except (FileExistsError, OSError, ValueError):
-            created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
-            created_paths.append(out.relative_to(a.research_dir).as_posix())
+            created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_outputs]
             print("PARTIAL: image manifest publication failed; created files preserved: " + ", ".join(created_paths))
             return 3
 

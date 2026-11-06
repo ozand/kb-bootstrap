@@ -38,18 +38,18 @@ class CapturePageExclusiveTests(unittest.TestCase):
                           side_effect=save_func or self.image_writer(root)):
             if collide_markdown:
                 original = capture_page._exclusive_write
-                def write(path, data, study):
+                def write(path, data, study, on_created=None):
                     if path.suffix == ".md" and not path.exists():
                         with path.open("xb") as stream:
                             stream.write(b"racing winner")
-                    return original(path, data, study)
+                    return original(path, data, study, on_created)
                 patcher = patch.object(capture_page, "_exclusive_write", side_effect=write)
             elif fail_markdown:
                 original = capture_page._exclusive_write
-                def write(path, data, study):
+                def write(path, data, study, on_created=None):
                     if path.suffix == ".md":
                         raise FileExistsError("raced markdown")
-                    return original(path, data, study)
+                    return original(path, data, study, on_created)
                 patcher = patch.object(capture_page, "_exclusive_write", side_effect=write)
             else:
                 patcher = patch.object(capture_page, "_exclusive_write", wraps=capture_page._exclusive_write)
@@ -60,8 +60,7 @@ class CapturePageExclusiveTests(unittest.TestCase):
     def image_writer(self, root):
         def save(src, base, window, study, created, method_out):
             path = base.with_suffix(".png")
-            capture_page._exclusive_write(path, b"synthetic image", study)
-            created.append(path)
+            capture_page._exclusive_write(path, b"synthetic image", study, created.append)
             method_out.append("downloaded_response")
             return path
         return save
@@ -227,6 +226,37 @@ class CapturePageExclusiveTests(unittest.TestCase):
                 capture_page._exclusive_write(link / "escaped.md", b"unsafe", root)
             self.assertFalse((outside / "escaped.md").exists())
 
+    def test_exclusive_write_failure_after_create_records_owned_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            target = root / "raw/001-owned.md"
+            owned = []
+            original = capture_page.os.fdopen
+
+            class FailingStream:
+                def __init__(self, stream):
+                    self.stream = stream
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    self.stream.close()
+                    raise OSError("synthetic close failure")
+                def write(self, data):
+                    self.stream.write(data[:5])
+                    raise OSError("synthetic write failure")
+
+            with patch.object(capture_page.os, "fdopen",
+                              side_effect=lambda *args, **kwargs: FailingStream(original(*args, **kwargs))):
+                with self.assertRaises(OSError):
+                    capture_page._exclusive_write(target, b"partial output", root, owned.append)
+            self.assertEqual(owned, [target])
+            self.assertEqual(target.read_bytes(), b"parti")
+            with self.assertRaises(FileExistsError):
+                capture_page._exclusive_write(target, b"replacement", root, owned.append)
+            self.assertEqual(target.read_bytes(), b"parti")
+            self.assertEqual(owned, [target])
+
     def test_image_manifest_exact_bytes_and_method_order(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -243,8 +273,8 @@ class CapturePageExclusiveTests(unittest.TestCase):
                 return path
 
             original = capture_page._exclusive_write
-            def write(path, data, study):
-                return original(path, data, study)
+            def write(path, data, study, on_created=None):
+                return original(path, data, study, on_created)
 
             with patch.object(capture_page, "_exclusive_write", side_effect=write):
                 result, output = self.run_main(root, self.page(images=images), images=2,
@@ -289,16 +319,54 @@ class CapturePageExclusiveTests(unittest.TestCase):
             self.assertEqual(manifest.read_bytes(), b"winner")
             self.assertFalse((root / "raw/img/001-1.png").exists())
 
+    def test_image_write_failure_after_exclusive_create_is_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            image = {"src": "https://example.test/image.png", "width": 800}
+            original = capture_page._exclusive_write
+
+            def write_image_then_fail(path, data, study, on_created=None):
+                original(path, data, study, on_created)
+                if path.parent.name == "img":
+                    raise OSError("synthetic close failure")
+
+            with patch.object(capture_page, "_exclusive_write", side_effect=write_image_then_fail):
+                result, output = self.run_main(root, self.page(images=[image]), images=1)
+            self.assertEqual(result, 3)
+            self.assertIn("PARTIAL", output)
+            self.assertIn("raw/img/001-1.png", output)
+            self.assertTrue((root / "raw/img/001-1.png").is_file())
+            self.assertFalse((root / "raw/001-example-page.images.json").exists())
+
+    def test_markdown_write_failure_after_exclusive_create_is_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.study(root)
+            original = capture_page._exclusive_write
+
+            def write_markdown_then_fail(path, data, study, on_created=None):
+                original(path, data, study, on_created)
+                if path.suffix == ".md":
+                    raise OSError("synthetic close failure")
+
+            with patch.object(capture_page, "_exclusive_write", side_effect=write_markdown_then_fail):
+                result, output = self.run_main(root, self.page())
+            self.assertEqual(result, 3)
+            self.assertIn("PARTIAL", output)
+            self.assertIn("raw/001-example-page.md", output)
+            self.assertTrue((root / "raw/001-example-page.md").is_file())
+
     def test_manifest_write_failure_after_capture_is_partial(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.study(root)
             image = {"src": "https://example.test/image.png", "width": 800}
             original = capture_page._exclusive_write
-            def fail_manifest(path, data, study):
+            def fail_manifest(path, data, study, on_created=None):
                 if path.name.endswith(".images.json"):
                     raise OSError("synthetic manifest failure")
-                return original(path, data, study)
+                return original(path, data, study, on_created)
             args = ["capture_page.py", str(root), "https://example.test/page", "--window-id", "123456", "--images", "1"]
             with patch.object(capture_page, "_exclusive_write", side_effect=fail_manifest):
                 result, output = self.run_main(root, self.page(images=[image]), images=1)
