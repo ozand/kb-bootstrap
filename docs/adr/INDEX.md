@@ -56,3 +56,4 @@ Coordinator delegation, ADR decision attribution, and independent review follow 
 | ADR-051 | Bounded exact fragment continuity observations | Superseded by ADR-052 |
 | ADR-052 | Bound aggregate fragment scan work | Accepted |
 | ADR-053 | Search one explicitly selected configured lesson store as bounded Markdown | Accepted |
+| ADR-054 | Record image capture method in an optional companion manifest | Accepted |
