@@ -120,8 +120,9 @@ MAGIC = ((b"\x89PNG", ".png"), (b"GIF8", ".gif"), (b"\xff\xd8", ".jpg"), (b"RIFF
 
 
 def save_image(src: str, base: Path, window_id: str,
-               study_dir: Path | None = None, created: list[Path] | None = None) -> Path | None:
-    """Download an image (browser screenshot as fallback). Returns the saved path."""
+               study_dir: Path | None = None, created: list[Path] | None = None,
+               method_out: list[str] | None = None) -> Path | None:
+    """Save an image and optionally report which capture branch produced its bytes."""
     try:
         req = urllib.request.Request(src, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=20) as resp:  # public http(s) image
@@ -135,6 +136,8 @@ def save_image(src: str, base: Path, window_id: str,
                 _exclusive_write(dest, data, study_dir)
                 if created is not None:
                     created.append(dest)
+            if method_out is not None:
+                method_out.append("downloaded_response")
             return dest
     except FileExistsError:
         raise
@@ -148,7 +151,11 @@ def save_image(src: str, base: Path, window_id: str,
             time.sleep(2)
             if study_dir is None:
                 surf("--window-id", window_id, "screenshot", "--output", str(dest))
-                return dest if dest.is_file() and not dest.is_symlink() else None
+                if dest.is_file() and not dest.is_symlink():
+                    if method_out is not None:
+                        method_out.append("surf_screenshot_fallback")
+                    return dest
+                return None
             fd, staged_name = tempfile.mkstemp(prefix=".capture-image-", suffix=".png", dir=str(dest.parent))
             os.close(fd)
             staged = Path(staged_name)
@@ -158,6 +165,8 @@ def save_image(src: str, base: Path, window_id: str,
             _exclusive_write(dest, staged.read_bytes(), study_dir)
             if created is not None:
                 created.append(dest)
+            if method_out is not None:
+                method_out.append("surf_screenshot_fallback")
             return dest
         finally:
             if staged is not None and staged.is_file() and not staged.is_symlink():
@@ -215,10 +224,15 @@ def main() -> int:
     saved = []
     created_images: list[Path] = []
     wanted = [i for i in page["images"] if i["width"] >= a.min_width][: max(a.images, 0)]
+    manifest = raw_dir / f"{stem}.images.json"
+    if wanted and (manifest.exists() or manifest.is_symlink()):
+        print("BLOCKED: image manifest already exists")
+        return 3
     for k, img in enumerate(wanted, 1):
         try:
+            method = []
             dest = save_image(img["src"], raw_dir / "img" / f"{num:03d}-{k}", window_id,
-                              a.research_dir, created_images)
+                              a.research_dir, created_images, method)
         except (FileExistsError, OSError, ValueError):
             created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
             if created_paths:
@@ -228,7 +242,7 @@ def main() -> int:
             return 3
         if dest:
             md = md.replace(f"]({img['src']})", f"](img/{dest.name})")
-            saved.append(dest.name)
+            saved.append((dest, method[0]))
     if saved:  # leave the window on the article, not on the last image
         surf("--window-id", window_id, "go", page["url"])
 
@@ -254,6 +268,25 @@ def main() -> int:
         else:
             print("BLOCKED: markdown output already exists or output path is unsafe")
         return 3
+
+    if saved:
+        manifest_value = {
+            "format": "kb-bootstrap-image-capture-methods",
+            "version": 1,
+            "capture": out.relative_to(a.research_dir).as_posix(),
+            "images": [
+                {"path": path.relative_to(a.research_dir).as_posix(), "method": method}
+                for path, method in saved
+            ],
+        }
+        data = (json.dumps(manifest_value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        try:
+            _exclusive_write(manifest, data, a.research_dir)
+        except (FileExistsError, OSError, ValueError):
+            created_paths = [path.relative_to(a.research_dir).as_posix() for path in created_images]
+            created_paths.append(out.relative_to(a.research_dir).as_posix())
+            print("PARTIAL: image manifest publication failed; created files preserved: " + ", ".join(created_paths))
+            return 3
 
     print(f"saved {out}  chars={len(md)} fidelity={fidelity} images_saved={len(saved)}")
     rest = [i for i in page["images"] if i not in wanted and i["width"] >= a.min_width]
