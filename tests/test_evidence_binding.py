@@ -274,6 +274,44 @@ class EvidenceBindingTests(unittest.TestCase):
                     {"status": "CLASSIFIED", "reason": "malformed_input"},
                 )
 
+    def test_opt_in_input_diagnostic_fidelity_loss_count_limit_is_unclassified(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        cases = (
+            (64, None, "NOT_APPLICABLE"),
+            (65, None, "NOT_CLASSIFIED"),
+            (64, "not-a-label", "CLASSIFIED"),
+        )
+        for count, invalid_loss, status in cases:
+            with self.subTest(count=count, invalid_loss=invalid_loss):
+                losses = [f"loss-{index}" for index in range(count)]
+                if invalid_loss is not None:
+                    losses[-1] = invalid_loss
+                loss_yaml = "[" + ", ".join(losses) + "]"
+                if invalid_loss == "not-a-label":
+                    loss_yaml = "[" + ", ".join(losses[:-1]) + ", 7]"
+                metadata = original.replace(
+                    "fidelity: {class: exact, coverage: all-bytes, losses: []}",
+                    f"fidelity: {{class: partial, coverage: excerpt, losses: {loss_yaml}}}",
+                )
+                self.base_meta.write_text(metadata, encoding="utf-8")
+                legacy = self.resolve()
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                if count == 64 and invalid_loss is None:
+                    self.assertEqual(legacy["status"], "COMPLETE")
+                    self.assertEqual(result["input_diagnostic"], {"status": "NOT_APPLICABLE"})
+                elif count > 64:
+                    self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                    self.assertEqual(result["input_diagnostic"], {
+                        "status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope",
+                    })
+                else:
+                    self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                    self.assertEqual(result["input_diagnostic"], {
+                        "status": "CLASSIFIED", "reason": "malformed_input",
+                    })
+        self.base_meta.write_text(original, encoding="utf-8")
+
     def test_opt_in_input_diagnostic_binding_count_limits_are_unclassified(self):
         cases = (
             ("bindings", "MAX_BINDINGS", 1),

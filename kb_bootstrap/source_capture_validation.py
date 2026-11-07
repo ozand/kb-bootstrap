@@ -392,7 +392,11 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
         elif method == "blocked" or not reps:
             return _malformed_source_capture("non-blocked capture requires representations")
         coverage, losses = fidelity.get("coverage"), fidelity.get("losses")
-        if not isinstance(coverage, str) or not (coverage == "unknown" or LABEL.fullmatch(coverage)) or not isinstance(losses, list) or len(losses) > 64 or any(not isinstance(loss, str) or not LABEL.fullmatch(loss) for loss in losses) or len(set(losses)) != len(losses):
+        if not isinstance(coverage, str) or not (coverage == "unknown" or LABEL.fullmatch(coverage)) or not isinstance(losses, list):
+            return _malformed_source_capture("fidelity coverage or losses are invalid")
+        if len(losses) > 64:
+            return False, ("fidelity loss count exceeds limit",), None
+        if any(not isinstance(loss, str) or not LABEL.fullmatch(loss) for loss in losses) or len(set(losses)) != len(losses):
             return _malformed_source_capture("fidelity coverage or losses are invalid")
         if cls == "exact" and (original_digest is None or coverage != "all-bytes" or losses):
             return _malformed_source_capture("exact fidelity requires known original bytes, all-bytes coverage, and no losses")
