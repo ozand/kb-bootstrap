@@ -261,8 +261,6 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
             diagnostic["classification"] = "malformed_input"
         elif record["schema"] != SCHEMA or record["version"] != 1:
             diagnostic["classification"] = "unsupported_schema"
-        else:
-            diagnostic["classification"] = "malformed_input"
     if not isinstance(record, dict) or set(record) != {"schema", "version", "sources"} or record.get("schema") != SCHEMA or type(record.get("version")) is not int or record["version"] != 1:
         return False, ("metadata schema or version is unsupported",), None
     sources = record["sources"]

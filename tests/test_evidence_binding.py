@@ -224,6 +224,31 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertTrue(os.path.samefile(observed_root, self.base_project))
         self.assertEqual(relative, "capture.yaml")
 
+    def test_opt_in_input_diagnostic_current_unsupported_after_valid_baseline(self):
+        self.current_meta.write_text(
+            "\n".join(("schema: kb-bootstrap.source-capture", "version: 2", "sources: []", "")),
+            encoding="utf-8",
+        )
+        legacy = self.resolve()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "unsupported_schema"})
+
+    def test_opt_in_input_diagnostic_later_resource_block_not_classified(self):
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        with patch.object(evidence_binding, "MAX_SELECTED_TOTAL", 1):
+            legacy_block = self.resolve()
+            result_block = self.diagnostic()
+        self.assertEqual(legacy_block, {"status": "BLOCKED", "reason": "resource_limit_exceeded"})
+        self.assertEqual(result_block["resolver_report"], legacy_block)
+        self.assertEqual(
+            result_block["input_diagnostic"],
+            {"status": "NOT_CLASSIFIED", "reason": "resource_limit_exceeded"},
+        )
+
     def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
         from kb_bootstrap.evidence_review import compose_evidence_review_worklist
         self.base_meta.write_text("schema: kb-bootstrap.source-capture\nversion: 2\nsources: []\n", encoding="utf-8")
