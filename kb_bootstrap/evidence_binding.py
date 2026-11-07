@@ -741,7 +741,7 @@ def resolve_evidence_binding_with_input_diagnostic(
     elif (report.get("reason") in {"invalid_binding", "invalid_or_incomplete_envelope"}
           and context["classification"] in {"malformed_input", "unsupported_schema"}):
         sidecar = {"status": "CLASSIFIED", "reason": context["classification"]}
-    elif context["classification"] == "resource_limit":
+    elif context["classification"] in {"resource_limit", "integrity_mismatch"}:
         sidecar = {"status": "NOT_CLASSIFIED", "reason": report.get("reason")}
     else:
         sidecar = {"status": "NOT_CLASSIFIED", "reason": report.get("reason")}

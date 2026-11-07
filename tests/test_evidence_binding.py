@@ -224,6 +224,24 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertTrue(os.path.samefile(observed_root, self.base_project))
         self.assertEqual(relative, "capture.yaml")
 
+    def test_opt_in_input_diagnostic_baseline_digest_mismatch_is_not_classified(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        self.base_meta.write_text(
+            original.replace(
+                f"    revision: {{algorithm: sha256, digest: {sha(self.base_bytes)}}}",
+                f"    revision: {{algorithm: sha256, digest: {'f' * 64}}}",
+            ),
+            encoding="utf-8",
+        )
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(
+            result["input_diagnostic"],
+            {"status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope"},
+        )
+
     def test_opt_in_input_diagnostic_current_unsupported_after_valid_baseline(self):
         self.current_meta.write_text(
             "\n".join(("schema: kb-bootstrap.source-capture", "version: 2", "sources: []", "")),

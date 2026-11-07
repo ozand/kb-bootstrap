@@ -452,6 +452,9 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
                     checked_retained.add(path)
                 observed_digest = hashlib.sha256(data).hexdigest()
                 if observed_digest != digest:
+                    diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+                    if diagnostic is not None:
+                        diagnostic["classification"] = "integrity_mismatch"
                     return False, ("representation digest does not match selected bytes",), None
                 if snapshot_digests_out is not None:
                     snapshot_digests_out[path] = observed_digest
