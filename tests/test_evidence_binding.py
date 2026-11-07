@@ -256,6 +256,25 @@ class EvidenceBindingTests(unittest.TestCase):
                     {"status": "CLASSIFIED", "reason": "malformed_input"},
                 )
 
+    def test_opt_in_input_diagnostic_yaml_limits_remain_unclassified(self):
+        from kb_bootstrap import source_capture_validation
+        cases = (
+            ("events", {"MAX_YAML_EVENTS": 5}, "\n".join(("schema: kb-bootstrap.source-capture", "version: 1", "sources: []", ""))),
+            ("depth", {"MAX_YAML_EVENTS": 200000, "MAX_YAML_DEPTH": 0}, "\n".join(("schema: kb-bootstrap.source-capture", "version: 1", "sources: []", ""))),
+        )
+        for name, limits, metadata in cases:
+            with self.subTest(name=name):
+                self.base_meta.write_text(metadata, encoding="utf-8")
+                with patch.multiple(source_capture_validation, **limits):
+                    legacy = self.resolve()
+                    result = self.diagnostic()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope"},
+                )
+
     def test_opt_in_input_diagnostic_malformed_nested_capture_matrix(self):
         original = self.base_meta.read_text(encoding="utf-8")
         malformed = {
