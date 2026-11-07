@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .source_capture_validation import (
+    _INPUT_DIAGNOSTIC_CONTEXT,
     MAX_FILE_BYTES,
     MAX_METADATA_BYTES,
     TOKEN,
@@ -31,6 +32,7 @@ MAX_REPORT_BYTES = 8 * 1024 * 1024
 MAX_SELECTED_TOTAL = 256 * 1024 * 1024
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _FRAGMENT_CONTEXT = contextvars.ContextVar("evidence_fragment_context", default=None)
+_INPUT_DIAGNOSTIC = contextvars.ContextVar("evidence_input_diagnostic", default=None)
 
 MAX_FRAGMENT_BYTES = 64 * 1024
 MAX_FRAGMENT_TOTAL_BYTES = 64 * 1024 * 1024
@@ -109,6 +111,16 @@ def _string(value: Any, maximum: int, *, nonempty: bool = True) -> bool:
         return not any(ord(ch) < 32 or ord(ch) == 127 or 0xD800 <= ord(ch) <= 0xDFFF for ch in value)
     except (UnicodeError, TypeError):
         return False
+
+
+def _binding_input_classification(value: Any) -> Optional[str]:
+    if not isinstance(value, dict) or set(value) != {"schema", "version", "knowledge", "bindings"}:
+        return "malformed_input"
+    if not isinstance(value["schema"], str) or type(value["version"]) is not int:
+        return "malformed_input"
+    if value["schema"] != SCHEMA or value["version"] != 1:
+        return "unsupported_schema"
+    return None
 
 
 def _validate_binding(value: Any) -> Optional[str]:
@@ -341,17 +353,30 @@ def resolve_evidence_binding(
     try:
         binding = json.loads(binding_bytes.decode("utf-8"), object_pairs_hook=_pairs)
     except (UnicodeError, ValueError, json.JSONDecodeError, RecursionError):
+        diagnostic = _INPUT_DIAGNOSTIC.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
         return _blocked("invalid_binding")
     try:
         if len(json.dumps(binding, ensure_ascii=False).encode("utf-8")) > MAX_BINDING_BYTES:
             return _blocked("resource_limit_exceeded")
     except (TypeError, ValueError, UnicodeEncodeError, RecursionError):
+        diagnostic = _INPUT_DIAGNOSTIC.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
         return _blocked("invalid_binding")
+    diagnostic = _INPUT_DIAGNOSTIC.get()
+    if diagnostic is not None:
+        diagnostic["classification"] = _binding_input_classification(binding)
     invalid = _validate_binding(binding)
     if invalid:
+        if diagnostic is not None and diagnostic.get("classification") is None:
+            diagnostic["classification"] = "malformed_input"
         return _blocked(invalid)
     knowledge = binding["knowledge"]
     if knowledge["path"] != knowledge_path:
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
         return _blocked("invalid_binding")
     knowledge_bytes, error = _read_selected(base_root, knowledge_path, MAX_FILE_BYTES)
     if error:
@@ -392,16 +417,21 @@ def resolve_evidence_binding(
     grouped_invalid_fragments = set() if fragment_context is not None else None
     baseline_digests = {} if fragment_context is not None else None
     current_digests = {} if fragment_context is not None else None
+    diagnostic_token = _INPUT_DIAGNOSTIC_CONTEXT.set(_INPUT_DIAGNOSTIC.get()) if _INPUT_DIAGNOSTIC.get() is not None else None
     baseline, baseline_corpus, reason = _envelope(
         baseline_project_root, baseline_metadata_path, baseline_corpus_root, baseline_selected_paths,
         baseline_snapshots, baseline_digests
     )
     if reason:
+        if diagnostic_token is not None:
+            _INPUT_DIAGNOSTIC_CONTEXT.reset(diagnostic_token)
         return _blocked(reason)
     current, current_corpus, reason = _envelope(
         current_project_root, current_metadata_path, current_corpus_root, current_selected_paths,
         current_snapshots, current_digests
     )
+    if diagnostic_token is not None:
+        _INPUT_DIAGNOSTIC_CONTEXT.reset(diagnostic_token)
     if reason:
         return _blocked(reason)
     assert baseline is not None and current is not None and baseline_corpus is not None and current_corpus is not None
@@ -664,6 +694,48 @@ def _kmp_offsets(text: bytes, pattern: bytes):
                 return offsets
             matched = prefix[matched - 1]
     return offsets
+
+
+def resolve_evidence_binding_with_input_diagnostic(
+    *,
+    project_root: str | Path,
+    binding_path: str | Path,
+    knowledge_path: str,
+    baseline_metadata_path: str | Path,
+    baseline_project_root: str | Path,
+    baseline_corpus_root: str | Path,
+    baseline_selected_paths: Iterable[str],
+    current_metadata_path: str | Path,
+    current_project_root: str | Path,
+    current_corpus_root: str | Path,
+    current_selected_paths: Iterable[str],
+    expected_revisions: Optional[Dict[str, Any]] = None,
+    authorize_validation_read: Callable[[], bool] = lambda: False,
+    authorize_processing_and_report: Callable[[], bool] = lambda: False,
+) -> dict:
+    """Resolve once and optionally classify malformed versus unsupported input."""
+    context = {"classification": None}
+    token = _INPUT_DIAGNOSTIC.set(context)
+    try:
+        report = resolve_evidence_binding(
+            project_root=project_root, binding_path=binding_path, knowledge_path=knowledge_path,
+            baseline_metadata_path=baseline_metadata_path, baseline_project_root=baseline_project_root,
+            baseline_corpus_root=baseline_corpus_root, baseline_selected_paths=baseline_selected_paths,
+            current_metadata_path=current_metadata_path, current_project_root=current_project_root,
+            current_corpus_root=current_corpus_root, current_selected_paths=current_selected_paths,
+            expected_revisions=expected_revisions, authorize_validation_read=authorize_validation_read,
+            authorize_processing_and_report=authorize_processing_and_report,
+        )
+    finally:
+        _INPUT_DIAGNOSTIC.reset(token)
+    if report.get("status") == "COMPLETE":
+        sidecar = {"status": "NOT_APPLICABLE"}
+    elif (report.get("reason") in {"invalid_binding", "invalid_or_incomplete_envelope"}
+          and context["classification"] in {"malformed_input", "unsupported_schema"}):
+        sidecar = {"status": "CLASSIFIED", "reason": context["classification"]}
+    else:
+        sidecar = {"status": "NOT_CLASSIFIED", "reason": report.get("reason")}
+    return {"resolver_report": report, "input_diagnostic": sidecar}
 
 
 def resolve_evidence_binding_with_fragment_continuity(

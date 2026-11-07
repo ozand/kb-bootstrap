@@ -120,6 +120,108 @@ class EvidenceBindingTests(unittest.TestCase):
         args.update(kwargs)
         return resolve_evidence_binding(**args)
 
+    def diagnostic(self, **kwargs):
+        args = dict(
+            project_root=self.binding_root, binding_path="binding.json", knowledge_path="topic.md",
+            baseline_metadata_path="capture.yaml", baseline_project_root=self.base_project,
+            baseline_corpus_root=self.base_corpus, baseline_selected_paths=["evidence.md"],
+            current_metadata_path="capture.yaml", current_project_root=self.current_project,
+            current_corpus_root=self.current_corpus, current_selected_paths=["evidence.md"],
+            authorize_validation_read=lambda: True, authorize_processing_and_report=lambda: True,
+        )
+        args.update(kwargs)
+        return evidence_binding.resolve_evidence_binding_with_input_diagnostic(**args)
+
+    def test_opt_in_input_diagnostic_binding_matrix_and_legacy_parity(self):
+        cases = [
+            ("valid", "COMPLETE", "NOT_APPLICABLE"),
+            ("unsupported", "BLOCKED", "unsupported_schema"),
+            ("wrong_type", "BLOCKED", "malformed_input"),
+            ("boolean_version", "BLOCKED", "malformed_input"),
+            ("extra_key", "BLOCKED", "malformed_input"),
+            ("unsupported_schema", "BLOCKED", "unsupported_schema"),
+        ]
+        for case, report_status, diagnostic_reason in cases:
+            with self.subTest(case=case):
+                self.binding = json.loads(json.dumps(self.binding))
+                if case in {"unsupported", "unsupported_schema"}:
+                    self.binding["version"] = 2 if case == "unsupported" else 1
+                    self.binding["schema"] = "kb-bootstrap.evidence-bindings-next"
+                elif case == "wrong_type":
+                    self.binding["schema"] = 3
+                elif case == "boolean_version":
+                    self.binding["version"] = True
+                elif case == "extra_key":
+                    self.binding["extra"] = "private marker"
+                self._write_binding()
+                old = self.resolve()
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], old)
+                self.assertEqual(old["status"], report_status)
+                if report_status == "COMPLETE":
+                    self.assertEqual(result["input_diagnostic"], {"status": "NOT_APPLICABLE"})
+                else:
+                    self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": diagnostic_reason})
+                    self.assertNotIn("private marker", json.dumps(result))
+                self.binding = json.loads(json.dumps({
+                    "schema": "kb-bootstrap.evidence-bindings", "version": 1,
+                    "knowledge": {"path": "topic.md", "sha256": sha(self.knowledge)},
+                    "bindings": [{"binding_id": "binding-1", "evidence": [{
+                        "source_id": "source-base", "representation_id": "rep-base",
+                        "observed_sha256": sha(self.base_bytes),
+                        "current": {"source_id": "source-current", "representation_id": "rep-current"},
+                    }]}],
+                }))
+
+    def test_opt_in_input_diagnostic_duplicate_json_and_access_denial(self):
+        self.binding_path.write_text('{"schema":"kb-bootstrap.evidence-bindings","schema":"secret","version":1}', encoding="utf-8")
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertNotIn("secret", json.dumps(result))
+        with patch("kb_bootstrap.raw_manifest.os.open") as open_spy:
+            with self.assertRaises(PermissionError):
+                self.diagnostic(authorize_validation_read=lambda: False)
+        open_spy.assert_not_called()
+
+    def test_opt_in_input_diagnostic_reads_binding_once(self):
+        original = evidence_binding._read_selected
+        binding_reads = []
+
+        def counted(root, relative, limit):
+            if relative == "binding.json":
+                binding_reads.append(relative)
+            return original(root, relative, limit)
+
+        with patch.object(evidence_binding, "_read_selected", side_effect=counted):
+            result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], self.resolve())
+        self.assertEqual(binding_reads, ["binding.json"])
+
+    def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
+        from kb_bootstrap.evidence_review import compose_evidence_review_worklist
+        self.base_meta.write_text("schema: kb-bootstrap.source-capture\nversion: 2\nsources: []\n", encoding="utf-8")
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], self.resolve())
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "unsupported_schema"})
+        self.assertEqual(result["resolver_report"], {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        self.base_meta.write_text(
+            "schema: kb-bootstrap.source-capture\\nversion: 1\\nsources: []\\n", encoding="utf-8"
+        )
+        self._write_envelope(self.base_meta, "source-base", "rep-base", self.base_bytes)
+        self.current_meta.write_text(
+            "schema: kb-bootstrap.source-capture\\nversion: 1\\nsources: []\\n", encoding="utf-8"
+        )
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        result = self.diagnostic()
+        legacy = self.resolve()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(
+            compose_evidence_review_worklist(result["resolver_report"], [], True, {}),
+            compose_evidence_review_worklist(legacy, [], True, {}),
+        )
+
     def test_complete_unchanged_mapping_emits_exact_bounded_report(self):
         (self.base_project / "raw/baseline").mkdir(parents=True)
         (self.current_project / "raw/current").mkdir(parents=True)

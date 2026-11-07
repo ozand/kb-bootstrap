@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import contextvars
 import json
 import re
 from pathlib import Path
@@ -22,6 +23,8 @@ MAX_FILE_BYTES = 64 * 1024 * 1024
 MAX_TOTAL_BYTES = 256 * 1024 * 1024
 TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 LABEL = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
+_INPUT_DIAGNOSTIC_CONTEXT = contextvars.ContextVar("source_capture_input_diagnostic", default=None)
+
 OPAQUE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 
 
@@ -235,11 +238,26 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
         return False, ("metadata is not valid UTF-8",), None
     event_error = _events(text)
     if event_error:
+        diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
         return False, (event_error,), None
     try:
         record = yaml.load(text, Loader=_UniqueLoader)
     except (yaml.YAMLError, ValueError):
+        diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
         return False, ("metadata is invalid or has duplicate keys",), None
+    diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+    if diagnostic is not None and diagnostic.get("classification") is None:
+        if (not isinstance(record, dict) or set(record) != {"schema", "version", "sources"}
+                or not isinstance(record.get("schema"), str) or type(record.get("version")) is not int):
+            diagnostic["classification"] = "malformed_input"
+        elif record["schema"] != SCHEMA or record["version"] != 1:
+            diagnostic["classification"] = "unsupported_schema"
+        else:
+            diagnostic["classification"] = "malformed_input"
     if not isinstance(record, dict) or set(record) != {"schema", "version", "sources"} or record.get("schema") != SCHEMA or type(record.get("version")) is not int or record["version"] != 1:
         return False, ("metadata schema or version is unsupported",), None
     sources = record["sources"]
