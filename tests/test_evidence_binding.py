@@ -235,6 +235,27 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(result["resolver_report"], legacy)
         self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "unsupported_schema"})
 
+    def test_opt_in_input_diagnostic_malformed_capture_sources_are_classified(self):
+        malformed_records = ("sources: null", "sources: [null]")
+        for sources in malformed_records:
+            with self.subTest(sources=sources):
+                self.base_meta.write_text(
+                    "\n".join((
+                        "schema: kb-bootstrap.source-capture", "version: 1", sources, "",
+                    )),
+                    encoding="utf-8",
+                )
+                legacy = self.resolve()
+                self.assertEqual(
+                    legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"}
+                )
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "CLASSIFIED", "reason": "malformed_input"},
+                )
+
     def test_opt_in_input_diagnostic_later_resource_block_not_classified(self):
         legacy = self.resolve()
         result = self.diagnostic()

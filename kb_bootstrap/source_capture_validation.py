@@ -264,7 +264,12 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
     if not isinstance(record, dict) or set(record) != {"schema", "version", "sources"} or record.get("schema") != SCHEMA or type(record.get("version")) is not int or record["version"] != 1:
         return False, ("metadata schema or version is unsupported",), None
     sources = record["sources"]
-    if not isinstance(sources, list) or len(sources) > MAX_SOURCES:
+    if not isinstance(sources, list):
+        diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
+        return False, ("source list is invalid",), None
+    if len(sources) > MAX_SOURCES:
         return False, ("source count is invalid or exceeds limit",), None
     try:
         requested = []
@@ -324,6 +329,9 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
     checked_retained: Set[str] = set()
     for source in sources:
         if not isinstance(source, dict):
+            diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+            if diagnostic is not None:
+                diagnostic["classification"] = "malformed_input"
             return False, ("source record is invalid",), None
         sid = source.get("source_id")
         if not isinstance(sid, str) or not TOKEN.fullmatch(sid) or sid in source_ids:
