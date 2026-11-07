@@ -531,6 +531,15 @@ def resolve_evidence_binding(
                         or hashlib.sha256(fragment_bytes).hexdigest() != rep["revision"]["digest"]):
                     return _blocked("baseline_identity_mismatch")
                 if not _fragment_valid(ref.get("fragment"), fragment_bytes):
+                    diagnostic = _INPUT_DIAGNOSTIC.get()
+                    try:
+                        text = fragment_bytes.decode("utf-8")
+                    except UnicodeError:
+                        text = None
+                    if (diagnostic is not None and text is not None
+                            and ref["fragment"]["end_line"] >
+                            (0 if not text else text.count("\n") + (0 if text.endswith("\n") else 1))):
+                        diagnostic["classification"] = "malformed_input"
                     return _blocked("invalid_binding")
             mapping = ref.get("current")
             if mapping is not None:

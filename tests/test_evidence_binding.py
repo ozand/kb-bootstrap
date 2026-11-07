@@ -742,6 +742,18 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertIsNone(unmapped_observation["current"])
         self.assertEqual(unmapped_observation["current_offsets"], [])
 
+    def test_opt_in_input_diagnostic_out_of_range_fragment_is_malformed(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
+        self._write_binding()
+        standalone = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(standalone, {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(result["resolver_report"], standalone)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertNotIn(str(self.base_project), json.dumps(result))
+        self.assertNotIn(str(self.base_bytes), json.dumps(result))
+
     def test_fragment_continuity_invalid_range_preserves_resolver_block(self):
         ref = self.binding["bindings"][0]["evidence"][0]
         ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
