@@ -1,6 +1,6 @@
 # ADR-055: Propose distinct malformed and unsupported evidence schema outcomes
 
-**Status**: Accepted
+**Status**: Superseded by ADR-056
 **Date**: 2026-11-07
 **Authors**: Pi coding agent
 **Supersedes**: None

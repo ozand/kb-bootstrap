@@ -1,10 +1,12 @@
 # ADR-056: Refine ADR-055 discriminator types and continuity scope
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-07
 **Authors**: Pi coding agent
-**Supersedes**: ADR-055 (only its discriminator type-classification and diagnostic/continuity combination clauses, if accepted)
+**Supersedes**: ADR-055 (only its discriminator type-classification and diagnostic/continuity combination clauses)
 **Related**: Issue #128; ADR-031, ADR-036, ADR-042, ADR-051, ADR-052, ADR-055
+
+Technical acceptance: accepted under the owner's standing delegation recorded in [AGENTS.md](../../AGENTS.md), authorized by Issue #223, after independent exact-head review 15ff passed commit `ed1bbda76d50c87c0c1c278a40f430d0ffe04f7e`. Acceptance applies only to ADR-056's two named refinements. No runtime implementation, issue completion, rollout, or consumer migration is claimed or authorized by this record.
 
 ## Context
 
