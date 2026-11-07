@@ -123,7 +123,7 @@ def _binding_input_classification(value: Any) -> Optional[str]:
     return None
 
 
-def _validate_binding(value: Any) -> Optional[str]:
+def _validate_binding(value: Any, diagnostic=None) -> Optional[str]:
     if not _keys(value, {"schema", "version", "knowledge", "bindings"}):
         return "invalid_binding"
     if value["schema"] != SCHEMA or type(value["version"]) is not int or value["version"] != 1:
@@ -137,7 +137,11 @@ def _validate_binding(value: Any) -> Optional[str]:
     if not isinstance(knowledge["sha256"], str) or not DIGEST.fullmatch(knowledge["sha256"]):
         return "invalid_binding"
     bindings = value["bindings"]
-    if not isinstance(bindings, list) or len(bindings) > MAX_BINDINGS:
+    if not isinstance(bindings, list):
+        return "invalid_binding"
+    if len(bindings) > MAX_BINDINGS:
+        if diagnostic is not None:
+            diagnostic["classification"] = "resource_limit"
         return "invalid_binding"
     binding_ids = set()
     for binding in bindings:
@@ -157,7 +161,11 @@ def _validate_binding(value: Any) -> Optional[str]:
         if "review_actor" in binding and not _safe_actor(binding["review_actor"]):
             return "invalid_binding"
         refs = binding["evidence"]
-        if not isinstance(refs, list) or not 1 <= len(refs) <= MAX_REFERENCES:
+        if not isinstance(refs, list) or not refs:
+            return "invalid_binding"
+        if len(refs) > MAX_REFERENCES:
+            if diagnostic is not None:
+                diagnostic["classification"] = "resource_limit"
             return "invalid_binding"
         seen_pairs = set()
         for ref in refs:
@@ -368,7 +376,7 @@ def resolve_evidence_binding(
     diagnostic = _INPUT_DIAGNOSTIC.get()
     if diagnostic is not None:
         diagnostic["classification"] = _binding_input_classification(binding)
-    invalid = _validate_binding(binding)
+    invalid = _validate_binding(binding, diagnostic)
     if invalid:
         if diagnostic is not None and diagnostic.get("classification") is None:
             diagnostic["classification"] = "malformed_input"
@@ -733,6 +741,8 @@ def resolve_evidence_binding_with_input_diagnostic(
     elif (report.get("reason") in {"invalid_binding", "invalid_or_incomplete_envelope"}
           and context["classification"] in {"malformed_input", "unsupported_schema"}):
         sidecar = {"status": "CLASSIFIED", "reason": context["classification"]}
+    elif context["classification"] == "resource_limit":
+        sidecar = {"status": "NOT_CLASSIFIED", "reason": report.get("reason")}
     else:
         sidecar = {"status": "NOT_CLASSIFIED", "reason": report.get("reason")}
     return {"resolver_report": report, "input_diagnostic": sidecar}

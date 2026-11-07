@@ -256,6 +256,38 @@ class EvidenceBindingTests(unittest.TestCase):
                     {"status": "CLASSIFIED", "reason": "malformed_input"},
                 )
 
+    def test_opt_in_input_diagnostic_binding_count_limits_are_unclassified(self):
+        cases = (
+            ("bindings", "MAX_BINDINGS", 1),
+            ("references", "MAX_REFERENCES", 1),
+        )
+        for name, limit_name, limit in cases:
+            with self.subTest(name=name):
+                if name == "bindings":
+                    self.binding["bindings"] = [
+                        {"binding_id": f"b{index}", "evidence": [{
+                            "source_id": "source-base", "representation_id": "rep-base",
+                            "observed_sha256": sha(self.base_bytes),
+                        }]}
+                        for index in range(3)
+                    ]
+                else:
+                    self.binding["bindings"][0]["evidence"] = [
+                        {"source_id": f"s{index}", "representation_id": f"r{index}",
+                         "observed_sha256": sha(self.base_bytes)}
+                        for index in range(3)
+                    ]
+                self._write_binding()
+                with patch.object(evidence_binding, limit_name, limit):
+                    legacy = self.resolve()
+                    result = self.diagnostic()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_binding"})
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "NOT_CLASSIFIED", "reason": "invalid_binding"},
+                )
+
     def test_opt_in_input_diagnostic_yaml_limits_remain_unclassified(self):
         from kb_bootstrap import source_capture_validation
         cases = (
