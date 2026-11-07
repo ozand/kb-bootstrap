@@ -1,10 +1,12 @@
 # ADR-055: Propose distinct malformed and unsupported evidence schema outcomes
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-07
 **Authors**: Pi coding agent
 **Supersedes**: None
 **Related**: Issue #128; ADR-024, ADR-026, ADR-031, ADR-036, ADR-042, ADR-051, ADR-052
+
+Technical acceptance: accepted under the owner's standing delegation recorded in [AGENTS.md](../../AGENTS.md), authorized by Issue #223, after independent exact-head review a453 passed commit `3369219d0fff52eee8cc9f668b6114346947b32d`. Acceptance applies only to this ADR-055 decision. No runtime implementation, issue completion, rollout, or consumer migration is claimed or authorized by this record.
 
 ## Context
 
@@ -40,7 +42,7 @@ Rollout is consumer-first without a coordinated deployment assumption: release r
 
 ## Consequences
 
-Operators can tell malformed input from a valid-but-unsupported schema only after the compatibility contract is accepted and deployed. Unsupported input still blocks; the resolver does not guess, downgrade, or infer. Until compatible consumers are available, current behavior remains unchanged.
+Operators can distinguish malformed input from a valid-but-unsupported schema through the proposed opt-in diagnostic once separately authorized implementation is delivered. Unsupported input still blocks; the resolver does not guess, downgrade, or infer. Until then, existing behavior remains unchanged. ADR-055 is Accepted as an architecture decision; its test contract is future implementation evidence, not evidence that runtime behavior exists.
 
 ## Alternatives Considered
 
