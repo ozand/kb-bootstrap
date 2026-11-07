@@ -545,6 +545,9 @@ def resolve_evidence_binding(
             if mapping is not None:
                 target = _validated_rep(current_index, mapping["source_id"], mapping["representation_id"])
                 if target is not None and target["retention"] != "retained":
+                    diagnostic = _INPUT_DIAGNOSTIC.get()
+                    if diagnostic is not None:
+                        diagnostic["classification"] = "malformed_input"
                     return _blocked("invalid_binding")
 
     # Enforce ADR-031's aggregate selected knowledge/evidence bytes across both envelopes.

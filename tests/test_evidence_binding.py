@@ -520,7 +520,21 @@ class EvidenceBindingTests(unittest.TestCase):
         }
         self._write_binding()
         result = self.resolve(current_selected_paths=["evidence.md"])
+        diagnostic = self.diagnostic(current_selected_paths=["evidence.md"])
         self.assertEqual(result, {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(diagnostic["resolver_report"], result)
+        self.assertEqual(diagnostic["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+
+    def test_opt_in_input_diagnostic_baseline_identity_mismatch_is_not_classified(self):
+        self.binding["bindings"][0]["evidence"][0]["observed_sha256"] = "0" * 64
+        self._write_binding()
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "baseline_identity_mismatch"})
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {
+            "status": "NOT_CLASSIFIED", "reason": "baseline_identity_mismatch",
+        })
 
     def test_baseline_reference_only_target_blocks_as_identity_mismatch(self):
         self._add_reference_only_source(self.base_meta, "source-base-ref", "rep-base-ref", "not-selected.md")
