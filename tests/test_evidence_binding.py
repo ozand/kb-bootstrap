@@ -256,6 +256,38 @@ class EvidenceBindingTests(unittest.TestCase):
                     {"status": "CLASSIFIED", "reason": "malformed_input"},
                 )
 
+    def test_opt_in_input_diagnostic_malformed_nested_capture_matrix(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        malformed = {
+            "source_id_type": original.replace("source_id: source-base", "source_id: []"),
+            "origin_shape": original.replace("origin: {kind: opaque-owner-reference, reference: source-base}", "origin: []"),
+            "representation_container": original.replace("representations:\n", "representations: null\n").replace(
+                "  - representation_id: rep-base\n    revision:", "  revision:"
+            ),
+            "unknown_source_key": original.replace("- source_id: source-base", "- unknown: marker\n  source_id: source-base"),
+            "missing_source_field": original.replace("  origin: {kind: opaque-owner-reference, reference: source-base}\n", ""),
+            "duplicate_source_id": original.replace(
+                "  origin: {kind: opaque-owner-reference, reference: source-base}\n",
+                "  source_id: duplicate\n  origin: {kind: opaque-owner-reference, reference: source-base}\n",
+            ),
+            "malformed_coordinates": original.replace(
+                "    revision: {algorithm:",
+                "    coordinates: {local: {unit: byte, range: [true, 2]}}\n    revision: {algorithm:",
+            ),
+        }
+        for name, value in malformed.items():
+            with self.subTest(name=name):
+                self.base_meta.write_text(value, encoding="utf-8")
+                legacy = self.resolve()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "CLASSIFIED", "reason": "malformed_input"},
+                )
+        self.base_meta.write_text(original, encoding="utf-8")
+
     def test_opt_in_input_diagnostic_later_resource_block_not_classified(self):
         legacy = self.resolve()
         result = self.diagnostic()

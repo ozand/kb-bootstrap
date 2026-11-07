@@ -205,6 +205,13 @@ def validate_source_capture(metadata_path: str | Path, project_root: str | Path,
     return valid, errors
 
 
+def _malformed_source_capture(reason: str):
+    diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+    if diagnostic is not None:
+        diagnostic["classification"] = "malformed_input"
+    return False, (reason,), None
+
+
 def _validate_source_capture(metadata_path: str | Path, project_root: str | Path,
                              corpus_root: str | Path, selected_paths: Iterable[str],
                              manifest_path: str | Path | None = None,
@@ -265,10 +272,7 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
         return False, ("metadata schema or version is unsupported",), None
     sources = record["sources"]
     if not isinstance(sources, list):
-        diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
-        if diagnostic is not None:
-            diagnostic["classification"] = "malformed_input"
-        return False, ("source list is invalid",), None
+        return _malformed_source_capture("source list is invalid")
     if len(sources) > MAX_SOURCES:
         return False, ("source count is invalid or exceeds limit",), None
     try:
@@ -329,19 +333,16 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
     checked_retained: Set[str] = set()
     for source in sources:
         if not isinstance(source, dict):
-            diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
-            if diagnostic is not None:
-                diagnostic["classification"] = "malformed_input"
-            return False, ("source record is invalid",), None
+            return _malformed_source_capture("source record is invalid")
         sid = source.get("source_id")
         if not isinstance(sid, str) or not TOKEN.fullmatch(sid) or sid in source_ids:
-            return False, ("source identifier is invalid or duplicated",), None
+            return _malformed_source_capture("source identifier is invalid or duplicated")
         source_ids.add(sid)
         if not _origin(source.get("origin")):
-            return False, ("origin descriptor is invalid",), None
+            return _malformed_source_capture("origin descriptor is invalid")
         allowed_source = {"source_id", "origin", "original_revision", "original_retention", "capture", "fidelity", "representations", "permissions"}
         if set(source) - allowed_source or not {"source_id", "origin", "original_revision", "original_retention", "capture", "fidelity", "representations"} <= set(source):
-            return False, ("source fields are unsupported or required fields are missing",), None
+            return _malformed_source_capture("source fields are unsupported or required fields are missing")
         if "permissions" in source:
             permissions = source["permissions"]
             if (not isinstance(permissions, dict) or set(permissions) != {"access", "retention", "redistribution"}
@@ -349,36 +350,36 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
                            or _utf8_size(item) is None or _utf8_size(item) > 128
                            or any(ord(char) < 32 or ord(char) == 127 for char in item)
                            for item in permissions.values())):
-                return False, ("permission labels are invalid",), None
+                return _malformed_source_capture("permission labels are invalid")
         original = source.get("original_revision")
         original_digest = _digest_record(original, original=True)
         if (not isinstance(original, dict)
                 or set(original) - {"algorithm", "digest", "media_type", "language", "observed_at", "opaque"}
                 or (original_digest is None and (not isinstance(original.get("opaque"), str) or not original["opaque"]))
                 or ("opaque" in original and set(original) - {"opaque", "media_type", "language", "observed_at"})):
-            return False, ("original revision is invalid",), None
+            return _malformed_source_capture("original revision is invalid")
         if "observed_at" in original and not _timestamp(original["observed_at"]):
-            return False, ("original observation time is invalid",), None
+            return _malformed_source_capture("original observation time is invalid")
         if "opaque" in original and not (original["opaque"] == "unknown" or (isinstance(original["opaque"], str) and OPAQUE.fullmatch(original["opaque"]))):
-            return False, ("opaque original revision is invalid",), None
+            return _malformed_source_capture("opaque original revision is invalid")
         if "media_type" in original and (not isinstance(original["media_type"], str) or not original["media_type"]):
-            return False, ("original media type is invalid",), None
+            return _malformed_source_capture("original media type is invalid")
         retention = source.get("original_retention")
         if not isinstance(retention, str) or retention not in {"retained", "reference-only", "unknown"}:
-            return False, ("original retention is invalid",), None
+            return _malformed_source_capture("original retention is invalid")
         if retention == "retained" and original_digest is None:
-            return False, ("retained original requires a known original digest",), None
+            return _malformed_source_capture("retained original requires a known original digest")
         capture, fidelity, reps = source.get("capture"), source.get("fidelity"), source.get("representations")
         if not isinstance(capture, dict) or not isinstance(fidelity, dict) or not isinstance(reps, list):
-            return False, ("capture, fidelity, and representations are required",), None
+            return _malformed_source_capture("capture, fidelity, and representations are required")
         method, cls = capture.get("method"), fidelity.get("class")
         if (set(capture) - {"method", "captured_at", "converter", "reason"}
                 or set(fidelity) != {"class", "coverage", "losses"}
                 or not isinstance(method, str) or method not in {"direct", "converted", "manual-summary", "blocked"}
                 or not isinstance(cls, str) or cls not in {"exact", "partial", "manual-summary", "blocked", "unknown"}):
-            return False, ("capture method or fidelity class is invalid",), None
+            return _malformed_source_capture("capture method or fidelity class is invalid")
         if "captured_at" in capture and not _timestamp(capture["captured_at"]):
-            return False, ("capture time is invalid",), None
+            return _malformed_source_capture("capture time is invalid")
         if len(reps) > MAX_REPRESENTATIONS:
             return False, ("representation count exceeds limit",), None
         if cls == "blocked":
@@ -386,62 +387,62 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
             if (method != "blocked" or reps or not isinstance(reason, str)
                     or reason not in {"origin-unavailable", "access-not-provided", "conversion-failed", "unsupported-input"}
                     or set(capture) - {"method", "reason"}):
-                return False, ("blocked capture is inconsistent",), None
+                return _malformed_source_capture("blocked capture is inconsistent")
         elif method == "blocked" or not reps:
-            return False, ("non-blocked capture requires representations",), None
+            return _malformed_source_capture("non-blocked capture requires representations")
         coverage, losses = fidelity.get("coverage"), fidelity.get("losses")
         if not isinstance(coverage, str) or not (coverage == "unknown" or LABEL.fullmatch(coverage)) or not isinstance(losses, list) or len(losses) > 64 or any(not isinstance(loss, str) or not LABEL.fullmatch(loss) for loss in losses) or len(set(losses)) != len(losses):
-            return False, ("fidelity coverage or losses are invalid",), None
+            return _malformed_source_capture("fidelity coverage or losses are invalid")
         if cls == "exact" and (original_digest is None or coverage != "all-bytes" or losses):
-            return False, ("exact fidelity requires known original bytes, all-bytes coverage, and no losses",), None
+            return _malformed_source_capture("exact fidelity requires known original bytes, all-bytes coverage, and no losses")
         if cls in {"partial", "manual-summary"} and not losses:
-            return False, ("partial fidelity requires declared losses",), None
+            return _malformed_source_capture("partial fidelity requires declared losses")
         if cls == "unknown" and coverage != "unknown":
-            return False, ("unknown fidelity requires unknown coverage",), None
+            return _malformed_source_capture("unknown fidelity requires unknown coverage")
         if cls == "blocked" and ((source.get("origin") or {}).get("kind") != "unavailable") and capture.get("reason") == "origin-unavailable":
-            return False, ("origin-unavailable reason requires an unavailable origin",), None
+            return _malformed_source_capture("origin-unavailable reason requires an unavailable origin")
         if cls == "manual-summary" and method != "manual-summary":
-            return False, ("manual-summary fidelity requires manual-summary method",), None
+            return _malformed_source_capture("manual-summary fidelity requires manual-summary method")
         if method in {"direct", "blocked"} and "converter" in capture:
-            return False, ("converter metadata is only valid for converted or manual-summary captures",), None
+            return _malformed_source_capture("converter metadata is only valid for converted or manual-summary captures")
         if method == "manual-summary" and cls != "manual-summary":
-            return False, ("manual-summary method requires manual-summary fidelity",), None
+            return _malformed_source_capture("manual-summary method requires manual-summary fidelity")
         if method == "blocked" and (set(capture) - {"method", "reason"} or cls != "blocked"):
-            return False, ("blocked capture has unsupported or inconsistent metadata",), None
+            return _malformed_source_capture("blocked capture has unsupported or inconsistent metadata")
         if method != "blocked" and "reason" in capture:
-            return False, ("capture reason is only valid for blocked records",), None
+            return _malformed_source_capture("capture reason is only valid for blocked records")
         if method != "converted" and method not in {"direct", "manual-summary", "blocked"}:
-            return False, ("capture method is unsupported",), None
+            return _malformed_source_capture("capture method is unsupported")
         if method in {"converted", "manual-summary"} and "converter" in capture:
             converter = capture["converter"]
             if (not isinstance(converter, dict) or set(converter) - {"identity", "version", "parameters"}
                     or not isinstance(converter.get("identity"), str) or not TOKEN.fullmatch(converter["identity"])
                     or not isinstance(converter.get("version"), str) or not TOKEN.fullmatch(converter["version"])):
-                return False, ("converter lineage requires identity and version",), None
+                return _malformed_source_capture("converter lineage requires identity and version")
         if method == "converted" and "converter" not in capture:
-            return False, ("converted capture requires converter identity and version",), None
+            return _malformed_source_capture("converted capture requires converter identity and version")
         rep_ids: Set[str] = set()
         rep_digests: list[str] = []
         rep_paths: Set[str] = set()
         for rep in reps:
             if not isinstance(rep, dict):
-                return False, ("representation is invalid",), None
+                return _malformed_source_capture("representation is invalid")
             rid = rep.get("representation_id")
             digest = _digest_record(rep.get("revision"))
             path = rep.get("raw_path")
             if not isinstance(rid, str) or not TOKEN.fullmatch(rid) or rid in rep_ids or digest is None or not isinstance(path, str) or not _safe_relative(path):
-                return False, ("representation identifier, revision, or path is invalid",), None
+                return _malformed_source_capture("representation identifier, revision, or path is invalid")
             if set(rep) - {"representation_id", "revision", "media_type", "language", "raw_path", "retention", "coordinates"} or not {"representation_id", "revision", "media_type", "raw_path", "retention"} <= set(rep):
-                return False, ("representation fields are unsupported or required fields are missing",), None
+                return _malformed_source_capture("representation fields are unsupported or required fields are missing")
             if (not isinstance(rep.get("media_type"), str) or rep.get("media_type") not in {"text/plain", "text/markdown"}
                     or not isinstance(rep.get("retention"), str) or rep.get("retention") not in {"retained", "reference-only", "unknown"}):
-                return False, ("representation media type or retention is unsupported",), None
+                return _malformed_source_capture("representation media type or retention is unsupported")
             if path in rep_paths:
-                return False, ("representation path is duplicated",), None
+                return _malformed_source_capture("representation path is duplicated")
             rep_ids.add(rid)
             rep_digests.append(digest)
             if path.casefold() in {existing.casefold() for existing in all_referenced | rep_paths}:
-                return False, ("representation paths collide",), None
+                return _malformed_source_capture("representation paths collide")
             rep_paths.add(path)
             all_referenced.add(path)
             if path in selected:
@@ -455,30 +456,30 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
                     snapshot_digests_out[path] = observed_digest
                 coords_value = rep.get("coordinates", {})
                 if not isinstance(coords_value, dict) or set(coords_value) - {"local", "original"}:
-                    return False, ("coordinates are invalid",), None
+                    return _malformed_source_capture("coordinates are invalid")
                 if "local" in coords_value and not _coordinate(coords_value["local"], data):
-                    return False, ("local coordinate is invalid",), None
+                    return _malformed_source_capture("local coordinate is invalid")
             elif rep.get("retention") == "retained":
                 return False, ("retained representation is unavailable",), None
             if "coordinates" in rep:
                 coords = rep["coordinates"]
                 if not isinstance(coords, dict) or set(coords) - {"local", "original"}:
-                    return False, ("coordinates are invalid",), None
+                    return _malformed_source_capture("coordinates are invalid")
                 if "local" in coords and not _coordinate(coords["local"], selected.get(path)):
-                    return False, ("local coordinate is invalid",), None
+                    return _malformed_source_capture("local coordinate is invalid")
                 if "original" in coords and not _coordinate(coords["original"], None):
-                    return False, ("original coordinate is invalid",), None
+                    return _malformed_source_capture("original coordinate is invalid")
         if cls == "exact" and any(
             digest != original_digest
             for rep, digest in zip(reps, rep_digests)
             if rep.get("retention") == "retained"
         ):
-            return False, ("every exact representation must match original digest",), None
+            return _malformed_source_capture("every exact representation must match original digest")
         if retention == "retained" and not any(
             rep_digest == original_digest and rep.get("retention") == "retained"
             for rep, rep_digest in zip(reps, rep_digests)
         ):
-            return False, ("retained original requires a matching retained representation",), None
+            return _malformed_source_capture("retained original requires a matching retained representation")
     expected_retained = {
         rep["raw_path"]
         for source in sources
