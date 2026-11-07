@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import stat
@@ -120,6 +121,318 @@ class EvidenceBindingTests(unittest.TestCase):
         args.update(kwargs)
         return resolve_evidence_binding(**args)
 
+    def diagnostic(self, **kwargs):
+        args = dict(
+            project_root=self.binding_root, binding_path="binding.json", knowledge_path="topic.md",
+            baseline_metadata_path="capture.yaml", baseline_project_root=self.base_project,
+            baseline_corpus_root=self.base_corpus, baseline_selected_paths=["evidence.md"],
+            current_metadata_path="capture.yaml", current_project_root=self.current_project,
+            current_corpus_root=self.current_corpus, current_selected_paths=["evidence.md"],
+            authorize_validation_read=lambda: True, authorize_processing_and_report=lambda: True,
+        )
+        args.update(kwargs)
+        return evidence_binding.resolve_evidence_binding_with_input_diagnostic(**args)
+
+    def test_opt_in_input_diagnostic_binding_matrix_and_legacy_parity(self):
+        cases = [
+            ("valid", "COMPLETE", "NOT_APPLICABLE"),
+            ("unsupported", "BLOCKED", "unsupported_schema"),
+            ("wrong_type", "BLOCKED", "malformed_input"),
+            ("boolean_version", "BLOCKED", "malformed_input"),
+            ("extra_key", "BLOCKED", "malformed_input"),
+            ("unsupported_schema", "BLOCKED", "unsupported_schema"),
+        ]
+        for case, report_status, diagnostic_reason in cases:
+            with self.subTest(case=case):
+                self.binding = json.loads(json.dumps(self.binding))
+                if case in {"unsupported", "unsupported_schema"}:
+                    self.binding["version"] = 2 if case == "unsupported" else 1
+                    self.binding["schema"] = "kb-bootstrap.evidence-bindings-next"
+                elif case == "wrong_type":
+                    self.binding["schema"] = 3
+                elif case == "boolean_version":
+                    self.binding["version"] = True
+                elif case == "extra_key":
+                    self.binding["extra"] = "private marker"
+                self._write_binding()
+                old = self.resolve()
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], old)
+                self.assertEqual(old["status"], report_status)
+                if report_status == "COMPLETE":
+                    self.assertEqual(result["input_diagnostic"], {"status": "NOT_APPLICABLE"})
+                else:
+                    self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": diagnostic_reason})
+                    self.assertNotIn("private marker", json.dumps(result))
+                self.binding = json.loads(json.dumps({
+                    "schema": "kb-bootstrap.evidence-bindings", "version": 1,
+                    "knowledge": {"path": "topic.md", "sha256": sha(self.knowledge)},
+                    "bindings": [{"binding_id": "binding-1", "evidence": [{
+                        "source_id": "source-base", "representation_id": "rep-base",
+                        "observed_sha256": sha(self.base_bytes),
+                        "current": {"source_id": "source-current", "representation_id": "rep-current"},
+                    }]}],
+                }))
+
+    def test_opt_in_input_diagnostic_duplicate_json_and_access_denial(self):
+        self.binding_path.write_text('{"schema":"kb-bootstrap.evidence-bindings","schema":"secret","version":1}', encoding="utf-8")
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertNotIn("secret", json.dumps(result))
+        with patch("kb_bootstrap.raw_manifest.os.open") as open_spy:
+            with self.assertRaises(PermissionError):
+                self.diagnostic(authorize_validation_read=lambda: False)
+        open_spy.assert_not_called()
+
+    def test_opt_in_input_diagnostic_reads_binding_once(self):
+        original = evidence_binding._read_selected
+        binding_reads = []
+
+        def counted(root, relative, limit):
+            if relative == "binding.json":
+                binding_reads.append(relative)
+            return original(root, relative, limit)
+
+        with patch.object(evidence_binding, "_read_selected", side_effect=counted):
+            result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], self.resolve())
+        self.assertEqual(binding_reads, ["binding.json"])
+
+    def test_opt_in_input_diagnostic_invalid_utf8_yaml_is_malformed(self):
+        invalid_metadata = bytes([255])
+        self.base_meta.write_bytes(invalid_metadata)
+        self.assertEqual(self.base_meta.read_bytes(), invalid_metadata)
+        legacy = self.resolve()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+
+        from kb_bootstrap import source_capture_validation
+        original = source_capture_validation._read_regular
+        metadata_reads = []
+
+        def counted(root, relative, limit):
+            if relative == "capture.yaml":
+                metadata_reads.append((Path(root), relative))
+            return original(root, relative, limit)
+
+        with patch.object(source_capture_validation, "_read_regular", side_effect=counted):
+            result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertEqual(len(metadata_reads), 1)
+        observed_root, relative = metadata_reads[0]
+        self.assertTrue(os.path.samefile(observed_root, self.base_project))
+        self.assertEqual(relative, "capture.yaml")
+
+    def test_opt_in_input_diagnostic_baseline_digest_mismatch_is_not_classified(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        self.base_meta.write_text(
+            original.replace(
+                f"    revision: {{algorithm: sha256, digest: {sha(self.base_bytes)}}}",
+                f"    revision: {{algorithm: sha256, digest: {'f' * 64}}}",
+            ),
+            encoding="utf-8",
+        )
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(
+            result["input_diagnostic"],
+            {"status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope"},
+        )
+
+    def test_opt_in_input_diagnostic_current_unsupported_after_valid_baseline(self):
+        self.current_meta.write_text(
+            "\n".join(("schema: kb-bootstrap.source-capture", "version: 2", "sources: []", "")),
+            encoding="utf-8",
+        )
+        legacy = self.resolve()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "unsupported_schema"})
+
+    def test_opt_in_input_diagnostic_malformed_capture_sources_are_classified(self):
+        malformed_records = ("sources: null", "sources: [null]")
+        for sources in malformed_records:
+            with self.subTest(sources=sources):
+                self.base_meta.write_text(
+                    "\n".join((
+                        "schema: kb-bootstrap.source-capture", "version: 1", sources, "",
+                    )),
+                    encoding="utf-8",
+                )
+                legacy = self.resolve()
+                self.assertEqual(
+                    legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"}
+                )
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "CLASSIFIED", "reason": "malformed_input"},
+                )
+
+    def test_opt_in_input_diagnostic_fidelity_loss_count_limit_is_unclassified(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        cases = (
+            (64, None, "NOT_APPLICABLE"),
+            (65, None, "NOT_CLASSIFIED"),
+            (64, "not-a-label", "CLASSIFIED"),
+        )
+        for count, invalid_loss, status in cases:
+            with self.subTest(count=count, invalid_loss=invalid_loss):
+                losses = [f"loss-{index}" for index in range(count)]
+                if invalid_loss is not None:
+                    losses[-1] = invalid_loss
+                loss_yaml = "[" + ", ".join(losses) + "]"
+                if invalid_loss == "not-a-label":
+                    loss_yaml = "[" + ", ".join(losses[:-1]) + ", 7]"
+                metadata = original.replace(
+                    "fidelity: {class: exact, coverage: all-bytes, losses: []}",
+                    f"fidelity: {{class: partial, coverage: excerpt, losses: {loss_yaml}}}",
+                )
+                self.base_meta.write_text(metadata, encoding="utf-8")
+                legacy = self.resolve()
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                if count == 64 and invalid_loss is None:
+                    self.assertEqual(legacy["status"], "COMPLETE")
+                    self.assertEqual(result["input_diagnostic"], {"status": "NOT_APPLICABLE"})
+                elif count > 64:
+                    self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                    self.assertEqual(result["input_diagnostic"], {
+                        "status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope",
+                    })
+                else:
+                    self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                    self.assertEqual(result["input_diagnostic"], {
+                        "status": "CLASSIFIED", "reason": "malformed_input",
+                    })
+        self.base_meta.write_text(original, encoding="utf-8")
+
+    def test_opt_in_input_diagnostic_binding_count_limits_are_unclassified(self):
+        cases = (
+            ("bindings", "MAX_BINDINGS", 1),
+            ("references", "MAX_REFERENCES", 1),
+        )
+        for name, limit_name, limit in cases:
+            with self.subTest(name=name):
+                if name == "bindings":
+                    self.binding["bindings"] = [
+                        {"binding_id": f"b{index}", "evidence": [{
+                            "source_id": "source-base", "representation_id": "rep-base",
+                            "observed_sha256": sha(self.base_bytes),
+                        }]}
+                        for index in range(3)
+                    ]
+                else:
+                    self.binding["bindings"][0]["evidence"] = [
+                        {"source_id": f"s{index}", "representation_id": f"r{index}",
+                         "observed_sha256": sha(self.base_bytes)}
+                        for index in range(3)
+                    ]
+                self._write_binding()
+                with patch.object(evidence_binding, limit_name, limit):
+                    legacy = self.resolve()
+                    result = self.diagnostic()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_binding"})
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "NOT_CLASSIFIED", "reason": "invalid_binding"},
+                )
+
+    def test_opt_in_input_diagnostic_yaml_limits_remain_unclassified(self):
+        from kb_bootstrap import source_capture_validation
+        cases = (
+            ("events", {"MAX_YAML_EVENTS": 5}, "\n".join(("schema: kb-bootstrap.source-capture", "version: 1", "sources: []", ""))),
+            ("depth", {"MAX_YAML_EVENTS": 200000, "MAX_YAML_DEPTH": 0}, "\n".join(("schema: kb-bootstrap.source-capture", "version: 1", "sources: []", ""))),
+        )
+        for name, limits, metadata in cases:
+            with self.subTest(name=name):
+                self.base_meta.write_text(metadata, encoding="utf-8")
+                with patch.multiple(source_capture_validation, **limits):
+                    legacy = self.resolve()
+                    result = self.diagnostic()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "NOT_CLASSIFIED", "reason": "invalid_or_incomplete_envelope"},
+                )
+
+    def test_opt_in_input_diagnostic_malformed_nested_capture_matrix(self):
+        original = self.base_meta.read_text(encoding="utf-8")
+        malformed = {
+            "source_id_type": original.replace("source_id: source-base", "source_id: []"),
+            "origin_shape": original.replace("origin: {kind: opaque-owner-reference, reference: source-base}", "origin: []"),
+            "representation_container": original.replace("representations:\n", "representations: null\n").replace(
+                "  - representation_id: rep-base\n    revision:", "  revision:"
+            ),
+            "unknown_source_key": original.replace("- source_id: source-base", "- unknown: marker\n  source_id: source-base"),
+            "missing_source_field": original.replace("  origin: {kind: opaque-owner-reference, reference: source-base}\n", ""),
+            "duplicate_source_id": original.replace(
+                "  origin: {kind: opaque-owner-reference, reference: source-base}\n",
+                "  source_id: duplicate\n  origin: {kind: opaque-owner-reference, reference: source-base}\n",
+            ),
+            "malformed_coordinates": original.replace(
+                "    revision: {algorithm:",
+                "    coordinates: {local: {unit: byte, range: [true, 2]}}\n    revision: {algorithm:",
+            ),
+        }
+        for name, value in malformed.items():
+            with self.subTest(name=name):
+                self.base_meta.write_text(value, encoding="utf-8")
+                legacy = self.resolve()
+                self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+                result = self.diagnostic()
+                self.assertEqual(result["resolver_report"], legacy)
+                self.assertEqual(
+                    result["input_diagnostic"],
+                    {"status": "CLASSIFIED", "reason": "malformed_input"},
+                )
+        self.base_meta.write_text(original, encoding="utf-8")
+
+    def test_opt_in_input_diagnostic_later_resource_block_not_classified(self):
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        with patch.object(evidence_binding, "MAX_SELECTED_TOTAL", 1):
+            legacy_block = self.resolve()
+            result_block = self.diagnostic()
+        self.assertEqual(legacy_block, {"status": "BLOCKED", "reason": "resource_limit_exceeded"})
+        self.assertEqual(result_block["resolver_report"], legacy_block)
+        self.assertEqual(
+            result_block["input_diagnostic"],
+            {"status": "NOT_CLASSIFIED", "reason": "resource_limit_exceeded"},
+        )
+
+    def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
+        from kb_bootstrap.evidence_review import compose_evidence_review_worklist
+        self.base_meta.write_text("schema: kb-bootstrap.source-capture\nversion: 2\nsources: []\n", encoding="utf-8")
+        result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], self.resolve())
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "unsupported_schema"})
+        self.assertEqual(result["resolver_report"], {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+        self.base_meta.write_text(
+            "schema: kb-bootstrap.source-capture\\nversion: 1\\nsources: []\\n", encoding="utf-8"
+        )
+        self._write_envelope(self.base_meta, "source-base", "rep-base", self.base_bytes)
+        self.current_meta.write_text(
+            "schema: kb-bootstrap.source-capture\\nversion: 1\\nsources: []\\n", encoding="utf-8"
+        )
+        self._write_envelope(self.current_meta, "source-current", "rep-current", self.current_bytes)
+        self._write_binding()
+        result = self.diagnostic()
+        legacy = self.resolve()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(
+            compose_evidence_review_worklist(result["resolver_report"], [], True, {}),
+            compose_evidence_review_worklist(legacy, [], True, {}),
+        )
+
     def test_complete_unchanged_mapping_emits_exact_bounded_report(self):
         (self.base_project / "raw/baseline").mkdir(parents=True)
         (self.current_project / "raw/current").mkdir(parents=True)
@@ -207,7 +520,21 @@ class EvidenceBindingTests(unittest.TestCase):
         }
         self._write_binding()
         result = self.resolve(current_selected_paths=["evidence.md"])
+        diagnostic = self.diagnostic(current_selected_paths=["evidence.md"])
         self.assertEqual(result, {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(diagnostic["resolver_report"], result)
+        self.assertEqual(diagnostic["input_diagnostic"], {"status": "NOT_CLASSIFIED", "reason": "invalid_binding"})
+
+    def test_opt_in_input_diagnostic_baseline_identity_mismatch_is_not_classified(self):
+        self.binding["bindings"][0]["evidence"][0]["observed_sha256"] = "0" * 64
+        self._write_binding()
+        legacy = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "baseline_identity_mismatch"})
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {
+            "status": "NOT_CLASSIFIED", "reason": "baseline_identity_mismatch",
+        })
 
     def test_baseline_reference_only_target_blocks_as_identity_mismatch(self):
         self._add_reference_only_source(self.base_meta, "source-base-ref", "rep-base-ref", "not-selected.md")
@@ -466,6 +793,18 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(unmapped_observation["outcome"], "unassessable_empty_fragment")
         self.assertIsNone(unmapped_observation["current"])
         self.assertEqual(unmapped_observation["current_offsets"], [])
+
+    def test_opt_in_input_diagnostic_out_of_range_fragment_is_malformed(self):
+        ref = self.binding["bindings"][0]["evidence"][0]
+        ref["fragment"] = {"representation_id": "rep-base", "start_line": 1, "end_line": 2}
+        self._write_binding()
+        standalone = self.resolve()
+        result = self.diagnostic()
+        self.assertEqual(standalone, {"status": "BLOCKED", "reason": "invalid_binding"})
+        self.assertEqual(result["resolver_report"], standalone)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertNotIn(str(self.base_project), json.dumps(result))
+        self.assertNotIn(str(self.base_bytes), json.dumps(result))
 
     def test_fragment_continuity_invalid_range_preserves_resolver_block(self):
         ref = self.binding["bindings"][0]["evidence"][0]
