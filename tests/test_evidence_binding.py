@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import stat
@@ -218,7 +219,10 @@ class EvidenceBindingTests(unittest.TestCase):
             result = self.diagnostic()
         self.assertEqual(result["resolver_report"], legacy)
         self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
-        self.assertEqual(metadata_reads, [(self.base_project, "capture.yaml")])
+        self.assertEqual(len(metadata_reads), 1)
+        observed_root, relative = metadata_reads[0]
+        self.assertTrue(os.path.samefile(observed_root, self.base_project))
+        self.assertEqual(relative, "capture.yaml")
 
     def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
         from kb_bootstrap.evidence_review import compose_evidence_review_worklist
