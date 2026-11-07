@@ -523,7 +523,7 @@ class EvidenceBindingTests(unittest.TestCase):
         diagnostic = self.diagnostic(current_selected_paths=["evidence.md"])
         self.assertEqual(result, {"status": "BLOCKED", "reason": "invalid_binding"})
         self.assertEqual(diagnostic["resolver_report"], result)
-        self.assertEqual(diagnostic["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertEqual(diagnostic["input_diagnostic"], {"status": "NOT_CLASSIFIED", "reason": "invalid_binding"})
 
     def test_opt_in_input_diagnostic_baseline_identity_mismatch_is_not_classified(self):
         self.binding["bindings"][0]["evidence"][0]["observed_sha256"] = "0" * 64
