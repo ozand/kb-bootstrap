@@ -234,7 +234,12 @@ def _validate_source_capture(metadata_path: str | Path, project_root: str | Path
             return False, ("metadata " + error,), None
         assert metadata is not None
         text = metadata.decode("utf-8")
-    except (UnicodeError, ValueError, OSError):
+    except UnicodeError:
+        diagnostic = _INPUT_DIAGNOSTIC_CONTEXT.get()
+        if diagnostic is not None:
+            diagnostic["classification"] = "malformed_input"
+        return False, ("metadata is not valid UTF-8",), None
+    except (ValueError, OSError):
         return False, ("metadata is not valid UTF-8",), None
     event_error = _events(text)
     if event_error:

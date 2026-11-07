@@ -198,6 +198,27 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(result["resolver_report"], self.resolve())
         self.assertEqual(binding_reads, ["binding.json"])
 
+    def test_opt_in_input_diagnostic_invalid_utf8_yaml_is_malformed(self):
+        self.base_meta.write_bytes(b"\\xff")
+        legacy = self.resolve()
+        self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
+
+        from kb_bootstrap import source_capture_validation
+        original = source_capture_validation._read_regular
+        metadata_reads = []
+
+        def counted(root, relative, limit):
+            if relative == "capture.yaml":
+                metadata_reads.append((Path(root), relative))
+            return original(root, relative, limit)
+
+        with patch.object(source_capture_validation, "_read_regular", side_effect=counted):
+            result = self.diagnostic()
+        self.assertEqual(result["resolver_report"], legacy)
+        self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
+        self.assertNotIn("\\xff", json.dumps(result))
+        self.assertEqual(metadata_reads, [(self.base_project, "capture.yaml")])
+
     def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
         from kb_bootstrap.evidence_review import compose_evidence_review_worklist
         self.base_meta.write_text("schema: kb-bootstrap.source-capture\nversion: 2\nsources: []\n", encoding="utf-8")
