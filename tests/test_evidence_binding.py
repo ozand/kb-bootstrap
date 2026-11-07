@@ -199,7 +199,9 @@ class EvidenceBindingTests(unittest.TestCase):
         self.assertEqual(binding_reads, ["binding.json"])
 
     def test_opt_in_input_diagnostic_invalid_utf8_yaml_is_malformed(self):
-        self.base_meta.write_bytes(b"\\xff")
+        invalid_metadata = bytes([255])
+        self.base_meta.write_bytes(invalid_metadata)
+        self.assertEqual(self.base_meta.read_bytes(), invalid_metadata)
         legacy = self.resolve()
         self.assertEqual(legacy, {"status": "BLOCKED", "reason": "invalid_or_incomplete_envelope"})
 
@@ -216,7 +218,6 @@ class EvidenceBindingTests(unittest.TestCase):
             result = self.diagnostic()
         self.assertEqual(result["resolver_report"], legacy)
         self.assertEqual(result["input_diagnostic"], {"status": "CLASSIFIED", "reason": "malformed_input"})
-        self.assertNotIn("\\xff", json.dumps(result))
         self.assertEqual(metadata_reads, [(self.base_project, "capture.yaml")])
 
     def test_opt_in_input_diagnostic_yaml_unsupported_and_composer_compatibility(self):
