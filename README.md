@@ -12,6 +12,12 @@ For contributors writing project explanations or setup instructions, see the sho
 
 Current release: **0.4.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes and the [existing-consumer migration procedure](docs/MIGRATING_EXISTING_CONSUMERS.md) for staged adoption and rollback guidance.
 
+## License
+
+Project-owned code and documentation are available under the [MIT License](LICENSE), copyright Andrey Ozhigin. Third-party dependencies and external source materials retain their own terms; this license does not grant rights to those materials.
+
+Contact: [info@ayga.tech](mailto:info@ayga.tech) · [Telegram](https://t.me/ozand_ru).
+
 ## Caller-declared evidence lineage
 
 The pure `kb_bootstrap.evidence_lineage.classify_evidence_lineage(records, coverage_complete)` helper classifies explicitly supplied lineage records; it does not inspect sources or verify independence. For example:
