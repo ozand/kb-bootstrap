@@ -1,0 +1,3 @@
+# Harbor Cache
+
+Harbor Cache is an imaginary cache library. This synthetic README claims that repeated reads avoid recomputing values. It gives no benchmark, source-code listing, release, or test record. The described API is get(key), put(key, value) and clear(). The author suggests clearing the cache when its upstream data changes. Version and publication date are unknown.

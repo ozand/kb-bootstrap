@@ -1,6 +1,6 @@
 # Authoring clear project documentation
 
-This guide is for contributors writing README explanations, setup instructions, and operational notes. Keep product behavior and local repository policy as the source of truth; this is a writing aid, not a validation contract.
+This guide is for contributors writing README explanations, setup instructions, and operational notes. Keep product behavior and local repository policy as the source of truth; this is a writing aid, not a validation contract. For choosing a procedure by input type, see the advisory [task-routing guide](guides/TASK_ROUTING.md).
 
 ## Start with the reader's problem
 

@@ -1,0 +1,7 @@
+# Synthetic recording excerpt
+
+00:00 Teacher: Today we will discuss why a work queue needs a capacity limit. This is a classroom illustration, not a production measurement.
+00:20 Teacher: Suppose jobs arrive faster than a single worker can finish them. An unlimited queue can grow indefinitely.
+00:42 Learner: Does this always cause an outage?
+00:47 Teacher: No. We have not measured an actual system. You must check arrival rate, service time and overload policy in your setting.
+01:10 Teacher: In the exercise, propose one policy and write down its tradeoff. End of the available excerpt; the rest of the recording is not provided.
