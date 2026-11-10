@@ -15,4 +15,4 @@ Preserve the source's or consumer contract's own labels. A measurement status su
 
 ## Apply only relevant checks
 
-Universal OKF checks, consumer-owned policy checks, and retrieval/index checks are separate; run and report only those required by the target workflow. See [validation composition](../VALIDATION_COMPOSITION.md) and the [canonical profile](../OKF_V0_2_CANONICAL_PROFILE.md). This routing aid is not a new command, schema, or guarantee of quality.
+Universal OKF checks, consumer-owned policy checks, and retrieval/index checks are separate; run and report only those required by the target workflow. See [validation composition](../VALIDATION_COMPOSITION.md) and the [canonical profile](../OKF_V0_2_CANONICAL_PROFILE.md). This routing aid is not a new command, schema, or guarantee of quality. A small synthetic reader exercise is recorded in the [Issue #281 routing experiment](../implementation/issue-281-routing/README.md); its result is not a quality claim.

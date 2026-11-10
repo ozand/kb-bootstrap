@@ -1,0 +1,5 @@
+# Imaginary Beacon Interface Specification, draft 0.2
+
+Clause 2: A compatible receiver SHALL accept a frame containing one unsigned sequence number and an ASCII payload of at most 32 bytes.
+Clause 3: A duplicate sequence number MAY be discarded. This draft does not specify retention duration or counter wraparound.
+Clause 4: The specification describes intended interoperability. No implementation, certification or physical-device test is supplied.
