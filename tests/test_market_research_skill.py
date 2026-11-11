@@ -88,6 +88,13 @@ class MarketResearchScaffoldTests(unittest.TestCase):
             self.assertIn("A local-only study may stop", skill_text)
             self.assertIn("no\ncommit or push cadence is required", skill_text)
             self.assertIn("This is not a local\ncapture importer", skill_text)
+            self.assertIn("check_research.py kb/research/<folder> --skip-validate", skill_text)
+            self.assertIn("kb-bootstrap validate-core --dir kb", skill_text)
+            self.assertIn("This checks required files, links, and RawCapture metadata", skill_text)
+            self.assertIn("not complete schema compliance, source completeness, or semantic correctness", skill_text)
+            self.assertIn("`NOT RUN`", skill_text)
+            self.assertIn("Do not run `qmd update` merely because QMD is configured", skill_text)
+            self.assertIn("../qmd-operator/SKILL.md", skill_text)
             self.assertIn("only when repository delivery is", skill_text)
             self.assertIn("For local-only work, record the reviewed study location", skill_text)
             self.assertIn("its name does not itself exclude files from Git", skill_text)
@@ -147,7 +154,16 @@ class MarketResearchScriptTests(unittest.TestCase):
             )
             ok = run_script("check_research.py", str(study), "--kb", str(root / "kb"),
                             "--min-screenshots", "0", "--skip-validate")
+            self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
             self.assertIn("OK", ok.stdout.splitlines()[-1], ok.stdout)
+            core = subprocess.run(
+                [sys.executable, "-m", "kb_bootstrap.cli", "validate-core", "--dir", str(root / "kb")],
+                cwd=Path.cwd(), capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(core.returncode, 0, core.stdout + core.stderr)
+            self.assertIn("=== Core Validation Scope ===", core.stdout)
+            self.assertIn("Local checks only; retrieval, index freshness and publication readiness: not checked.", core.stdout)
+            self.assertIn("publication readiness: not checked", core.stdout)
 
 
 if __name__ == "__main__":
