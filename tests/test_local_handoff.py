@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -217,6 +219,93 @@ class LocalHandoffTests(unittest.TestCase):
         posix_imports = {alias.name for node in ast.walk(branch.orelse[0]) if isinstance(node, ast.Import) for alias in node.names}
         self.assertIn("msvcrt", windows_imports)
         self.assertIn("fcntl", posix_imports)
+
+    def test_fresh_process_revalidates_explicit_source_without_rewriting_history(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            record_path = root / "handoff.json"
+            source_path = root / "source.txt"
+            source_path.write_bytes(b"synthetic source revision one\n")
+            source_revision = hashlib.sha256(source_path.read_bytes()).hexdigest()
+            record = make_record()
+            record["materials"] = [{"ref": "source:a", "revision": source_revision,
+                                    "observation": "read", "observed_scope": "whole",
+                                    "unread_remainder": "", "analysis": "analyzed",
+                                    "analyzed_scope": "whole", "unanalyzed_remainder": ""}]
+            pair = {"ref": "source:a", "revision": source_revision}
+            observed = {"ref": "source:a", "revision": source_revision, "result": "passed"}
+            attempt = {"attempt_id": "complete-1", "input_revisions": [pair],
+                       "output_revisions": [], "required_evidence": [],
+                       "observed_evidence": [observed], "state": "complete",
+                       "observed_at": "synthetic"}
+            record["steps"] = [{"step_id": "step-1", "intent": "check synthetic source",
+                                "input_revisions": [pair], "state": "complete",
+                                "output_revisions": [], "required_evidence": [],
+                                "observed_evidence": [observed], "blocker": None,
+                                "next_step": None, "attempts": [attempt],
+                                "current_resumability": "none"}]
+            created = save_record(record_path, record, permission=True)
+            self.assertEqual(created["status"], "created")
+            initial_bytes = record_path.read_bytes()
+            initial_record = load_record(record_path)["record"]
+
+            child = """
+import hashlib, json, sys
+from pathlib import Path
+from kb_bootstrap.local_handoff import check_record, load_record
+record_path, source_path = map(Path, sys.argv[1:3])
+loaded = load_record(record_path)
+if loaded["status"] != "loaded":
+    raise SystemExit("record did not load")
+record = loaded["record"]
+calls = []
+def checker(ref, revision, kind, *, acceptance_evidence_ref=None):
+    calls.append((ref, revision, kind, acceptance_evidence_ref))
+    if (ref, kind, acceptance_evidence_ref) != ("source:a", "input", None):
+        return {"status": "mismatch"}
+    try:
+        current = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    except OSError:
+        return {"status": "missing"}
+    return {"status": "passed" if current == revision else "mismatch"}
+checked = check_record(record, checker)
+print(json.dumps({"result_id": record["result_id"], "revision": record["revision"],
+                  "checked": checked, "calls": calls}, sort_keys=True))
+"""
+            project_root = Path(__file__).resolve().parents[1]
+
+            def check_in_fresh_process():
+                try:
+                    completed = subprocess.run(
+                        [sys.executable, "-c", child, str(record_path), str(source_path)],
+                        cwd=project_root, capture_output=True, text=True, timeout=30, check=True)
+                except subprocess.TimeoutExpired as exc:
+                    self.fail("fresh-process handoff check timed out: %s" % exc)
+                return json.loads(completed.stdout)
+
+            exact_call = ["source:a", source_revision, "input", None]
+            unchanged = check_in_fresh_process()
+            self.assertEqual(unchanged["calls"], [exact_call])
+            self.assertEqual(unchanged["checked"]["study_state"], "complete")
+            self.assertEqual(unchanged["checked"]["steps"][0]["historical_state"], "complete")
+            self.assertEqual(unchanged["checked"]["steps"][0]["current_resumability"], "none")
+            self.assertEqual(source_path.read_bytes(), b"synthetic source revision one\n")
+            self.assertEqual(record_path.read_bytes(), initial_bytes)
+
+            source_path.write_bytes(b"synthetic source revision two\n")
+            changed_source = source_path.read_bytes()
+            changed = check_in_fresh_process()
+            self.assertEqual(changed["calls"], [exact_call])
+            self.assertEqual(changed["checked"]["study_state"], "blocked")
+            self.assertEqual(changed["checked"]["steps"][0]["historical_state"], "complete")
+            self.assertEqual(changed["checked"]["steps"][0]["current_resumability"], "blocked")
+            self.assertEqual(changed["checked"]["steps"][0]["evidence"][0]["status"], "mismatch")
+            self.assertEqual(source_path.read_bytes(), changed_source)
+            self.assertEqual(record_path.read_bytes(), initial_bytes)
+            stored = load_record(record_path)["record"]
+            self.assertEqual((changed["revision"], changed["result_id"]),
+                             (initial_record["revision"], initial_record["result_id"]))
+            self.assertEqual(stored["steps"][0]["attempts"], initial_record["steps"][0]["attempts"])
 
     def test_two_process_same_baseline_has_one_winner(self):
         import multiprocessing
