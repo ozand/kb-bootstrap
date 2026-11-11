@@ -6,6 +6,7 @@ compatibility: Needs the surf browser CLI connected to Chrome/Chromium and Pytho
 metadata:
   author: ozand
   version: "2.0"
+  updated: '2026-11-11'
 ---
 
 # market-research
@@ -75,8 +76,9 @@ identity.
 
 Copy this checklist into your notes and tick it off:
 
-- [ ] 0. Look up what is known: `qmd search "<topic>" -c <project>-wiki` (collection names
-      are in `qmd/collections/*.yaml`) or `grep -ril "<topic>" kb/wiki`. Extend existing
+- [ ] 0. Look up what is known: use `qmd search "<topic>" -c <project>-wiki` only when QMD
+      retrieval is configured, selected, and authorized (collection names are in
+      `qmd/collections/*.yaml`); otherwise use `grep -ril "<topic>" kb/wiki`. Extend existing
       studies, entities and concepts instead of duplicating them. No `kb/wiki/`? Run
       `kb-bootstrap --type single` or create `kb/research/` and `kb/wiki/{entities,concepts,reports}/`.
 - [ ] 1. Brief: `python3 SKILL_DIR/scripts/new_research.py <slug> --title "<title>" --issue <url>`,
@@ -96,10 +98,19 @@ Copy this checklist into your notes and tick it off:
       [references/formats.md](references/formats.md), report skeleton in
       [assets/report-template.md](assets/report-template.md). Add new docs to `kb/wiki/index.md`.
 - [ ] 6. Ground every claim (below).
-- [ ] 7. Check: `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder>` → `OK`, then
-      `kb-bootstrap validate --dir kb --project-root .` (0 errors) and `qmd update` if configured.
-      Every `WARN` is unfinished work; if it cannot be fixed, say why in the report's Limitations.
-      Re-read the brief's done-criteria and confirm each one.
+- [ ] 7. Check the study:
+      `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder> --skip-validate` → `OK`.
+      `--skip-validate` suppresses this script's optional legacy combined validation; it does
+      not skip the study checks. This checks required files, links, and RawCapture metadata
+      markers, not complete schema compliance, source completeness, or semantic correctness.
+      If `kb-bootstrap` is available, separately run `kb-bootstrap validate-core --dir kb`
+      and any required consumer-owned checks; if unavailable, report universal validation as
+      `NOT RUN`. QMD retrieval or index maintenance is separate and optional: do it only when
+      explicitly selected and authorized, following the [QMD operator guide](../qmd-operator/SKILL.md).
+      Do not run `qmd update` merely because QMD is configured; it may update more than one
+      collection in the selected index. Every `WARN` is unfinished work; if it cannot be
+      fixed, say why in the report's Limitations. Re-read the brief's done-criteria and confirm
+      each one.
 - [ ] 8. Retain the selected captures in the owning repository. Before claiming delivery,
       select the exact existing `raw/*.md` capture paths and any existing provenance files
       required by the study; verify their repository-relative paths and current bytes. Do not
