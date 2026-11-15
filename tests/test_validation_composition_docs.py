@@ -100,12 +100,16 @@ def test_generated_wiki_guidance_marks_universal_conformance_not_run():
     assert "kb-bootstrap validate-core --dir kb" in skill
     assert "local profile/provenance/graph checks only" in skill
     assert "consumer policy compliance or publication readiness" in skill
-    assert "Report QMD retrieval/index checks as **NOT RUN** unless the selected QMD registration, update, and search checks were actually performed and their evidence recorded" in skill
+    assert "Report each selected QMD action—search, registration, and index update—separately as **PASS**, **FAIL**, or **NOT RUN** according to what actually happened" in skill
     assert "A successful legacy `validate` does not establish QMD runtime/index readiness" in skill
     assert "Report universal kb-bootstrap conformance as **NOT RUN** unless `kb-bootstrap validate --dir kb --project-root .` actually ran; report its actual pass/fail independently" in skill
     assert "If QMD retrieval is selected and authorized" in skill
     assert "Search does not by itself authorize collection registration or index maintenance" in skill
     assert "Register or update only when QMD maintenance is separately selected and authorized" in skill
+    assert "Report each selected QMD action—search, registration, and index update—separately as **PASS**, **FAIL**, or **NOT RUN**" in skill
+    assert "Use **NOT RUN** only for an action not performed" in skill
+    assert "a successful selected search remains a search result" in skill
+    assert "Do not claim index freshness unless the required registration and update evidence was recorded" in skill
     assert "../qmd-operator/SKILL.md" in skill
     assert "qmd update" in skill
     assert "configured but broken selected QMD workflow is a failure" in skill
