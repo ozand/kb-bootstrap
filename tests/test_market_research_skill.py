@@ -27,7 +27,7 @@ class MarketResearchPackagingTests(unittest.TestCase):
         self.assertTrue(text.startswith("---\nname: market-research\n"))
         self.assertLess(len(text.splitlines()), 500)
         for ref in ["sources", "feature-matrix", "technology", "ux-patterns",
-                    "positioning", "jtbd-cjm", "parallel-studies", "formats"]:
+                    "positioning", "jtbd-cjm", "parallel-studies", "formats", "local-capture"]:
             self.assertTrue((SKILL / "references" / f"{ref}.md").is_file(), ref)
             self.assertIn(f"references/{ref}.md", text)
         for asset in ["brief-template.md", "report-template.md"]:
@@ -59,6 +59,12 @@ class MarketResearchScaffoldTests(unittest.TestCase):
             self.assertTrue((skill / "SKILL.md").is_file())
             self.assertTrue((skill / "scripts/capture_page.py").is_file())
             self.assertTrue((skill / "scripts/produce_local_capture.py").is_file())
+            self.assertTrue((skill / "references/local-capture.md").is_file())
+            local_capture = (skill / "references/local-capture.md").read_text(encoding="utf-8")
+            for phrase in ("produce_local_capture.py", "--captured-at", "never the current time",
+                           "64 MiB", "PARTIAL", "import_local_capture.py",
+                           "preserves the declared metadata", "validate-core"):
+                self.assertIn(phrase, local_capture)
             self.assertTrue((skill / "scripts/extract_markdown.js").is_file())
             self.assertTrue((skill / "assets/brief-template.md").is_file())
             report_template = (skill / "assets/report-template.md").read_text(encoding="utf-8")
@@ -87,7 +93,9 @@ class MarketResearchScaffoldTests(unittest.TestCase):
             self.assertIn("no fixed commit/push", skill_text)
             self.assertIn("A local-only study may stop", skill_text)
             self.assertIn("no\ncommit or push cadence is required", skill_text)
-            self.assertIn("This is not a local\ncapture importer", skill_text)
+            self.assertIn("references/local-capture.md", skill_text)
+            self.assertIn("for web pages, use", skill_text)
+            self.assertIn("For supplied local text", skill_text)
             self.assertIn("check_research.py kb/research/<folder> --skip-validate", skill_text)
             self.assertIn("kb-bootstrap validate-core --dir kb", skill_text)
             self.assertIn("This checks required files, links, and RawCapture metadata", skill_text)
