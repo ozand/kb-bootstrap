@@ -2,11 +2,11 @@
 name: market-research
 description: Research products, competitors and technologies from public web sources and store the study in the repository knowledge base — every analysed page captured as Markdown with screenshots under kb/research/<date>_<slug>/raw/, conclusions as entities, concepts and a report under kb/wiki/. Covers feature and technology matrices, UX/UI patterns, positioning and reviews, pricing, JTBD and customer journey maps, and multi-agent market maps. Use when the user asks to research, benchmark, compare or analyse competitors, alternatives, a market, UX references or a technology choice.
 license: MIT
-compatibility: Needs the surf browser CLI connected to Chrome/Chromium and Python 3.9+; kb-bootstrap and qmd are optional (validation, search).
+compatibility: Python 3.9+; Surf with Chrome/Chromium is optional for web capture. kb-bootstrap and qmd are optional (validation, search).
 metadata:
   author: ozand
   version: "2.0"
-  updated: '2026-11-11'
+  updated: '2026-11-15'
 ---
 
 # market-research
@@ -68,11 +68,10 @@ If kb-bootstrap is not installed, verify `git remote -v` and `gh repo view` by h
 
 A local-only study may stop after its files are reviewed in the owning working tree; no
 commit or push cadence is required. If selected captures are to be retained as tracked
-repository content, use the separate explicit Git-retention step below. This is not a local
-capture importer: collection still uses the existing Surf workflow unless the user supplies
-already saved material through another explicitly authorized process. Do not imply that
-local review proves source eligibility, completeness, screenshot provenance, or cross-study
-identity.
+repository content, use the separate explicit Git-retention step below. For supplied local
+text, use the separate [local capture recipe](references/local-capture.md); for web
+collection, use the Surf workflow below. Local review does not prove source eligibility,
+completeness, screenshot provenance, or cross-study identity.
 
 Copy this checklist into your notes and tick it off:
 
@@ -84,10 +83,14 @@ Copy this checklist into your notes and tick it off:
 - [ ] 1. Brief: `python3 SKILL_DIR/scripts/new_research.py <slug> --title "<title>" --issue <url>`,
       then fill it (template: [assets/brief-template.md](assets/brief-template.md)). Pick
       the dimensions the question needs — not all of them every time.
-- [ ] 2. Find sources: read [references/sources.md](references/sources.md) once per study.
-      Discover real articles with `python3 SKILL_DIR/scripts/find_links.py <site-or-search-url> --match <kw,kw> --window-id <id>`.
-- [ ] 3. Capture every page you will rely on:
-      `python3 SKILL_DIR/scripts/capture_page.py kb/research/<folder> <url> --entity <slug> --window-id <id> --images <N> --by "<agent>"`
+- [ ] 2. Find sources: for web research, read [references/sources.md](references/sources.md)
+      once per study and discover real articles with
+      `python3 SKILL_DIR/scripts/find_links.py <site-or-search-url> --match <kw,kw> --window-id <id>`.
+      For supplied local text, skip web discovery and follow the [local capture recipe](references/local-capture.md).
+- [ ] 3. Capture every page you will rely on: for web pages, use
+      `python3 SKILL_DIR/scripts/capture_page.py kb/research/<folder> <url> --entity <slug> --window-id <id> --images <N> --by "<agent>"`.
+      For supplied local text, follow the [local capture recipe](references/local-capture.md)
+      when local handling is authorized.
 - [ ] 4. Analyse per dimension — load only the references the brief needs:
       feature matrix → [references/feature-matrix.md](references/feature-matrix.md);
       technology, platforms, pricing → [references/technology.md](references/technology.md);
