@@ -141,6 +141,150 @@ class LocalHandoffTests(unittest.TestCase):
         self.assertIn(("output:b", "same", "acceptance", "evidence:b"), calls)
         self.assertEqual(len([x for x in calls if x[2] == "acceptance"]), 2)
 
+    def test_check_revalidates_output_and_acceptance_without_changing_history(self):
+        from kb_bootstrap.local_handoff import _digest, _validate
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            accepted_output = root / "accepted-output.txt"
+            stable_output = root / "stable-output.txt"
+            required_evidence = root / "required-evidence.txt"
+            acceptance_evidence = root / "acceptance.json"
+            accepted_output.write_bytes(b"accepted output revision 1\n")
+            stable_output.write_bytes(b"unrelated stable output\n")
+            required_evidence.write_bytes(b"required evidence revision 1\n")
+            accepted_revision = hashlib.sha256(accepted_output.read_bytes()).hexdigest()
+            stable_revision = hashlib.sha256(stable_output.read_bytes()).hexdigest()
+            required_revision = hashlib.sha256(required_evidence.read_bytes()).hexdigest()
+            acceptance_ref = "evidence:acceptance-a"
+
+            def write_acceptance(status="accepted"):
+                acceptance_evidence.write_text(json.dumps({
+                    "status": status, "output_ref": "output:accepted-a",
+                    "output_revision": accepted_revision,
+                }, separators=(",", ":")), encoding="utf-8")
+
+            write_acceptance()
+            accepted_pair = {"ref": "output:accepted-a", "revision": accepted_revision}
+            required_pair = {"ref": "evidence:required-a", "revision": required_revision,
+                             "kind": "quality"}
+            observed_required = {"ref": required_pair["ref"], "revision": required_revision,
+                                 "result": "passed"}
+            observed_acceptance = {"ref": accepted_pair["ref"], "revision": accepted_revision,
+                                  "result": "passed"}
+
+            def completed_step(step_id, output, *, evidence=()):
+                outputs = [dict(output)]
+                required = [dict(item) for item in evidence]
+                observed = [dict(observed_required)] if required else []
+                if output["ref"] == accepted_pair["ref"]:
+                    observed.append(dict(observed_acceptance))
+                attempt = {"attempt_id": step_id + "-attempt", "input_revisions": [],
+                           "output_revisions": outputs, "required_evidence": required,
+                           "observed_evidence": observed, "state": "complete",
+                           "observed_at": "synthetic"}
+                return {"step_id": step_id, "intent": "verify synthetic output",
+                        "input_revisions": [], "state": "complete",
+                        "output_revisions": outputs, "required_evidence": required,
+                        "observed_evidence": observed, "blocker": None, "next_step": None,
+                        "attempts": [attempt], "current_resumability": "none"}
+
+            record = make_record()
+            record["outputs"] = [
+                {"ref": accepted_pair["ref"], "revision": accepted_revision,
+                 "standing": "accepted", "acceptance_evidence_ref": acceptance_ref},
+                {"ref": "output:stable", "revision": stable_revision,
+                 "standing": "provisional", "acceptance_evidence_ref": None},
+            ]
+            record["steps"] = [
+                completed_step("accepted-step", accepted_pair, evidence=[required_pair]),
+                completed_step("unrelated-step", {"ref": "output:stable", "revision": stable_revision}),
+            ]
+            record["result_id"] = _digest(record)
+            self.assertIsNone(_validate(record), _validate(record))
+            record_path = root / "handoff.json"
+            created = save_record(record_path, record, permission=True)
+            self.assertEqual(created["status"], "created")
+            original = load_record(record_path)["record"]
+            original_bytes = record_path.read_bytes()
+            original_snapshot = json.loads(json.dumps(original))
+            original_history = [(step["step_id"], step["attempts"], step["state"])
+                                for step in original["steps"]]
+
+            cases = (
+                ("baseline", None, None, "none", "complete", "passed", "passed", "passed"),
+                ("changed-output", "changed-output", None, "blocked", "blocked", "mismatch", "passed", "passed"),
+                ("missing-output", "missing-output", None, "blocked", "blocked", "missing", "passed", "passed"),
+                ("revoked-acceptance", None, "revoked", "blocked", "blocked", "passed", "passed", "revoked"),
+                ("required-check-unavailable", None, None, "revalidation-required", "partial", "passed", "unavailable", "passed"),
+            )
+            for (name, output_change, acceptance_status, expected_current, expected_study,
+                 expected_output_status, expected_required_status, expected_acceptance_status) in cases:
+                with self.subTest(case=name):
+                    accepted_output.write_bytes(b"accepted output revision 1\n")
+                    write_acceptance()
+                    if output_change == "changed-output":
+                        accepted_output.write_bytes(b"accepted output revision 2\n")
+                    elif output_change == "missing-output":
+                        accepted_output.unlink()
+                    if acceptance_status == "revoked":
+                        write_acceptance("revoked")
+
+                    calls = []
+                    def checker(ref, revision, kind, *, acceptance_evidence_ref=None):
+                        calls.append((ref, revision, kind, acceptance_evidence_ref))
+                        if kind == "output":
+                            path = {"output:accepted-a": accepted_output,
+                                    "output:stable": stable_output}.get(ref)
+                            if path is None or not path.exists():
+                                return {"status": "missing"}
+                            return {"status": "passed" if hashlib.sha256(path.read_bytes()).hexdigest() == revision else "mismatch"}
+                        if kind == "required:quality":
+                            if name == "required-check-unavailable":
+                                return {"status": "unavailable"}
+                            if not required_evidence.exists():
+                                return {"status": "missing"}
+                            return {"status": "passed" if hashlib.sha256(required_evidence.read_bytes()).hexdigest() == revision else "mismatch"}
+                        if kind == "acceptance":
+                            if acceptance_evidence_ref != acceptance_ref or not acceptance_evidence.exists():
+                                return {"status": "missing"}
+                            evidence = json.loads(acceptance_evidence.read_text(encoding="utf-8"))
+                            if evidence["status"] == "revoked":
+                                return {"status": "revoked"}
+                            if (evidence["output_ref"], evidence["output_revision"]) != (ref, revision):
+                                return {"status": "mismatch"}
+                            return {"status": "passed"}
+                        return {"status": "mismatch"}
+
+                    checked = check_record(original, checker)
+                    accepted = checked["steps"][0]
+                    unrelated = checked["steps"][1]
+                    self.assertEqual(accepted["historical_state"], "complete")
+                    self.assertEqual(accepted["current_resumability"], expected_current)
+                    self.assertEqual(unrelated["historical_state"], "complete")
+                    self.assertEqual(unrelated["current_resumability"], "none")
+                    self.assertEqual(checked["study_state"], expected_study)
+                    self.assertEqual(calls, [
+                        ("output:accepted-a", accepted_revision, "output", None),
+                        ("evidence:required-a", required_revision, "required:quality", None),
+                        ("output:stable", stable_revision, "output", None),
+                        ("output:accepted-a", accepted_revision, "acceptance", acceptance_ref),
+                    ])
+                    self.assertEqual(original, original_snapshot)
+                    self.assertEqual(original, load_record(record_path)["record"])
+                    self.assertEqual(record_path.read_bytes(), original_bytes)
+                    self.assertEqual([(step["step_id"], step["attempts"], step["state"])
+                                      for step in original["steps"]], original_history)
+                    self.assertEqual(original["revision"], 1)
+                    self.assertEqual(original["result_id"], created["result_id"])
+                    evidence_status = {(item["ref"], item["kind"]): item["status"]
+                                       for item in accepted["evidence"]}
+                    self.assertEqual(evidence_status[("output:accepted-a", "output")], expected_output_status)
+                    self.assertEqual(evidence_status[("evidence:required-a", "required:quality")],
+                                     expected_required_status)
+                    self.assertEqual(evidence_status[("output:accepted-a", "acceptance")],
+                                     expected_acceptance_status)
+
     def test_check_preserves_complete_history_but_derives_current_state(self):
         record = make_record()
         record["materials"] = [{"ref": "source:a", "revision": "r1", "observation": "read",
