@@ -95,15 +95,19 @@ def test_generated_wiki_guidance_marks_universal_conformance_not_run():
         skill = (target / ".agents/skills/kb-wiki-builder/SKILL.md").read_text(encoding="utf-8")
 
     assert "ordinary local file-based work without QMD retrieval/indexing" in skill
+    assert "Read the explicitly selected target source directly from its local file" in skill
+    assert "does not require QMD or context-mode" in skill
     assert "kb-bootstrap validate-core --dir kb" in skill
     assert "local profile/provenance/graph checks only" in skill
     assert "consumer policy compliance or publication readiness" in skill
     assert "Report QMD retrieval/index checks as **NOT RUN** unless the selected QMD registration, update, and search checks were actually performed and their evidence recorded" in skill
     assert "A successful legacy `validate` does not establish QMD runtime/index readiness" in skill
     assert "Report universal kb-bootstrap conformance as **NOT RUN** unless `kb-bootstrap validate --dir kb --project-root .` actually ran; report its actual pass/fail independently" in skill
-    assert "If QMD retrieval/indexing is selected" in skill
+    assert "If QMD retrieval is selected and authorized" in skill
+    assert "Search does not by itself authorize collection registration or index maintenance" in skill
+    assert "Register or update only when QMD maintenance is separately selected and authorized" in skill
+    assert "../qmd-operator/SKILL.md" in skill
     assert "qmd update" in skill
-    assert "smoke-search both `<project>-wiki` and `<project>-raw`" in skill
     assert "configured but broken selected QMD workflow is a failure" in skill
     assert "initialization retain their existing QMD declaration requirements" in skill
     assert "Core validation does not authorize skipping required consumer checks" in skill
