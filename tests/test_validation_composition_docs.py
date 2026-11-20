@@ -92,7 +92,18 @@ def test_generated_wiki_guidance_marks_universal_conformance_not_run():
         target = Path(tmp) / "consumer"
         with patch("sys.argv", ["kb-bootstrap", "--target", str(target)]):
             assert main() is None
-        skill = (target / ".agents/skills/kb-wiki-builder/SKILL.md").read_text(encoding="utf-8")
+        skill_path = target / ".agents/skills/kb-wiki-builder/SKILL.md"
+        skill = skill_path.read_text(encoding="utf-8")
+        legacy_guide = (skill_path.parent / "../qmd-operator/SKILL.md").resolve()
+        assert legacy_guide.is_file()
+
+        core_target = Path(tmp) / "core-only"
+        with patch("sys.argv", ["kb-bootstrap", "--target", str(core_target), "--core-only"]):
+            assert main() == 0
+        core_skill_path = core_target / ".agents/skills/kb-wiki-builder/SKILL.md"
+        core_skill = core_skill_path.read_text(encoding="utf-8")
+        core_guide = (core_skill_path.parent / "../qmd-operator/SKILL.md").resolve()
+        assert not core_guide.exists()
 
     assert "ordinary local file-based work without QMD retrieval/indexing" in skill
     assert "Read the explicitly selected target source directly from its local file" in skill
@@ -111,6 +122,12 @@ def test_generated_wiki_guidance_marks_universal_conformance_not_run():
     assert "a successful selected search remains a search result" in skill
     assert "Do not claim index freshness unless the required registration and update evidence was recorded" in skill
     assert "../qmd-operator/SKILL.md" in skill
+    assert "installed sibling `../qmd-operator/SKILL.md` when present" in skill
+    assert "[upstream guide](https://github.com/ozand/kb-bootstrap/blob/main/kb_bootstrap/templates/skills/qmd-operator/SKILL.md) otherwise" in skill
+    assert "not a prerequisite for local work" in skill
+    assert "installed sibling `../qmd-operator/SKILL.md` when present" in core_skill
+    assert "[upstream guide](https://github.com/ozand/kb-bootstrap/blob/main/kb_bootstrap/templates/skills/qmd-operator/SKILL.md) otherwise" in core_skill
+    assert "not a prerequisite for local work" in core_skill
     assert "qmd update" in skill
     assert "configured but broken selected QMD workflow is a failure" in skill
     assert "initialization retain their existing QMD declaration requirements" in skill
