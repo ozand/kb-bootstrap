@@ -97,13 +97,13 @@ def test_generated_wiki_guidance_marks_universal_conformance_not_run():
         legacy_guide = (skill_path.parent / "../qmd-operator/SKILL.md").resolve()
         assert legacy_guide.is_file()
 
-    core_target = Path(tmp) / "core-only"
-    with patch("sys.argv", ["kb-bootstrap", "--target", str(core_target), "--core-only"]):
-        assert main() == 0
-    core_skill_path = core_target / ".agents/skills/kb-wiki-builder/SKILL.md"
-    core_skill = core_skill_path.read_text(encoding="utf-8")
-    core_guide = (core_skill_path.parent / "../qmd-operator/SKILL.md").resolve()
-    assert not core_guide.exists()
+        core_target = Path(tmp) / "core-only"
+        with patch("sys.argv", ["kb-bootstrap", "--target", str(core_target), "--core-only"]):
+            assert main() == 0
+        core_skill_path = core_target / ".agents/skills/kb-wiki-builder/SKILL.md"
+        core_skill = core_skill_path.read_text(encoding="utf-8")
+        core_guide = (core_skill_path.parent / "../qmd-operator/SKILL.md").resolve()
+        assert not core_guide.exists()
 
     assert "ordinary local file-based work without QMD retrieval/indexing" in skill
     assert "Read the explicitly selected target source directly from its local file" in skill
