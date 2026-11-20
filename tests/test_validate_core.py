@@ -46,6 +46,26 @@ class ValidateCoreTests(unittest.TestCase):
                 self.assertIn('=== Core Validation Scope ===', text)
                 self.assertEqual(file.read_bytes(), payload)
 
+    def test_source_scalar_error_hints_resource_mapping_without_echo_or_write(self):
+        with tempfile.TemporaryDirectory() as temp:
+            file = Path(temp) / 'concept.md'
+            invalid = b'---\ntype: Concept\nsources:\n  - "SYNTHETIC_SOURCE_CANARY"\n---\n# Example\n'
+            file.write_bytes(invalid)
+
+            code, text = self.call(['validate-core', '--dir', temp])
+
+            self.assertEqual(code, 1)
+            self.assertIn('source 1 must be a mapping; use a resource key, e.g. {resource: docs/source.md}', text)
+            self.assertNotIn('SYNTHETIC_SOURCE_CANARY', text)
+            self.assertEqual(file.read_bytes(), invalid)
+
+            valid = invalid.replace(b'"SYNTHETIC_SOURCE_CANARY"', b'{resource: docs/source.md}')
+            file.write_bytes(valid)
+            code, text = self.call(['validate-core', '--dir', temp])
+            self.assertEqual(code, 0, text)
+            self.assertIn('Sources: present=1 absent=0 invalid=0', text)
+            self.assertEqual(file.read_bytes(), valid)
+
     def test_core_invalid_comparison_time_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             (Path(temp) / 'concept.md').write_text('---\ntype: Concept\n---\n', encoding='utf-8')

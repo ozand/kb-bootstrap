@@ -282,7 +282,9 @@ def _sources_errors(value: object) -> List[str]:
     errors: List[str] = []
     for position, source in enumerate(value, start=1):
         if not isinstance(source, dict):
-            errors.append(f"source {position} must be a mapping")
+            errors.append(
+                f"source {position} must be a mapping; use a resource key, e.g. {{resource: docs/source.md}}"
+            )
             continue
         if not _safe_resource(source.get("resource")):
             errors.append(f"source {position}.resource is missing or unsafe")
