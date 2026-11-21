@@ -536,7 +536,7 @@ This generates:
 
 This Python API carries bounded progress in one explicitly selected local JSON record. Create it after retaining intended source bytes and before analysis; save/check before handoff, then provide the next process only the record and explicitly retained artifacts. Prior chat is unnecessary. References stay opaque; loading is not a trust or truth claim.
 
-The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It prints statuses only, not source text or ephemeral directory paths:
+The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It saves, loads, and checks one pending step, printing only statuses. The checker reads only the explicitly selected synthetic source path; it never derives a filesystem path from the record's opaque reference:
 
 ```python
 import hashlib
@@ -556,7 +556,13 @@ with tempfile.TemporaryDirectory() as directory:
         "materials": [{"ref": "source:demo", "revision": revision,
             "observation": "captured", "observed_scope": "", "unread_remainder": "section A",
             "analysis": "not-started", "analyzed_scope": "", "unanalyzed_remainder": "section A"}],
-        "outputs": [], "steps": [], "checks": {"run": [], "not_run": []},
+        "outputs": [],
+        "steps": [{"step_id": "inspect-section-a", "intent": "Inspect section A",
+            "input_revisions": [{"ref": "source:demo", "revision": revision}],
+            "state": "pending", "output_revisions": [], "required_evidence": [],
+            "observed_evidence": [], "blocker": None, "next_step": "Inspect section A",
+            "attempts": [], "current_resumability": "ready"}],
+        "checks": {"run": [], "not_run": []},
         "retention": {"owner": "demo caller", "storage_class": "runtime-ephemeral",
             "storage_ref": "temporary demo", "retention_rule": "discard on exit",
             "access": "caller", "integrity": "sha256", "availability": "not-verified",
@@ -564,11 +570,34 @@ with tempfile.TemporaryDirectory() as directory:
     }
     path = root / "handoff.json"
     saved = save_record(path, record, permission=True)  # caller authorized synthetic local path
+    if saved["status"] != "created":
+        raise RuntimeError("handoff save did not succeed")
     loaded = load_record(path)
-    checked = check_record(loaded["record"], lambda *a, **k: {"status": "unavailable"})
-    print(saved["status"], loaded["status"], checked["study_state"])
+    if loaded["status"] != "loaded":
+        raise RuntimeError("handoff load did not succeed")
+
+    def check_selected_input(ref, selected_revision, kind, *, acceptance_evidence_ref=None):
+        if (ref, kind, acceptance_evidence_ref) != ("source:demo", "input", None):
+            return {"status": "mismatch"}
+        try:
+            current_bytes = retained.read_bytes()
+        except FileNotFoundError:
+            return {"status": "missing"}
+        except OSError:
+            return {"status": "unavailable"}
+        current = hashlib.sha256(current_bytes).hexdigest()
+        return {"status": "passed" if current == selected_revision else "mismatch"}
+
+    checked = check_record(loaded["record"], check_selected_input)
+    if checked["status"] != "checked":
+        raise RuntimeError("handoff check did not complete")
+    step = checked["steps"][0]
+    print(saved["status"], loaded["status"], step["historical_state"],
+          step["current_resumability"], checked["study_state"])
 ```
 
-The owner checker must attest current opaque input/output/evidence revisions; `passed` is not authenticated by the record. `permission=True` represents an out-of-record caller decision for this exact local path and retention/access boundary; it is not a policy engine. ADR-035 read permission does not grant write permission. Use synthetic/local-only data; sensitive processing needs separately verified permissions and safeguards.
+With the retained source bytes, the checked step is `pending`/`ready`; the next process can decide to continue from those artifacts. If the selected bytes change, the same checker returns `mismatch` and current resumability becomes `blocked`; stop and reselect the source, record its new revision, and explicitly update the handoff before retrying. If the selected source path is absent, return `missing`; it blocks current resumability. If reading it fails for another I/O reason, return `unavailable`: resumability is `revalidation-required` and study state is `partial`, not a pass or a claim that the source changed. Checking derives current state only; it does not edit the record, execute the step, or authorize anything. `passed` is the caller-selected checker's observation, not authenticated by the record.
+
+`permission=True` represents an out-of-record caller decision for this exact local path and retention/access boundary; it is not a policy engine. ADR-035 read permission does not grant write permission. Use synthetic/local-only data; sensitive processing needs separately verified permissions and safeguards.
 
 There is no CLI, daemon, session discovery, remote publication, transcript copying, QMD/index write, or knowledge promotion. Replacement preserves historical attempt prefixes under a local compare-and-replace boundary serialized across local processes by an advisory sidecar lock derived from the selected target path. The sibling lock file is an operational artifact in the selected parent directory and persists to avoid stale-lock cleanup/inode races; it contains no record payload. Advisory locking assumes cooperating processes and a stable local filesystem; it makes no distributed or hostile-writer guarantee. Follow the selected owner's retention/access policy.
