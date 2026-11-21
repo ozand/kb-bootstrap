@@ -362,7 +362,7 @@ print(result["status"], result.get("knowledge"), result.get("references"))
 
 The resolver has no CLI, does no discovery or QMD/network access, and writes no files. It reads exactly the explicitly selected binding, knowledge, metadata, and envelope-selected retained evidence files; ensure each input is authorized for this operation. Its JSON report is ephemeral. Hashes bind observed bytes only, not entailment, source truth, freshness, review, or approval. A denied host precondition raises `PermissionError` outside the ADR-036 report; these callbacks do not authenticate the caller, enforce revocation, or provide host-egress isolation. See [ADR-031](docs/adr/ADR-031-bind-explicit-knowledge-items-to-retained-evidence.md), [ADR-035](docs/adr/ADR-035-require-explicit-local-policy-for-evidence-reading.md), and [ADR-036](docs/adr/ADR-036-define-json-evidence-binding-input-and-report.md) for limits and boundaries.
 
-To build a transient worklist, pass the report returned by the resolver and the complete caller-declared graph to the pure ADR-042 composition helper. Mapping is explicit; matching IDs or digests does not infer ancestry. The resolver result below is the output of the preceding call; this example performs no extra file access:
+To build a transient review worklist, pass the resolver report to the pure ADR-042 composition helper. This minimal example supplies no lineage declarations, so lineage remains unknown. If the caller has an authorized, complete declared graph and explicit reference mappings, those may be supplied instead; they remain caller assertions, not verified ancestry. Mapping is explicit; matching IDs or digests does not infer ancestry. The resolver result below is the output of the preceding call; this example performs no extra file access.
 
 ```python
 from kb_bootstrap.evidence_review import compose_evidence_review_worklist
@@ -382,14 +382,16 @@ else:
         flags.append("document changed")
     for item in review["worklist"]:
         if item["review_required"]:
-            flags.append(f"{item['reference']['source_id']}: {item['reference']['state']}")
+            reference = item["reference"]
+            identity = (reference["source_id"], reference["representation_id"])
+            flags.append(f"{identity}: {reference['state']} ({reference['reason']})")
     if flags:
         print("REVIEW", "; ".join(flags))
     else:
         print("COMPLETE: no review flags from this comparison")
 ```
 
-`BLOCKED` means review was not assessed; it is not a clean result. For `COMPLETE`, the example preserves the document-review flag and each changed or missing reference reason. With no flags it reports only that this comparison found none; it does not approve content or a lifecycle change. No lineage records are asserted, so lineage remains `unknown`, not a demonstrated source relationship. The helper validates but cannot authenticate a supplied report or verify ancestry, independence, truth, completeness, or authority. See [ADR-040](docs/adr/ADR-040-classify-caller-declared-evidence-lineage.md) and [ADR-042](docs/adr/ADR-042-compose-evidence-reports-with-declared-lineage.md).
+`BLOCKED` means review was not assessed; it is not a clean result. For `COMPLETE`, the example preserves the document-review flag and reports each flagged reference by `(source_id, representation_id)`, state, and reason. With no flags it reports only that this comparison found none; it does not approve content or a lifecycle change. This example asserts no lineage records, so lineage remains `unknown`, not a demonstrated source relationship. The helper validates but cannot authenticate a supplied report or verify ancestry, independence, truth, completeness, or authority. See [ADR-040](docs/adr/ADR-040-classify-caller-declared-evidence-lineage.md) and [ADR-042](docs/adr/ADR-042-compose-evidence-reports-with-declared-lineage.md).
 
 For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
 
