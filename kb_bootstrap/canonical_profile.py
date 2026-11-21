@@ -57,7 +57,7 @@ def _yaml_error_diagnostic(error: yaml.YAMLError, line_count: int) -> str:
     line = getattr(mark, "line", None)
     if isinstance(line, int) and not isinstance(line, bool) and 0 <= line <= line_count:
         diagnostic += f" at frontmatter line {line + 1}"
-    return diagnostic + ")"
+    return diagnostic + "; hint: check quoting; quote scalar values containing ': ')"
 
 
 def _frontmatter(path: Path) -> Tuple[Dict[str, object], str]:

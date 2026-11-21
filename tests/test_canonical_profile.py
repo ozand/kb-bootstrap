@@ -74,12 +74,12 @@ class CanonicalProfileTests(unittest.TestCase):
 
     def test_malformed_frontmatter_fails_deterministically(self):
         fixtures = (
-            "# No frontmatter\n",
-            "---\ntype: Concept\n---oops\n",
-            "---\ntype: [broken\n---\n",
-            "---\n- type\n---\n",
+            ("# No frontmatter\n", "missing exact YAML frontmatter"),
+            ("---\ntype: Concept\n---oops\n", "missing exact YAML frontmatter"),
+            ("---\ntype: [broken\n---\n", "frontmatter is invalid YAML"),
+            ("---\n- type\n---\n", "frontmatter must be a mapping"),
         )
-        for content in fixtures:
+        for content, expected in fixtures:
             with self.subTest(content=content), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 self.write(root, "invalid.md", content)
@@ -90,6 +90,9 @@ class CanonicalProfileTests(unittest.TestCase):
                 self.assertFalse(first_valid or second_valid)
                 self.assertEqual(first, second)
                 self.assertIn("invalid.md", first)
+                self.assertIn(expected, first)
+                if expected != "frontmatter is invalid YAML":
+                    self.assertNotIn("; hint:", first)
 
     def test_yaml_scalars_remain_strings_for_profile_validation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -209,7 +212,7 @@ class CanonicalProfileTests(unittest.TestCase):
 
     def test_yaml_parse_errors_use_fixed_categories_and_frontmatter_lines(self):
         fixtures = (
-            ("---\ntype: Concept\n[broken\n---\n", "parser error", 2),
+            ("---\ntype: Concept\n[broken PRIVATE-CANARY\n---\n", "parser error", 2),
             ("---\ntype: Concept\ntitle: PRIVATE-CANARY: second\n---\n", "scanner error", 2),
         )
         for content, category, line in fixtures:
@@ -221,17 +224,27 @@ class CanonicalProfileTests(unittest.TestCase):
                 diagnostic = next(row for row in report.splitlines() if "invalid.md:" in row)
                 self.assertFalse(valid)
                 self.assertIn("frontmatter is invalid YAML (" + category, diagnostic)
-                self.assertIn(f"at frontmatter line {line})", diagnostic)
+                self.assertIn(
+                    f"at frontmatter line {line}; hint: check quoting; quote scalar values containing ': ')",
+                    diagnostic,
+                )
                 self.assertNotIn("PRIVATE-CANARY", report)
                 self.assertEqual(source.read_bytes(), original)
                 if category == "scanner error":
-                    output = io.StringIO()
-                    with patch("sys.argv", ["kb-bootstrap", "validate-core", "--dir", str(root)]):
-                        with redirect_stdout(output):
-                            code = main()
-                    self.assertEqual(code, 1)
-                    self.assertIn(f"frontmatter is invalid YAML (scanner error at frontmatter line {line})", output.getvalue())
-                    self.assertNotIn("PRIVATE-CANARY", output.getvalue())
+                    expected_diagnostic = (
+                        f"frontmatter is invalid YAML (scanner error at frontmatter line {line}; "
+                        "hint: check quoting; quote scalar values containing ': ')")
+                    for command, args in (
+                        ("validate-core", ["--dir", str(root)]),
+                        ("validate", ["--dir", str(root), "--project-root", str(root)]),
+                    ):
+                        output = io.StringIO()
+                        with patch("sys.argv", ["kb-bootstrap", command, *args]):
+                            with redirect_stdout(output):
+                                code = main()
+                        self.assertEqual(code, 1)
+                        self.assertIn(expected_diagnostic, output.getvalue())
+                        self.assertNotIn("PRIVATE-CANARY", output.getvalue())
 
     def test_yaml_error_line_is_omitted_for_missing_or_invalid_marks(self):
         invalid_marks = (None, True, 1.5, "1", -1, 3)
@@ -246,7 +259,10 @@ class CanonicalProfileTests(unittest.TestCase):
                     report, valid = validate_canonical_profile(root)
                 diagnostic = next(row for row in report.splitlines() if "invalid.md:" in row)
                 self.assertFalse(valid)
-                self.assertIn("frontmatter is invalid YAML (YAML error)", diagnostic)
+                self.assertIn(
+                    "frontmatter is invalid YAML (YAML error; hint: check quoting; quote scalar values containing ': ')",
+                    diagnostic,
+                )
                 self.assertNotIn("frontmatter line", diagnostic)
                 self.assertNotIn("PRIVATE-CANARY", report)
 
@@ -258,7 +274,10 @@ class CanonicalProfileTests(unittest.TestCase):
             with patch.object(canonical_profile.yaml, "load", side_effect=error):
                 report, valid = validate_canonical_profile(root)
             self.assertFalse(valid)
-            self.assertIn("frontmatter is invalid YAML (YAML error at frontmatter line 2)", report)
+            self.assertIn(
+                "frontmatter is invalid YAML (YAML error at frontmatter line 2; hint: check quoting; quote scalar values containing ': ')",
+                report,
+            )
 
     def test_unknown_yaml_error_uses_safe_line_and_never_leaks_parser_text(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -272,7 +291,10 @@ class CanonicalProfileTests(unittest.TestCase):
             ):
                 report, valid = validate_canonical_profile(root)
             self.assertFalse(valid)
-            self.assertIn("frontmatter is invalid YAML (YAML error at frontmatter line 2)", report)
+            self.assertIn(
+                "frontmatter is invalid YAML (YAML error at frontmatter line 2; hint: check quoting; quote scalar values containing ': ')",
+                report,
+            )
             self.assertNotIn("PRIVATE-CANARY", report)
 
     def test_valid_em_dash_frontmatter_remains_valid(self):
@@ -282,6 +304,7 @@ class CanonicalProfileTests(unittest.TestCase):
             report, valid = validate_canonical_profile(root)
             self.assertTrue(valid)
             self.assertIn("ERRORS: 0", report)
+            self.assertNotIn("; hint:", report)
 
 
 if __name__ == "__main__":
