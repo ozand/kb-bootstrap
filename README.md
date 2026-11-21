@@ -536,7 +536,7 @@ This generates:
 
 This Python API carries bounded progress in one explicitly selected local JSON record. Create it after retaining intended source bytes and before analysis; save/check before handoff, then provide the next process only the record and explicitly retained artifacts. Prior chat is unnecessary. References stay opaque; loading is not a trust or truth claim.
 
-The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It saves, loads, and checks one pending step, printing only derived statuses. The checker reads only the explicitly selected synthetic source path; it never derives a filesystem path from the record's opaque reference:
+The following synthetic temporary-directory example captures UTF-8 source before creating a revision-1 record. It saves, loads, and checks one pending step, printing only statuses. The checker reads only the explicitly selected synthetic source path; it never derives a filesystem path from the record's opaque reference:
 
 ```python
 import hashlib
@@ -570,9 +570,11 @@ with tempfile.TemporaryDirectory() as directory:
     }
     path = root / "handoff.json"
     saved = save_record(path, record, permission=True)  # caller authorized synthetic local path
+    if saved["status"] != "created":
+        raise RuntimeError("handoff save did not succeed")
     loaded = load_record(path)
-    if saved["status"] != "created" or loaded["status"] != "loaded":
-        raise RuntimeError("handoff save/load did not succeed")
+    if loaded["status"] != "loaded":
+        raise RuntimeError("handoff load did not succeed")
 
     def check_selected_input(ref, selected_revision, kind, *, acceptance_evidence_ref=None):
         if (ref, kind, acceptance_evidence_ref) != ("source:demo", "input", None):
