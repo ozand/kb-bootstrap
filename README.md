@@ -367,24 +367,29 @@ To build a transient worklist, pass the report returned by the resolver and the 
 ```python
 from kb_bootstrap.evidence_review import compose_evidence_review_worklist
 
-lineage = [
-    {"id": "source-origin", "kind": "independent", "upstream_ids": []},
-    {"id": "source-reprint", "kind": "reprint", "upstream_ids": ["source-origin"]},
-]
+# No lineage declarations were supplied: keep lineage unknown, not inferred.
 review = compose_evidence_review_worklist(
     resolver_report=result,
-    lineage_records=lineage,
-    coverage_complete=True,
-    reference_lineage_ids={
-        (result["references"][0]["source_id"], result["references"][0]["representation_id"]): "source-reprint"
-    } if result["status"] == "COMPLETE" and result["references"] else {},
+    lineage_records=[],
+    coverage_complete=False,
+    reference_lineage_ids={},
 )
-for item in review["worklist"]:
-    if item["review_required"]:
-        print(item["reference"]["source_id"], item["reference"]["state"], item["lineage"])
+if result["status"] == "BLOCKED":
+    print("BLOCKED: not assessed", result["reason"])
+else:
+    flags = []
+    if review["knowledge_review_required"]:
+        flags.append("document changed")
+    for item in review["worklist"]:
+        if item["review_required"]:
+            flags.append(f"{item['reference']['source_id']}: {item['reference']['state']}")
+    if flags:
+        print("REVIEW", "; ".join(flags))
+    else:
+        print("COMPLETE: no review flags from this comparison")
 ```
 
-The example identity pair must be replaced with an actual COMPLETE report row. Unmapped lineage remains `unknown`; incomplete declared coverage exposes no roots. The helper validates but cannot authenticate a supplied report or verify ancestry, independence, truth, completeness, or authority. Its output does not grant permission or approve a lifecycle change. See [ADR-040](docs/adr/ADR-040-classify-caller-declared-evidence-lineage.md) and [ADR-042](docs/adr/ADR-042-compose-evidence-reports-with-declared-lineage.md).
+`BLOCKED` means review was not assessed; it is not a clean result. For `COMPLETE`, the example preserves the document-review flag and each changed or missing reference reason. With no flags it reports only that this comparison found none; it does not approve content or a lifecycle change. No lineage records are asserted, so lineage remains `unknown`, not a demonstrated source relationship. The helper validates but cannot authenticate a supplied report or verify ancestry, independence, truth, completeness, or authority. See [ADR-040](docs/adr/ADR-040-classify-caller-declared-evidence-lineage.md) and [ADR-042](docs/adr/ADR-042-compose-evidence-reports-with-declared-lineage.md).
 
 For the explicit bounded lexical QMD 2.8.3 adapter, use a pre-provisioned, hook-free named state directory:
 
