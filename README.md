@@ -296,19 +296,20 @@ Local search uses literal Unicode case-folded substring matching and returns rel
 Python callers that already selected a canonical Markdown file can project one exact section by heading path:
 
 ```python
-import hashlib
 from pathlib import Path
 from kb_bootstrap.section_projection import project_section
 
 root = Path("kb")
 relative_path = "services/api.md"
-source_bytes = (root / relative_path).read_bytes()
-result = project_section(root, relative_path, hashlib.sha256(source_bytes).hexdigest(), ["Setup", "Timeouts"])
+expected_sha256 = "<sha256 recorded when this source revision was selected>"
+result = project_section(root, relative_path, expected_sha256, ["Setup", "Timeouts"])
 if result["status"] == "COMPLETE":
     print(result["text"])
+elif result["status"] == "REVISION_MISMATCH":
+    print("Source changed since selection; reselect it and record its new revision before retrying.")
 ```
 
-The digest binds this call to the supplied file bytes; it does not establish source truth, freshness, or approval. The result includes a revision-scoped locator. A stale expected digest returns `REVISION_MISMATCH` with the observed digest and no section text. This Python API is not a CLI option and does not perform QMD lookup or discovery; see [ADR-034](docs/adr/ADR-034-project-one-explicit-bounded-markdown-section.md) for limits and outcomes.
+Supply the digest retained when the caller selected the source revision; do not read or hash the live file immediately before projection to manufacture an expected revision. `REVISION_MISMATCH` returns the observed digest and no section text; stop and explicitly reselect the source before retrying. A match binds this call to the supplied revision, not to source truth, freshness, or approval. The result includes a revision-scoped locator. This Python API is not a CLI option and does not perform QMD lookup or discovery; see [ADR-034](docs/adr/ADR-034-project-one-explicit-bounded-markdown-section.md) for limits and outcomes.
 
 A caller can report the metadata for an already-produced projection result without executing the projection again:
 
