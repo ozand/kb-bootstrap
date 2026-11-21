@@ -540,7 +540,6 @@ The following synthetic temporary-directory example captures UTF-8 source before
 
 ```python
 import hashlib
-import json
 import tempfile
 from pathlib import Path
 from kb_bootstrap.local_handoff import save_record, load_record, check_record
@@ -578,20 +577,24 @@ with tempfile.TemporaryDirectory() as directory:
     def check_selected_input(ref, selected_revision, kind, *, acceptance_evidence_ref=None):
         if (ref, kind, acceptance_evidence_ref) != ("source:demo", "input", None):
             return {"status": "mismatch"}
-        if not retained.is_file():
+        try:
+            current_bytes = retained.read_bytes()
+        except FileNotFoundError:
             return {"status": "missing"}
-        current = hashlib.sha256(retained.read_bytes()).hexdigest()
+        except OSError:
+            return {"status": "unavailable"}
+        current = hashlib.sha256(current_bytes).hexdigest()
         return {"status": "passed" if current == selected_revision else "mismatch"}
 
     checked = check_record(loaded["record"], check_selected_input)
+    if checked["status"] != "checked":
+        raise RuntimeError("handoff check did not complete")
     step = checked["steps"][0]
-    print(json.dumps({"saved": saved["status"], "loaded": loaded["status"],
-                      "study_state": checked["study_state"],
-                      "step_state": step["historical_state"],
-                      "resumability": step["current_resumability"]}, sort_keys=True))
+    print(saved["status"], loaded["status"], step["historical_state"],
+          step["current_resumability"], checked["study_state"])
 ```
 
-With the retained source bytes, the checked step is `pending`/`ready`; the next process can decide to continue from those artifacts. If the selected bytes change, the same checker returns `mismatch` and current resumability becomes `blocked`; stop and reselect the source, record its new revision, and explicitly update the handoff before retrying. If the source cannot be checked, return `unavailable` instead: resumability is `revalidation-required` and study state is `partial`, not a pass or a claim that the source changed. Checking derives current state only; it does not edit the record, execute the step, or authorize anything. `passed` is the caller-selected checker's observation, not authenticated by the record.
+With the retained source bytes, the checked step is `pending`/`ready`; the next process can decide to continue from those artifacts. If the selected bytes change, the same checker returns `mismatch` and current resumability becomes `blocked`; stop and reselect the source, record its new revision, and explicitly update the handoff before retrying. If the selected source path is absent, return `missing`; it blocks current resumability. If reading it fails for another I/O reason, return `unavailable`: resumability is `revalidation-required` and study state is `partial`, not a pass or a claim that the source changed. Checking derives current state only; it does not edit the record, execute the step, or authorize anything. `passed` is the caller-selected checker's observation, not authenticated by the record.
 
 `permission=True` represents an out-of-record caller decision for this exact local path and retention/access boundary; it is not a policy engine. ADR-035 read permission does not grant write permission. Use synthetic/local-only data; sensitive processing needs separately verified permissions and safeguards.
 
