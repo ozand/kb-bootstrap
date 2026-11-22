@@ -31,8 +31,8 @@ Read before splitting a large research across several agents, and before consoli
 1. Follow step 7 of the [market-research skill](../SKILL.md) for study checks and warning
    handling.
 2. Spot-check 4–6 claims with `grep_claim.py` — summary facts, a few ✅ cells, numbers.
-   Any `NOT FOUND` → send it back with the exact list; expect this in about half of first
-   submissions.
+   Treat hits and misses as search results only; verify each claim in context using the
+   skill's [claim review rule](../SKILL.md#ground-every-claim).
 3. For UX studies, look at the required screenshots: real UI or marketing?
 
 ## Consolidate (separate study, after all merged)

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Check whether a claim is backed by raw captures — prints only matching lines.
+"""Search raw captures for claim keywords — prints candidate matching lines.
+
+Hits and misses are search results, not support verdicts; read sources in context.
 
 Usage:
   grep_claim.py kb/research/<folder> "precision-2" ["voiceprint" ...] [--raw 019,020] [--context 120]
 
 Every term is searched case-insensitively in raw/*.md (or only the listed raw numbers).
-For each hit prints "<raw file>:<line>: …<context>…" (max 3 hits per file). No hit for a
-term means the claim is NOT supported by what you captured: remove it, mark it as a
-hypothesis in «Ограничения», or capture a source that states it. Standard library only.
+For each hit prints "<raw file>:<line>: …<context>…" (max 3 hits per file). A hit may
+be negated or inapplicable; read the source in context before judging support. No hit means
+the searched term was not found in the selected captures, not that the claim is absent.
+Standard library only.
 """
 
 from __future__ import annotations
