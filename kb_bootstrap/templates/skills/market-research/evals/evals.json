@@ -10,7 +10,7 @@
         "At least 5 products appear in the report's feature matrix, the first column is the user's product",
         "Most raw pages are help-center/docs articles, not product home pages",
         "At least 8 screenshots of real product UI are linked from raw/wiki",
-        "Every checked ✅ cell has a raw page containing the key term (grep_claim.py finds it)",
+        "For each checked ✅ cell, use grep_claim.py to locate candidate passages and verify that the source supports the cell in context",
         "check_research.py prints OK"
       ]
     },
@@ -20,7 +20,7 @@
       "expected_output": "A technology-focused study: technology table (engine, deployment, API, pricing) and feature matrix for enrollment/identification, no UX section, numbers only from captured pricing/docs pages, limitations listing what could not be verified.",
       "assertions": [
         "The report has a technology/pricing table with a source link per row",
-        "Every price or limit in the report is found in a raw page by grep_claim.py",
+        "For each price or limit in the report, use grep_claim.py to locate candidate passages and verify the value and its applicability in source context",
         "No UX/UI section is forced into the report; the brief's dimensions exclude UX",
         "check_research.py is run with --min-screenshots 0 and prints OK"
       ]

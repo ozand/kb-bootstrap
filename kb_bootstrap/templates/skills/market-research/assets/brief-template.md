@@ -35,7 +35,7 @@ workflow_status: in-progress
 ## Done when
 - ≥ <N> products in the feature matrix; ≥ <N> raw pages, mostly docs/help/reviews, not home pages
 - ≥ <N> screenshots of real UI for the key screens when UX is in scope
-- every claim grounded in raw (`grep_claim.py`); follow step 7 of the market-research skill for study checks and report any unresolved WARN in Limitations
+- every claim checked against raw evidence in context using the market-research skill's Ground every claim rule; follow step 7 for study checks and report any unresolved WARN in Limitations
 - report follows assets/report-template.md
 
 ## Result

@@ -144,19 +144,22 @@ Several agents on one market map, or one study split by product area? Read
 
 ## Ground every claim
 
-Write only what captured raw pages say. Reviews of real studies found invented thresholds,
+Write only what captured raw pages support. Reviews of real studies found invented thresholds,
 feature and plan names, export formats and statistics that no raw file contained — the
 model "knew" them. For every fact in the summary, every ✅ cell, every number, every
-product card:
+product card, use `grep_claim.py` to locate candidate passages:
 
 ```bash
 python3 SKILL_DIR/scripts/grep_claim.py kb/research/<folder> "<key term>" [--raw 019,020]
 ```
 
-Found on a page with a screenshot of it → ✅ (UI); found in text → ✅ (docs), wording
-close to the source; `NOT FOUND` → delete it, move it to Limitations as a hypothesis, or
-capture a page that states it. Claims about the user's own product are checked in its code
-or docs, not taken from the brief.
+A keyword hit is only a navigation aid, not a support verdict. Read the cited source in
+context, including negation, scope, and applicability, before stating the claim; for a UI
+claim, inspect the actual screenshot. A miss means only that the searched terms were not
+found in the selected captures, not that the feature or claim is absent. If captured sources
+do not support the wording, do not state it as fact: remove it, record it in Limitations as
+an unverified hypothesis, or capture a source that supports it. Claims about the user's own
+product are checked in its code or docs, not taken from the brief.
 
 ## Gotchas
 

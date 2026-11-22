@@ -16,7 +16,8 @@ The core comparison table. Read when the brief asks what products can do.
    - `◐` — partial / only on some plans (say which in a footnote);
    - `—` — not found in captured sources. **Not found ≠ absent**; write this under the table.
 4. Every non-`—` cell must be backed by a raw file: link it in the cell, or give per-product
-   source lists right under the table. Run `grep_claim.py` for each cell before delivering.
+   source lists right under the table. Use `grep_claim.py` to locate candidate passages for
+   each cell; verify support in context using the skill's [claim review rule](../SKILL.md#ground-every-claim).
 
 ## Template
 
