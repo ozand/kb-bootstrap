@@ -26,7 +26,6 @@ workflow_status: in-progress
 
 ## Dimensions
 <!-- Keep only what the questions need. Each maps to a reference in the skill. -->
-<!-- For validation and non-UX screenshot thresholds, follow step 7 of the market-research skill. -->
 - [ ] Feature matrix — capability × product (references/feature-matrix.md)
 - [ ] Technology, platforms, pricing (references/technology.md)
 - [ ] UX/UI patterns with screenshots (references/ux-patterns.md)

@@ -102,12 +102,13 @@ Copy this checklist into your notes and tick it off:
       [assets/report-template.md](assets/report-template.md). Add new docs to `kb/wiki/index.md`.
 - [ ] 6. Ground every claim (below).
 - [ ] 7. Check the study:
-      `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder> --skip-validate`.
-      Add `--min-screenshots 0` only for a non-UX study; keep the default screenshot threshold
-      when UX evidence is in scope and meet the brief's real-UI screenshot criteria. The command
-      may print `OK` and `WARN` together: `OK` does not erase warnings. Every `WARN` is
-      unfinished work; if it cannot be fixed, say why in the report's Limitations. The
-      `--skip-validate` flag suppresses this script's optional legacy combined validation; it
+      `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder> --skip-validate` →
+      require exit 0 and final `OK`; `PROBLEM` or a failed checker blocks completion. Add
+      `--min-screenshots 0` only for a non-UX study; keep the default screenshot threshold when
+      UX evidence is in scope and meet the brief's real-UI screenshot criteria. The command may
+      print `OK` and `WARN` together: `OK` does not erase warnings. Resolve each `WARN`, or if
+      unresolved, say why in the report's Limitations. The `--skip-validate` flag suppresses
+      this script's optional legacy combined validation; it
       does not skip the study checks. This checks required files, links, and RawCapture metadata
       markers, not complete schema compliance, source completeness, or semantic correctness.
       If `kb-bootstrap` is available, separately run `kb-bootstrap validate-core --dir kb`
