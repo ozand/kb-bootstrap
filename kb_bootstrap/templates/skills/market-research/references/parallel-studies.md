@@ -28,11 +28,14 @@ Read before splitting a large research across several agents, and before consoli
 
 ## Review each study before merging
 
-1. `check_research.py` OK, no WARN.
+1. Follow step 7 of the [market-research skill](../SKILL.md) for study checks. For a
+   non-UX study, the screenshot threshold may be set to zero; UX studies still require
+   the real-UI screenshots specified by their brief. An `OK` result does not erase a
+   `WARN`: resolve each warning or record its reason in the report's Limitations.
 2. Spot-check 4–6 claims with `grep_claim.py` — summary facts, a few ✅ cells, numbers.
    Any `NOT FOUND` → send it back with the exact list; expect this in about half of first
    submissions.
-3. Look at 2 screenshots: real UI or marketing?
+3. For UX studies, look at the required screenshots: real UI or marketing?
 
 ## Consolidate (separate study, after all merged)
 
