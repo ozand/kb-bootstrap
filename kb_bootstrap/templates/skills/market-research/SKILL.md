@@ -102,18 +102,21 @@ Copy this checklist into your notes and tick it off:
       [assets/report-template.md](assets/report-template.md). Add new docs to `kb/wiki/index.md`.
 - [ ] 6. Ground every claim (below).
 - [ ] 7. Check the study:
-      `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder> --skip-validate` → `OK`.
-      `--skip-validate` suppresses this script's optional legacy combined validation; it does
-      not skip the study checks. This checks required files, links, and RawCapture metadata
+      `python3 SKILL_DIR/scripts/check_research.py kb/research/<folder> --skip-validate` →
+      require exit 0 and final `OK`; `PROBLEM` or a failed checker blocks completion. Add
+      `--min-screenshots 0` only for a non-UX study; keep the default screenshot threshold when
+      UX evidence is in scope and meet the brief's real-UI screenshot criteria. The command may
+      print `OK` and `WARN` together: `OK` does not erase warnings. Resolve each `WARN`, or if
+      unresolved, say why in the report's Limitations. The `--skip-validate` flag suppresses
+      this script's optional legacy combined validation; it
+      does not skip the study checks. This checks required files, links, and RawCapture metadata
       markers, not complete schema compliance, source completeness, or semantic correctness.
       If `kb-bootstrap` is available, separately run `kb-bootstrap validate-core --dir kb`
       and any required consumer-owned checks; if unavailable, report universal validation as
       `NOT RUN`. QMD retrieval or index maintenance is separate and optional: do it only when
       explicitly selected and authorized, following the [QMD operator guide](../qmd-operator/SKILL.md).
       Do not run `qmd update` merely because QMD is configured; it may update more than one
-      collection in the selected index. Every `WARN` is unfinished work; if it cannot be
-      fixed, say why in the report's Limitations. Re-read the brief's done-criteria and confirm
-      each one.
+      collection in the selected index. Re-read the brief's done-criteria and confirm each one.
 - [ ] 8. Retain the selected captures in the owning repository. Before claiming delivery,
       select the exact existing `raw/*.md` capture paths and any existing provenance files
       required by the study; verify their repository-relative paths and current bytes. Do not
