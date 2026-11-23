@@ -86,14 +86,35 @@ class LocalRetrievalTests(unittest.TestCase):
 
     def test_output_cap_and_truncated_exit(self):
         self.put('a.md', b'\x01' * 65536)
-        result, code = read_local('a.md', self.root, 65536)
+        original_encoder = json_bytes
+        with patch('kb_bootstrap.local_retrieval.json_bytes', wraps=original_encoder) as encoder:
+            result, code = read_local('a.md', self.root, 65536)
         self.assertEqual((result['status'], result['truncated'], code), ('TRUNCATED', True, 3))
-        self.assertLessEqual(len(json_bytes(result)) + 1, 262144)
+        self.assertLessEqual(len(original_encoder(result)) + 1, 262144)
+        self.assertLess(encoder.call_count, 20)
+        content = '\x01' * 65536
+        self.assertGreater(len(original_encoder({**result, 'content': content[:len(result['content']) + 1]})) + 1, 262144)
         self.put('a.md', 'needle')
         with patch('kb_bootstrap.local_retrieval.MAX_OUTPUT', 200):
             result, code = search_local('needle', self.root)
             self.assertLessEqual(len(json_bytes(result)) + 1, 200)
             self.assertEqual(code, 3)
+
+    def test_output_cap_maximal_prefix_and_tiny_block(self):
+        content = 'é\\"\n☃' * 160
+        self.put('a.md', content.encode('utf-8'))
+        probe = {'status': 'TRUNCATED', 'path': 'a.md', 'content': content, 'truncated': True}
+        cap = len(json_bytes({**probe, 'content': content[:len(content) // 2]})) + 1
+        with patch('kb_bootstrap.local_retrieval.MAX_OUTPUT', cap):
+            result, code = read_local('a.md', self.root, len(content.encode('utf-8')))
+        self.assertEqual((result['status'], result['truncated'], code), ('TRUNCATED', True, 3))
+        self.assertLessEqual(len(json_bytes(result)) + 1, cap)
+        self.assertGreater(len(json_bytes({**result, 'content': content[:len(result['content']) + 1]})) + 1, cap)
+        self.assertEqual(content[:len(result['content'])], result['content'])
+        with patch('kb_bootstrap.local_retrieval.MAX_OUTPUT', 1):
+            blocked, blocked_code = read_local('a.md', self.root, len(content.encode('utf-8')))
+        self.assertEqual((blocked['status'], blocked['reason'], blocked['truncated'], blocked_code),
+                         ('BLOCKED', 'output_unavailable', False, 1))
 
     def test_invalid_query_and_paths(self):
         for query in ('', 'a\nb', 'a\x85b', 'x' * 513):

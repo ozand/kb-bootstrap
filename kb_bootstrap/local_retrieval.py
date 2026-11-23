@@ -233,9 +233,15 @@ def read_local(value,directory,max_bytes=DEFAULT_READ):
         else: return blocked_read("invalid_utf8",rel)
     result={"status":"TRUNCATED" if truncated else "COMPLETE","path":rel,"content":content,"truncated":truncated}
     code=3 if truncated else 0
-    while len(json_bytes(result))+1>MAX_OUTPUT and content:
-        content=content[:-1]
+    if len(json_bytes(result))+1>MAX_OUTPUT:
         truncated=True; code=3
-        result.update(status="TRUNCATED",content=content,truncated=True)
-    if len(json_bytes(result))+1>MAX_OUTPUT: return blocked_read("output_unavailable")
+        result.update(status="TRUNCATED",truncated=True)
+        low,high=0,len(content)
+        while low<high:
+            middle=(low+high+1)//2
+            result["content"]=content[:middle]
+            if len(json_bytes(result))+1<=MAX_OUTPUT: low=middle
+            else: high=middle-1
+        result["content"]=content[:low]
+        if len(json_bytes(result))+1>MAX_OUTPUT: return blocked_read("output_unavailable")
     return result,code
