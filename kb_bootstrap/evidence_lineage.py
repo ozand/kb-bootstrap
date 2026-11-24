@@ -64,13 +64,11 @@ def classify_evidence_lineage(records, coverage_complete):
 
     dependents = {identifier: [] for identifier in by_id}
     remaining = {}
-    roots = {}
+    roots = {} if coverage_complete else None
     for identifier, (kind, upstream_ids) in by_id.items():
         remaining[identifier] = len(upstream_ids)
-        if kind == "independent":
-            roots[identifier] = frozenset((identifier,))
-        else:
-            roots[identifier] = frozenset()
+        if roots is not None:
+            roots[identifier] = frozenset((identifier,)) if kind == "independent" else frozenset()
         for upstream in upstream_ids:
             dependents[upstream].append(identifier)
 
@@ -82,7 +80,8 @@ def classify_evidence_lineage(records, coverage_complete):
         identifier = ready.popleft()
         visited += 1
         for dependent in dependents[identifier]:
-            roots[dependent] = roots[dependent] | roots[identifier]
+            if roots is not None:
+                roots[dependent] = roots[dependent] | roots[identifier]
             remaining[dependent] -= 1
             if remaining[dependent] == 0:
                 ready.append(dependent)
