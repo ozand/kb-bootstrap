@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kb_bootstrap.local_handoff import check_record, load_record, save_record
+from kb_bootstrap.local_handoff import MAX_BYTES, check_record, load_record, save_record
 
 
 def make_record():
@@ -304,6 +304,68 @@ class LocalHandoffTests(unittest.TestCase):
         self.assertEqual(result["steps"][0]["historical_state"], "complete")
         self.assertEqual(result["steps"][0]["current_resumability"], "revalidation-required")
         self.assertEqual(record, original)
+
+    def test_save_rejects_oversize_payload_before_target_io(self):
+        import kb_bootstrap.local_handoff as module
+
+        exact = make_record()
+        exact["objective"] = "x"
+        exact["steps"] = [{
+            "step_id": f"budget-{n}", "intent": "size-boundary", "input_revisions": [],
+            "state": "pending", "output_revisions": [], "required_evidence": [],
+            "observed_evidence": [], "blocker": None, "next_step": None,
+            "attempts": [], "current_resumability": "ready",
+        } for n in range(15)]
+
+        def wire_size(record):
+            value = dict(record)
+            value.pop("result_id", None)
+            digest = hashlib.sha256(json.dumps(value, ensure_ascii=False,
+                separators=(",", ":")).encode("utf-8")).hexdigest()
+            value["result_id"] = digest
+            return len(json.dumps(value, ensure_ascii=False,
+                separators=(",", ":")).encode("utf-8")) + 1
+
+        gap = MAX_BYTES - wire_size(exact)
+        for index in range(1500):
+            step = exact["steps"][index % len(exact["steps"])]
+            step["required_evidence"].append({
+                "ref": str(index) + "é" * 250, "revision": '"' * 300, "kind": "check",
+            })
+            gap = MAX_BYTES - wire_size(exact)
+            if 0 <= gap < 1200:
+                break
+        self.assertGreaterEqual(gap, 0)
+        self.assertLess(gap, 1200)
+        exact["objective"] += "x" * gap
+        self.assertEqual(wire_size(exact), MAX_BYTES)
+
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "record.json"
+            created = save_record(target, exact, permission=True)
+            self.assertEqual(created["status"], "created")
+            baseline = target.read_bytes()
+            self.assertEqual(len(baseline), MAX_BYTES)
+            self.assertEqual(wire_size(load_record(target)["record"]), MAX_BYTES)
+
+            over_create = dict(exact, objective=exact["objective"] + "x")
+            over_replace = dict(over_create, revision=2)
+            self.assertEqual(wire_size(over_create), MAX_BYTES + 1)
+            self.assertEqual(wire_size(over_replace), MAX_BYTES + 1)
+            denied = save_record(target, over_create, permission=False)
+            self.assertEqual(denied["status"], "denied")
+            with patch.object(module, "_reparse", side_effect=AssertionError("target inspected")), \
+                 patch.object(module, "_exclusive_writer", side_effect=AssertionError("destination locked")), \
+                 patch.object(module.os, "lstat", side_effect=AssertionError("filesystem inspected")), \
+                 patch.object(module.tempfile, "mkstemp", side_effect=AssertionError("temporary file created")):
+                rejected_create = save_record(Path(folder) / "new.json", over_create, permission=True)
+                rejected_replace = save_record(target, over_replace,
+                    expected_record_id=created["record"]["record_id"], expected_revision=1,
+                    expected_result_id=created["result_id"], permission=True)
+            self.assertEqual(rejected_create["status"], "invalid")
+            self.assertEqual(rejected_replace["status"], "invalid")
+            self.assertEqual(target.read_bytes(), baseline)
+            self.assertFalse((Path(folder) / "new.json").exists())
 
     def test_save_failure_outcomes_preserve_or_report_unknown(self):
         import kb_bootstrap.local_handoff as module
