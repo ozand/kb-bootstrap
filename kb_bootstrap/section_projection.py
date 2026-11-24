@@ -92,7 +92,7 @@ def _fence_close(line: str, marker: str, count: int):
 
 def _parse(data: bytes):
     text = data.decode("utf-8")
-    lines = text.splitlines(keepends=True)
+    lines = [line.decode("utf-8") for line in data.splitlines(keepends=True)]
     logical = [line[:-2] if line.endswith("\r\n") else line[:-1] if line.endswith(("\n", "\r")) else line for line in lines]
     start = _frontmatter_end(lines)
     headings = []
