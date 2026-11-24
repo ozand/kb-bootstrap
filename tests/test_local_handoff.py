@@ -326,15 +326,12 @@ class LocalHandoffTests(unittest.TestCase):
             return len(json.dumps(value, ensure_ascii=False,
                 separators=(",", ":")).encode("utf-8")) + 1
 
-        gap = MAX_BYTES - wire_size(exact)
-        for index in range(1500):
-            step = exact["steps"][index % len(exact["steps"])]
-            step["required_evidence"].append({
+        evidence_count = 913  # Diagnostic: the prior incremental builder first entered the padding window here.
+        for index in range(evidence_count):
+            exact["steps"][index % len(exact["steps"])]["required_evidence"].append({
                 "ref": str(index) + "é" * 250, "revision": '"' * 300, "kind": "check",
             })
-            gap = MAX_BYTES - wire_size(exact)
-            if 0 <= gap < 1200:
-                break
+        gap = MAX_BYTES - wire_size(exact)
         self.assertGreaterEqual(gap, 0)
         self.assertLess(gap, 1200)
         exact["objective"] += "x" * gap
