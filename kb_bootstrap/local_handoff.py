@@ -483,7 +483,7 @@ def save_record(path, candidate, *, expected_record_id=None, expected_revision=N
     except (TypeError, ValueError, UnicodeError, RecursionError):
         return {"status": "invalid", "record": None, "result_id": None}
     error = _validate(candidate_record)
-    if error:
+    if error or len(data) > MAX_BYTES:
         return {"status": "invalid", "record": None, "result_id": None}
     try:
         target = Path(path)
