@@ -106,6 +106,20 @@ class SectionProjectionTests(unittest.TestCase):
         self.assertEqual(result["text"], "# Guide\r\nbody\r\n")
         self.assertEqual((result["start_line"], result["end_line"]), (1, 2))
 
+    def test_unicode_line_separator_stays_with_physical_line(self):
+        for newline in (b"\n", b"\r\n", b"\r"):
+            with self.subTest(newline=newline):
+                data = newline.join((b"# Guide", "body\u2028# Inline".encode("utf-8"), b"# Next", b"end", b""))
+                result = self.project(data)
+                self.assertEqual(result["status"], "COMPLETE")
+                self.assertEqual(result["heading_path"], ["Guide"])
+                self.assertEqual((result["start_line"], result["end_line"]), (1, 2))
+                self.assertEqual(result["text"], "# Guide" + newline.decode() + "body\u2028# Inline" + newline.decode())
+                next_result = self.project(data, selector=("Next",))
+                self.assertEqual(next_result["heading_path"], ["Next"])
+                self.assertEqual(next_result["start_line"], 3)
+                self.assertEqual(next_result["text"], "# Next" + newline.decode() + "end" + newline.decode())
+
     def test_revision_mismatch_has_observed_hash_only_no_reason_or_text(self):
         data = b"# Guide\nsecret\n"
         self.project(data)
