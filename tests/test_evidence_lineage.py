@@ -54,17 +54,29 @@ class EvidenceLineageTests(unittest.TestCase):
             [{"id": "a", "kind": "independent", "upstream_ids": ["b", "b"]}],
         ]
         for records in invalid:
-            with self.subTest(records=records):
-                with self.assertRaises(ValueError):
-                    classify_evidence_lineage(records, True)
+            for coverage_complete in (False, True):
+                with self.subTest(records=records, coverage_complete=coverage_complete):
+                    with self.assertRaises(ValueError):
+                        classify_evidence_lineage(records, coverage_complete)
         with self.assertRaises(ValueError):
             classify_evidence_lineage([], 1)
 
     def test_incomplete_coverage_never_classifies_independence(self):
-        result = classify_evidence_lineage(
-            [{"id": "a", "kind": "independent", "upstream_ids": []}], False
-        )
-        self.assertEqual(result, [{"id": "a", "state": "unknown"}])
+        records = [
+            {"id": "a", "kind": "independent", "upstream_ids": []},
+            {"id": "g", "kind": "generated", "upstream_ids": ["a"]},
+            {"id": "r", "kind": "reprint", "upstream_ids": ["g"]},
+        ]
+        self.assertEqual(classify_evidence_lineage(records, False), [
+            {"id": "a", "state": "unknown"},
+            {"id": "g", "state": "unknown"},
+            {"id": "r", "state": "unknown"},
+        ])
+        self.assertEqual(classify_evidence_lineage(records, True), [
+            {"id": "a", "state": "classified", "root_ids": ["a"], "root_count": 1},
+            {"id": "g", "state": "classified", "root_ids": ["a"], "root_count": 1},
+            {"id": "r", "state": "classified", "root_ids": ["a"], "root_count": 1},
+        ])
         self.assertEqual(classify_evidence_lineage([], True), [])
 
     def test_graph_limits_and_maximum_chain(self):
